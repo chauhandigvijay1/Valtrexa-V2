@@ -19,6 +19,8 @@ import { Route as AuthenticatedSkillsRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedResumesRouteImport } from './routes/_authenticated/resumes'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
+import { Route as AuthenticatedPainpointsRouteImport } from './routes/_authenticated/painpoints'
+import { Route as AuthenticatedOutreachRouteImport } from './routes/_authenticated/outreach'
 import { Route as AuthenticatedOpportunitiesRouteImport } from './routes/_authenticated/opportunities'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedApplicationsRouteImport } from './routes/_authenticated/applications'
@@ -72,6 +74,16 @@ const AuthenticatedProfileRoute = AuthenticatedProfileRouteImport.update({
   path: '/profile',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedPainpointsRoute = AuthenticatedPainpointsRouteImport.update({
+  id: '/painpoints',
+  path: '/painpoints',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedOutreachRoute = AuthenticatedOutreachRouteImport.update({
+  id: '/outreach',
+  path: '/outreach',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedOpportunitiesRoute =
   AuthenticatedOpportunitiesRouteImport.update({
     id: '/opportunities',
@@ -99,6 +111,8 @@ export interface FileRoutesByFullPath {
   '/applications': typeof AuthenticatedApplicationsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/opportunities': typeof AuthenticatedOpportunitiesRoute
+  '/outreach': typeof AuthenticatedOutreachRoute
+  '/painpoints': typeof AuthenticatedPainpointsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/resumes': typeof AuthenticatedResumesRoute
@@ -113,6 +127,8 @@ export interface FileRoutesByTo {
   '/applications': typeof AuthenticatedApplicationsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/opportunities': typeof AuthenticatedOpportunitiesRoute
+  '/outreach': typeof AuthenticatedOutreachRoute
+  '/painpoints': typeof AuthenticatedPainpointsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/projects': typeof AuthenticatedProjectsRoute
   '/resumes': typeof AuthenticatedResumesRoute
@@ -129,6 +145,8 @@ export interface FileRoutesById {
   '/_authenticated/applications': typeof AuthenticatedApplicationsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/opportunities': typeof AuthenticatedOpportunitiesRoute
+  '/_authenticated/outreach': typeof AuthenticatedOutreachRoute
+  '/_authenticated/painpoints': typeof AuthenticatedPainpointsRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
   '/_authenticated/resumes': typeof AuthenticatedResumesRoute
@@ -145,6 +163,8 @@ export interface FileRouteTypes {
     | '/applications'
     | '/dashboard'
     | '/opportunities'
+    | '/outreach'
+    | '/painpoints'
     | '/profile'
     | '/projects'
     | '/resumes'
@@ -159,6 +179,8 @@ export interface FileRouteTypes {
     | '/applications'
     | '/dashboard'
     | '/opportunities'
+    | '/outreach'
+    | '/painpoints'
     | '/profile'
     | '/projects'
     | '/resumes'
@@ -174,6 +196,8 @@ export interface FileRouteTypes {
     | '/_authenticated/applications'
     | '/_authenticated/dashboard'
     | '/_authenticated/opportunities'
+    | '/_authenticated/outreach'
+    | '/_authenticated/painpoints'
     | '/_authenticated/profile'
     | '/_authenticated/projects'
     | '/_authenticated/resumes'
@@ -261,6 +285,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedProfileRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/painpoints': {
+      id: '/_authenticated/painpoints'
+      path: '/painpoints'
+      fullPath: '/painpoints'
+      preLoaderRoute: typeof AuthenticatedPainpointsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/outreach': {
+      id: '/_authenticated/outreach'
+      path: '/outreach'
+      fullPath: '/outreach'
+      preLoaderRoute: typeof AuthenticatedOutreachRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/opportunities': {
       id: '/_authenticated/opportunities'
       path: '/opportunities'
@@ -289,6 +327,8 @@ interface AuthenticatedRouteChildren {
   AuthenticatedApplicationsRoute: typeof AuthenticatedApplicationsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedOpportunitiesRoute: typeof AuthenticatedOpportunitiesRoute
+  AuthenticatedOutreachRoute: typeof AuthenticatedOutreachRoute
+  AuthenticatedPainpointsRoute: typeof AuthenticatedPainpointsRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
   AuthenticatedResumesRoute: typeof AuthenticatedResumesRoute
@@ -299,6 +339,8 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedApplicationsRoute: AuthenticatedApplicationsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedOpportunitiesRoute: AuthenticatedOpportunitiesRoute,
+  AuthenticatedOutreachRoute: AuthenticatedOutreachRoute,
+  AuthenticatedPainpointsRoute: AuthenticatedPainpointsRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
   AuthenticatedResumesRoute: AuthenticatedResumesRoute,
