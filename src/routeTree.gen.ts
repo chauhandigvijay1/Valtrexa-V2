@@ -17,6 +17,7 @@ import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedSkillsRouteImport } from './routes/_authenticated/skills'
 import { Route as AuthenticatedResumesRouteImport } from './routes/_authenticated/resumes'
+import { Route as AuthenticatedRecruitersRouteImport } from './routes/_authenticated/recruiters'
 import { Route as AuthenticatedProjectsRouteImport } from './routes/_authenticated/projects'
 import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticated/profile'
 import { Route as AuthenticatedPainpointsRouteImport } from './routes/_authenticated/painpoints'
@@ -62,6 +63,11 @@ const AuthenticatedSkillsRoute = AuthenticatedSkillsRouteImport.update({
 const AuthenticatedResumesRoute = AuthenticatedResumesRouteImport.update({
   id: '/resumes',
   path: '/resumes',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedRecruitersRoute = AuthenticatedRecruitersRouteImport.update({
+  id: '/recruiters',
+  path: '/recruiters',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
 const AuthenticatedProjectsRoute = AuthenticatedProjectsRouteImport.update({
@@ -115,6 +121,7 @@ export interface FileRoutesByFullPath {
   '/painpoints': typeof AuthenticatedPainpointsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/projects': typeof AuthenticatedProjectsRoute
+  '/recruiters': typeof AuthenticatedRecruitersRoute
   '/resumes': typeof AuthenticatedResumesRoute
   '/skills': typeof AuthenticatedSkillsRoute
 }
@@ -131,6 +138,7 @@ export interface FileRoutesByTo {
   '/painpoints': typeof AuthenticatedPainpointsRoute
   '/profile': typeof AuthenticatedProfileRoute
   '/projects': typeof AuthenticatedProjectsRoute
+  '/recruiters': typeof AuthenticatedRecruitersRoute
   '/resumes': typeof AuthenticatedResumesRoute
   '/skills': typeof AuthenticatedSkillsRoute
 }
@@ -149,6 +157,7 @@ export interface FileRoutesById {
   '/_authenticated/painpoints': typeof AuthenticatedPainpointsRoute
   '/_authenticated/profile': typeof AuthenticatedProfileRoute
   '/_authenticated/projects': typeof AuthenticatedProjectsRoute
+  '/_authenticated/recruiters': typeof AuthenticatedRecruitersRoute
   '/_authenticated/resumes': typeof AuthenticatedResumesRoute
   '/_authenticated/skills': typeof AuthenticatedSkillsRoute
 }
@@ -167,6 +176,7 @@ export interface FileRouteTypes {
     | '/painpoints'
     | '/profile'
     | '/projects'
+    | '/recruiters'
     | '/resumes'
     | '/skills'
   fileRoutesByTo: FileRoutesByTo
@@ -183,6 +193,7 @@ export interface FileRouteTypes {
     | '/painpoints'
     | '/profile'
     | '/projects'
+    | '/recruiters'
     | '/resumes'
     | '/skills'
   id:
@@ -200,6 +211,7 @@ export interface FileRouteTypes {
     | '/_authenticated/painpoints'
     | '/_authenticated/profile'
     | '/_authenticated/projects'
+    | '/_authenticated/recruiters'
     | '/_authenticated/resumes'
     | '/_authenticated/skills'
   fileRoutesById: FileRoutesById
@@ -271,6 +283,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedResumesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/recruiters': {
+      id: '/_authenticated/recruiters'
+      path: '/recruiters'
+      fullPath: '/recruiters'
+      preLoaderRoute: typeof AuthenticatedRecruitersRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/projects': {
       id: '/_authenticated/projects'
       path: '/projects'
@@ -331,6 +350,7 @@ interface AuthenticatedRouteChildren {
   AuthenticatedPainpointsRoute: typeof AuthenticatedPainpointsRoute
   AuthenticatedProfileRoute: typeof AuthenticatedProfileRoute
   AuthenticatedProjectsRoute: typeof AuthenticatedProjectsRoute
+  AuthenticatedRecruitersRoute: typeof AuthenticatedRecruitersRoute
   AuthenticatedResumesRoute: typeof AuthenticatedResumesRoute
   AuthenticatedSkillsRoute: typeof AuthenticatedSkillsRoute
 }
@@ -343,6 +363,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedPainpointsRoute: AuthenticatedPainpointsRoute,
   AuthenticatedProfileRoute: AuthenticatedProfileRoute,
   AuthenticatedProjectsRoute: AuthenticatedProjectsRoute,
+  AuthenticatedRecruitersRoute: AuthenticatedRecruitersRoute,
   AuthenticatedResumesRoute: AuthenticatedResumesRoute,
   AuthenticatedSkillsRoute: AuthenticatedSkillsRoute,
 }
