@@ -1,7 +1,4 @@
 import { google } from "googleapis";
-import dotenv from "dotenv";
-
-dotenv.config({ path: ".env.local" });
 
 const oauth2Client = new google.auth.OAuth2(
   process.env.GMAIL_CLIENT_ID,
