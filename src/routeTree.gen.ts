@@ -24,9 +24,11 @@ import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedPainpointsRouteImport } from './routes/_authenticated/painpoints'
 import { Route as AuthenticatedOutreachRouteImport } from './routes/_authenticated/outreach'
 import { Route as AuthenticatedOpportunitiesRouteImport } from './routes/_authenticated/opportunities'
+import { Route as AuthenticatedJobMatchesRouteImport } from './routes/_authenticated/job-matches'
 import { Route as AuthenticatedInterviewsRouteImport } from './routes/_authenticated/interviews'
 import { Route as AuthenticatedInterviewPrepRouteImport } from './routes/_authenticated/interview-prep'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCompanyResearchRouteImport } from './routes/_authenticated/company-research'
 import { Route as AuthenticatedApplicationsRouteImport } from './routes/_authenticated/applications'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
 
@@ -105,6 +107,11 @@ const AuthenticatedOpportunitiesRoute =
     path: '/opportunities',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedJobMatchesRoute = AuthenticatedJobMatchesRouteImport.update({
+  id: '/job-matches',
+  path: '/job-matches',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedInterviewsRoute = AuthenticatedInterviewsRouteImport.update({
   id: '/interviews',
   path: '/interviews',
@@ -121,6 +128,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCompanyResearchRoute =
+  AuthenticatedCompanyResearchRouteImport.update({
+    id: '/company-research',
+    path: '/company-research',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedApplicationsRoute =
   AuthenticatedApplicationsRouteImport.update({
     id: '/applications',
@@ -141,9 +154,11 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/applications': typeof AuthenticatedApplicationsRoute
+  '/company-research': typeof AuthenticatedCompanyResearchRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/interview-prep': typeof AuthenticatedInterviewPrepRoute
   '/interviews': typeof AuthenticatedInterviewsRoute
+  '/job-matches': typeof AuthenticatedJobMatchesRoute
   '/opportunities': typeof AuthenticatedOpportunitiesRoute
   '/outreach': typeof AuthenticatedOutreachRoute
   '/painpoints': typeof AuthenticatedPainpointsRoute
@@ -162,9 +177,11 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/applications': typeof AuthenticatedApplicationsRoute
+  '/company-research': typeof AuthenticatedCompanyResearchRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/interview-prep': typeof AuthenticatedInterviewPrepRoute
   '/interviews': typeof AuthenticatedInterviewsRoute
+  '/job-matches': typeof AuthenticatedJobMatchesRoute
   '/opportunities': typeof AuthenticatedOpportunitiesRoute
   '/outreach': typeof AuthenticatedOutreachRoute
   '/painpoints': typeof AuthenticatedPainpointsRoute
@@ -185,9 +202,11 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/applications': typeof AuthenticatedApplicationsRoute
+  '/_authenticated/company-research': typeof AuthenticatedCompanyResearchRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/interview-prep': typeof AuthenticatedInterviewPrepRoute
   '/_authenticated/interviews': typeof AuthenticatedInterviewsRoute
+  '/_authenticated/job-matches': typeof AuthenticatedJobMatchesRoute
   '/_authenticated/opportunities': typeof AuthenticatedOpportunitiesRoute
   '/_authenticated/outreach': typeof AuthenticatedOutreachRoute
   '/_authenticated/painpoints': typeof AuthenticatedPainpointsRoute
@@ -208,9 +227,11 @@ export interface FileRouteTypes {
     | '/signup'
     | '/analytics'
     | '/applications'
+    | '/company-research'
     | '/dashboard'
     | '/interview-prep'
     | '/interviews'
+    | '/job-matches'
     | '/opportunities'
     | '/outreach'
     | '/painpoints'
@@ -229,9 +250,11 @@ export interface FileRouteTypes {
     | '/signup'
     | '/analytics'
     | '/applications'
+    | '/company-research'
     | '/dashboard'
     | '/interview-prep'
     | '/interviews'
+    | '/job-matches'
     | '/opportunities'
     | '/outreach'
     | '/painpoints'
@@ -251,9 +274,11 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_authenticated/analytics'
     | '/_authenticated/applications'
+    | '/_authenticated/company-research'
     | '/_authenticated/dashboard'
     | '/_authenticated/interview-prep'
     | '/_authenticated/interviews'
+    | '/_authenticated/job-matches'
     | '/_authenticated/opportunities'
     | '/_authenticated/outreach'
     | '/_authenticated/painpoints'
@@ -381,6 +406,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOpportunitiesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/job-matches': {
+      id: '/_authenticated/job-matches'
+      path: '/job-matches'
+      fullPath: '/job-matches'
+      preLoaderRoute: typeof AuthenticatedJobMatchesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/interviews': {
       id: '/_authenticated/interviews'
       path: '/interviews'
@@ -400,6 +432,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/company-research': {
+      id: '/_authenticated/company-research'
+      path: '/company-research'
+      fullPath: '/company-research'
+      preLoaderRoute: typeof AuthenticatedCompanyResearchRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/applications': {
@@ -422,9 +461,11 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedApplicationsRoute: typeof AuthenticatedApplicationsRoute
+  AuthenticatedCompanyResearchRoute: typeof AuthenticatedCompanyResearchRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedInterviewPrepRoute: typeof AuthenticatedInterviewPrepRoute
   AuthenticatedInterviewsRoute: typeof AuthenticatedInterviewsRoute
+  AuthenticatedJobMatchesRoute: typeof AuthenticatedJobMatchesRoute
   AuthenticatedOpportunitiesRoute: typeof AuthenticatedOpportunitiesRoute
   AuthenticatedOutreachRoute: typeof AuthenticatedOutreachRoute
   AuthenticatedPainpointsRoute: typeof AuthenticatedPainpointsRoute
@@ -439,9 +480,11 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedApplicationsRoute: AuthenticatedApplicationsRoute,
+  AuthenticatedCompanyResearchRoute: AuthenticatedCompanyResearchRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedInterviewPrepRoute: AuthenticatedInterviewPrepRoute,
   AuthenticatedInterviewsRoute: AuthenticatedInterviewsRoute,
+  AuthenticatedJobMatchesRoute: AuthenticatedJobMatchesRoute,
   AuthenticatedOpportunitiesRoute: AuthenticatedOpportunitiesRoute,
   AuthenticatedOutreachRoute: AuthenticatedOutreachRoute,
   AuthenticatedPainpointsRoute: AuthenticatedPainpointsRoute,
