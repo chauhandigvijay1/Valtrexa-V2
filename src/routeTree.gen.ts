@@ -23,6 +23,8 @@ import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedPainpointsRouteImport } from './routes/_authenticated/painpoints'
 import { Route as AuthenticatedOutreachRouteImport } from './routes/_authenticated/outreach'
 import { Route as AuthenticatedOpportunitiesRouteImport } from './routes/_authenticated/opportunities'
+import { Route as AuthenticatedInterviewsRouteImport } from './routes/_authenticated/interviews'
+import { Route as AuthenticatedInterviewPrepRouteImport } from './routes/_authenticated/interview-prep'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedApplicationsRouteImport } from './routes/_authenticated/applications'
 
@@ -96,6 +98,17 @@ const AuthenticatedOpportunitiesRoute =
     path: '/opportunities',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedInterviewsRoute = AuthenticatedInterviewsRouteImport.update({
+  id: '/interviews',
+  path: '/interviews',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedInterviewPrepRoute =
+  AuthenticatedInterviewPrepRouteImport.update({
+    id: '/interview-prep',
+    path: '/interview-prep',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -116,6 +129,8 @@ export interface FileRoutesByFullPath {
   '/signup': typeof SignupRoute
   '/applications': typeof AuthenticatedApplicationsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/interview-prep': typeof AuthenticatedInterviewPrepRoute
+  '/interviews': typeof AuthenticatedInterviewsRoute
   '/opportunities': typeof AuthenticatedOpportunitiesRoute
   '/outreach': typeof AuthenticatedOutreachRoute
   '/painpoints': typeof AuthenticatedPainpointsRoute
@@ -133,6 +148,8 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/applications': typeof AuthenticatedApplicationsRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
+  '/interview-prep': typeof AuthenticatedInterviewPrepRoute
+  '/interviews': typeof AuthenticatedInterviewsRoute
   '/opportunities': typeof AuthenticatedOpportunitiesRoute
   '/outreach': typeof AuthenticatedOutreachRoute
   '/painpoints': typeof AuthenticatedPainpointsRoute
@@ -152,6 +169,8 @@ export interface FileRoutesById {
   '/signup': typeof SignupRoute
   '/_authenticated/applications': typeof AuthenticatedApplicationsRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/interview-prep': typeof AuthenticatedInterviewPrepRoute
+  '/_authenticated/interviews': typeof AuthenticatedInterviewsRoute
   '/_authenticated/opportunities': typeof AuthenticatedOpportunitiesRoute
   '/_authenticated/outreach': typeof AuthenticatedOutreachRoute
   '/_authenticated/painpoints': typeof AuthenticatedPainpointsRoute
@@ -171,6 +190,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/applications'
     | '/dashboard'
+    | '/interview-prep'
+    | '/interviews'
     | '/opportunities'
     | '/outreach'
     | '/painpoints'
@@ -188,6 +209,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/applications'
     | '/dashboard'
+    | '/interview-prep'
+    | '/interviews'
     | '/opportunities'
     | '/outreach'
     | '/painpoints'
@@ -206,6 +229,8 @@ export interface FileRouteTypes {
     | '/signup'
     | '/_authenticated/applications'
     | '/_authenticated/dashboard'
+    | '/_authenticated/interview-prep'
+    | '/_authenticated/interviews'
     | '/_authenticated/opportunities'
     | '/_authenticated/outreach'
     | '/_authenticated/painpoints'
@@ -325,6 +350,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOpportunitiesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/interviews': {
+      id: '/_authenticated/interviews'
+      path: '/interviews'
+      fullPath: '/interviews'
+      preLoaderRoute: typeof AuthenticatedInterviewsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/interview-prep': {
+      id: '/_authenticated/interview-prep'
+      path: '/interview-prep'
+      fullPath: '/interview-prep'
+      preLoaderRoute: typeof AuthenticatedInterviewPrepRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/dashboard': {
       id: '/_authenticated/dashboard'
       path: '/dashboard'
@@ -345,6 +384,8 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteChildren {
   AuthenticatedApplicationsRoute: typeof AuthenticatedApplicationsRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedInterviewPrepRoute: typeof AuthenticatedInterviewPrepRoute
+  AuthenticatedInterviewsRoute: typeof AuthenticatedInterviewsRoute
   AuthenticatedOpportunitiesRoute: typeof AuthenticatedOpportunitiesRoute
   AuthenticatedOutreachRoute: typeof AuthenticatedOutreachRoute
   AuthenticatedPainpointsRoute: typeof AuthenticatedPainpointsRoute
@@ -358,6 +399,8 @@ interface AuthenticatedRouteChildren {
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedApplicationsRoute: AuthenticatedApplicationsRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedInterviewPrepRoute: AuthenticatedInterviewPrepRoute,
+  AuthenticatedInterviewsRoute: AuthenticatedInterviewsRoute,
   AuthenticatedOpportunitiesRoute: AuthenticatedOpportunitiesRoute,
   AuthenticatedOutreachRoute: AuthenticatedOutreachRoute,
   AuthenticatedPainpointsRoute: AuthenticatedPainpointsRoute,
