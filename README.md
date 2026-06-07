@@ -10,13 +10,6 @@ An AI-powered platform that unifies resume intelligence, application generation,
 
 <br>
 
-[![Stars](https://img.shields.io/github/stars/chauhandigvijay1/Valtrexa-V2?style=for-the-badge)](https://github.com/chauhandigvijay1/Valtrexa-V2/stargazers)
-[![Forks](https://img.shields.io/github/forks/chauhandigvijay1/Valtrexa-V2?style=for-the-badge)](https://github.com/chauhandigvijay1/Valtrexa-V2/network/members)
-[![Issues](https://img.shields.io/github/issues/chauhandigvijay1/Valtrexa-V2?style=for-the-badge)](https://github.com/chauhandigvijay1/Valtrexa-V2/issues)
-[![License](https://img.shields.io/github/license/chauhandigvijay1/Valtrexa-V2?style=for-the-badge)](https://github.com/chauhandigvijay1/Valtrexa-V2/blob/main/LICENSE)
-
-<br>
-
 ![React](https://img.shields.io/badge/React-18-61DAFB?style=flat-square\&logo=react)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5.0-3178C6?style=flat-square\&logo=typescript)
 ![Supabase](https://img.shields.io/badge/Supabase-PostgreSQL-3ECF8E?style=flat-square\&logo=supabase)
