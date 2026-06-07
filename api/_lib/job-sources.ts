@@ -38,7 +38,9 @@ async function fetchHtml(url: string, headers?: Record<string, string>) {
 }
 
 export async function importGreenhouse(boardToken: string): Promise<ImportedJob[]> {
-  const payload = await fetchJson(`https://boards-api.greenhouse.io/v1/boards/${boardToken}/jobs?content=true`);
+  const payload = await fetchJson(
+    `https://boards-api.greenhouse.io/v1/boards/${boardToken}/jobs?content=true`,
+  );
   return (payload.jobs ?? []).map((job: any) => ({
     externalId: String(job.id),
     title: job.title,
@@ -61,7 +63,9 @@ export async function importLever(site: string): Promise<ImportedJob[]> {
     location: job.categories?.location ?? null,
     url: job.hostedUrl ?? null,
     source: "lever",
-    description: [job.descriptionPlain, job.additionalPlain, job.listsPlain].filter(Boolean).join("\n\n"),
+    description: [job.descriptionPlain, job.additionalPlain, job.listsPlain]
+      .filter(Boolean)
+      .join("\n\n"),
     postedAt: job.createdAt ? new Date(job.createdAt).toISOString() : null,
     rawPayload: job,
   }));
@@ -95,7 +99,7 @@ export async function importAshby(boardUrl: string): Promise<ImportedJob[]> {
   try {
     const html = await fetchHtml(boardUrl);
     const $ = cheerio.load(html);
-    const scriptContent = $('script#__NEXT_DATA__').html();
+    const scriptContent = $("script#__NEXT_DATA__").html();
     if (!scriptContent) {
       return [];
     }
@@ -119,7 +123,12 @@ export async function importAshby(boardUrl: string): Promise<ImportedJob[]> {
   }
 }
 
-function scrapeAnchorJobs(source: string, html: string, baseUrl: string, companyName?: string | null): ImportedJob[] {
+function scrapeAnchorJobs(
+  source: string,
+  html: string,
+  baseUrl: string,
+  companyName?: string | null,
+): ImportedJob[] {
   const $ = cheerio.load(html);
   const jobs: ImportedJob[] = [];
   $("a").each((index, el) => {
@@ -127,7 +136,12 @@ function scrapeAnchorJobs(source: string, html: string, baseUrl: string, company
     const href = $(el).attr("href");
     if (!href || !title || title.length < 8) return;
     const lowerHref = href.toLowerCase();
-    if (!lowerHref.includes("/job") && !lowerHref.includes("/jobs") && !lowerHref.includes("position")) return;
+    if (
+      !lowerHref.includes("/job") &&
+      !lowerHref.includes("/jobs") &&
+      !lowerHref.includes("position")
+    )
+      return;
     const url = href.startsWith("http") ? href : new URL(href, baseUrl).toString();
     jobs.push({
       externalId: `${source}-${index}-${Buffer.from(url).toString("base64").slice(0, 24)}`,
@@ -144,7 +158,11 @@ function scrapeAnchorJobs(source: string, html: string, baseUrl: string, company
   return jobs;
 }
 
-export async function importHtmlSource(source: "linkedin" | "naukri" | "wellfound" | "indeed" | "instahyre", searchUrl: string, headers?: Record<string, string>) {
+export async function importHtmlSource(
+  source: "linkedin" | "naukri" | "wellfound" | "indeed" | "instahyre",
+  searchUrl: string,
+  headers?: Record<string, string>,
+) {
   const html = await fetchHtml(searchUrl, headers);
   return scrapeAnchorJobs(source, html, searchUrl);
 }

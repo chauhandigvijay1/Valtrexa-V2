@@ -18,4 +18,3 @@ await mkdir(dirname(target), { recursive: true });
 await rm(target, { recursive: true, force: true });
 await cp(source, target, { recursive: true });
 await assertDirectory(resolve(target, "assets"), "Copied TanStack Start server assets");
-

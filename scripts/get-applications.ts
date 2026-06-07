@@ -12,7 +12,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
   }
   return env;
@@ -40,7 +44,10 @@ async function main() {
   console.log(JSON.stringify(folls, null, 2));
 
   console.log("--- Interview Prep ---");
-  const { data: preps, error: errPreps } = await admin.from("interview_preparation").select("*").limit(3);
+  const { data: preps, error: errPreps } = await admin
+    .from("interview_preparation")
+    .select("*")
+    .limit(3);
   console.log(JSON.stringify(preps, null, 2));
 }
 

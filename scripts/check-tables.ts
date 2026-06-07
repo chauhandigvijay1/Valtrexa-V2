@@ -12,7 +12,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
   }
   return env;
@@ -36,7 +40,11 @@ async function main() {
   }
 
   console.log("--- Fetching all AI Generations ---");
-  const { data: ai, error: errAi } = await admin.from("ai_generations").select("*").order("created_at", { ascending: false }).limit(3);
+  const { data: ai, error: errAi } = await admin
+    .from("ai_generations")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(3);
   if (errAi) {
     console.error("Error fetching AI gens:", errAi);
   } else {

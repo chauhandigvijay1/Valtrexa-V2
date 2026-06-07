@@ -27,17 +27,19 @@ export async function emitWorkflowEvent(input: {
         application_id: input.entityId,
         due_at: due.toISOString(),
         done: false,
-        note: `Day ${d} automated follow-up check`
+        note: `Day ${d} automated follow-up check`,
       } as any);
     }
   }
-
 
   if (insertResult.error) {
     return {
       persisted: false,
       delivered: 0,
-      error: insertResult.error instanceof Error ? insertResult.error.message : String(insertResult.error),
+      error:
+        insertResult.error instanceof Error
+          ? insertResult.error.message
+          : String(insertResult.error),
     };
   }
 

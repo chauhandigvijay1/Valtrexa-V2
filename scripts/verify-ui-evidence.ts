@@ -17,7 +17,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
     if (!process.env[key]) process.env[key] = value;
   }
@@ -69,9 +73,9 @@ async function createSampleResume() {
       "\\subsection*{Education}",
       "B.Tech in Computer Science from IIT Delhi.",
       "AWS Certified Solutions Architect certification.",
-      "\\end{document}"
+      "\\end{document}",
     ].join("\n"),
-    "utf-8"
+    "utf-8",
   );
   return resumePath;
 }
@@ -80,7 +84,9 @@ async function stopServerTree(server: ChildProcess) {
   if (!server.pid) return;
   if (process.platform === "win32") {
     await new Promise<void>((resolve) => {
-      const killer = spawn("taskkill", ["/PID", String(server.pid), "/T", "/F"], { stdio: "ignore" });
+      const killer = spawn("taskkill", ["/PID", String(server.pid), "/T", "/F"], {
+        stdio: "ignore",
+      });
       killer.on("exit", () => resolve());
       killer.on("error", () => resolve());
     });
@@ -122,7 +128,7 @@ async function main() {
 
   const browser = await chromium.launch({ headless: true });
   const page = await browser.newPage({ viewport: { width: 1440, height: 1600 } });
-  
+
   page.on("pageerror", (error) => {
     console.error("PAGEERROR:", error.message);
   });
@@ -164,7 +170,7 @@ async function main() {
     screenshotName: string,
     url: string,
     apiEndpoints: string[],
-    dbTableQueries: { table: string; select?: string; filter?: (qb: any) => any }[]
+    dbTableQueries: { table: string; select?: string; filter?: (qb: any) => any }[],
   ) {
     await delay(1500); // Wait for animations / state updates
     const scrPath = path.join(outputDir, screenshotName);
@@ -186,7 +192,10 @@ async function main() {
       } else {
         queryBuilder = queryBuilder.eq("user_id", userId);
       }
-      const { data } = await queryBuilder.order("created_at", { ascending: false }).limit(1).maybeSingle();
+      const { data } = await queryBuilder
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
       dbRows[q.table] = data ?? null;
     }
 
@@ -217,8 +226,12 @@ async function main() {
     console.log("STEP: Candidate Brain");
     await page.goto("http://127.0.0.1:4173/profile", { waitUntil: "networkidle" });
     await page.getByPlaceholder("https://github.com/...").fill("https://github.com/janeengineer");
-    await page.getByPlaceholder("https://linkedin.com/in/...").fill("https://linkedin.com/in/janeengineer");
-    await page.getByPlaceholder("e.g. Senior Frontend Engineer, Full Stack Engineer").fill("Platform Engineer");
+    await page
+      .getByPlaceholder("https://linkedin.com/in/...")
+      .fill("https://linkedin.com/in/janeengineer");
+    await page
+      .getByPlaceholder("e.g. Senior Frontend Engineer, Full Stack Engineer")
+      .fill("Platform Engineer");
     await page.getByRole("button", { name: "Save Profile Preferences" }).click();
     await page.getByText("Profile preferences saved successfully!").waitFor({ timeout: 5000 });
     await collect(
@@ -226,7 +239,7 @@ async function main() {
       "01-candidate-brain.png",
       page.url(),
       [], // no direct custom API called here (uses supabase client directly)
-      [{ table: "candidate_profiles" }]
+      [{ table: "candidate_profiles" }],
     );
 
     // Workflow 2: Resume Upload
@@ -239,10 +252,11 @@ async function main() {
       "02-resume-upload.png",
       page.url(),
       ["/api/resumes/process"],
-      [{ table: "resumes" }, { table: "resume_versions" }]
+      [{ table: "resumes" }, { table: "resume_versions" }],
     );
 
-    const jobDescription = "We need a software engineer with TypeScript, React, Supabase, PostgreSQL, automation, and technical writing skills.";
+    const jobDescription =
+      "We need a software engineer with TypeScript, React, Supabase, PostgreSQL, automation, and technical writing skills.";
 
     // Workflow 3: ATS Analysis
     console.log("STEP: ATS Analysis");
@@ -255,7 +269,7 @@ async function main() {
       "03-ats-details.png",
       page.url(),
       ["/api/resumes/analyze"],
-      [{ table: "resume_analyses" }]
+      [{ table: "resume_analyses" }],
     );
 
     // Workflow 4: LaTeX Tailor
@@ -271,7 +285,7 @@ async function main() {
       "04-latex-tailor.png",
       page.url(),
       ["/api/resumes/tailor"],
-      [{ table: "tailored_resumes" }]
+      [{ table: "tailored_resumes" }],
     );
 
     // Workflow 5: PDF Preview
@@ -283,7 +297,7 @@ async function main() {
       "05-pdf-preview.png",
       page.url(),
       [],
-      [{ table: "tailored_resumes" }]
+      [{ table: "tailored_resumes" }],
     );
 
     // Workflow 6: Company Research
@@ -292,14 +306,17 @@ async function main() {
     await page.getByRole("button", { name: "Generate" }).first().click();
     await page.locator('div:has-text("Company name *") >> input').first().fill("Supabase");
     await page.locator('div:has-text("Website") >> input').first().fill("https://supabase.com");
-    await page.getByRole("button", { name: /^Generate$/ }).last().click();
+    await page
+      .getByRole("button", { name: /^Generate$/ })
+      .last()
+      .click();
     await page.getByText("Suggested Outreach Angles").waitFor({ timeout: 120000 });
     await collect(
       "Company Research",
       "06-company-research.png",
       page.url(),
       ["/api/company-research/generate"],
-      [{ table: "company_research" }]
+      [{ table: "company_research" }],
     );
 
     // Workflow 12: High Value Target
@@ -312,7 +329,7 @@ async function main() {
       "07-high-value-target.png",
       page.url(),
       [],
-      [{ table: "companies", filter: (qb) => qb.eq("user_id", userId) }]
+      [{ table: "companies", filter: (qb) => qb.eq("user_id", userId) }],
     );
 
     // Workflow 7: Recruiter Discovery
@@ -320,20 +337,20 @@ async function main() {
       console.log("STEP: Recruiter Discovery");
       await page.goto("http://127.0.0.1:4173/recruiters", { waitUntil: "networkidle" });
       await page.getByRole("button", { name: "New recruiter" }).click();
-      
+
       const rDialog = page.getByRole("dialog");
       await rDialog.locator("input").nth(0).fill("Alice Recruiter");
       await rDialog.locator("input").nth(1).fill("Supabase");
       await rDialog.locator("input").nth(2).fill("alice@supabase.com");
       await rDialog.getByRole("button", { name: "Save" }).click();
-      
+
       await page.getByText("Alice Recruiter").waitFor({ timeout: 10000 });
       await collect(
         "Recruiter Discovery",
         "08-recruiter-discovery.png",
         page.url(),
         [],
-        [{ table: "recruiters" }]
+        [{ table: "recruiters" }],
       );
 
       console.log("STEP: AI Recruiter Discovery");
@@ -342,24 +359,32 @@ async function main() {
       await discDialog.getByPlaceholder("e.g., Supabase, Vercel…").fill("Supabase");
       await discDialog.getByPlaceholder("e.g., Senior Frontend Engineer").fill("Platform Engineer");
       await discDialog.getByRole("button", { name: "Discover" }).click();
-      
+
       // Wait for the API call to complete
-      const response = await page.waitForResponse(resp => resp.url().includes("/api/recruiters/discover") && resp.status() === 200, { timeout: 90000 });
-      
+      const response = await page.waitForResponse(
+        (resp) => resp.url().includes("/api/recruiters/discover") && resp.status() === 200,
+        { timeout: 90000 },
+      );
+
       // Get the name of the discovered recruiter from the API response
       const discoveredRes = await response.json();
       const recruiterName = discoveredRes?.recruiters?.[0]?.name || "Supabase Recruiting Team";
       console.log(`Discovered recruiter: ${recruiterName}`);
-      
+
       await page.getByText(recruiterName).waitFor({ timeout: 10000 });
       await collect(
         "AI Recruiter Discovery Results",
         "18-recruiter-discovery-results.png",
         page.url(),
         ["/api/recruiters/discover"],
-        [{ table: "recruiters", filter: (qb) => qb.eq("user_id", userId).eq("source", "discovery") }]
+        [
+          {
+            table: "recruiters",
+            filter: (qb) => qb.eq("user_id", userId).eq("source", "discovery"),
+          },
+        ],
       );
-      
+
       console.log("STEP: AI Recruiter Enrichment Expansion");
       await page.getByText(recruiterName).first().click();
       await page.getByText("CRM Notes & Details").waitFor({ timeout: 5000 });
@@ -368,7 +393,12 @@ async function main() {
         "19-recruiter-enrichment.png",
         page.url(),
         [],
-        [{ table: "recruiters", filter: (qb) => qb.eq("user_id", userId).eq("source", "discovery") }]
+        [
+          {
+            table: "recruiters",
+            filter: (qb) => qb.eq("user_id", userId).eq("source", "discovery"),
+          },
+        ],
       );
     } catch (err: any) {
       console.error("Recruiter Discovery failed:", err.message);
@@ -379,28 +409,33 @@ async function main() {
       console.log("STEP: Application Package & Tier Assignment");
       await page.goto("http://127.0.0.1:4173/applications", { waitUntil: "networkidle" });
       await page.getByRole("button", { name: "New application" }).click();
-      
+
       const aDialog = page.getByRole("dialog");
       await aDialog.locator("input").nth(0).fill("Supabase");
       await aDialog.locator("input").nth(1).fill("Platform Engineer");
       await aDialog.getByRole("button", { name: "Save" }).click();
-      
+
       await page.getByText("Platform Engineer").waitFor({ timeout: 10000 });
-      await page.getByRole("button", { name: "Generate application package + assign tier" }).first().click();
-      await page.getByText("Application package generated", { exact: false }).waitFor({ timeout: 90000 });
+      await page
+        .getByRole("button", { name: "Generate application package + assign tier" })
+        .first()
+        .click();
+      await page
+        .getByText("Application package generated", { exact: false })
+        .waitFor({ timeout: 90000 });
       await collect(
         "Application Package",
         "09-application-package.png",
         page.url(),
         ["/api/applications/generate-package"],
-        [{ table: "applications" }]
+        [{ table: "applications" }],
       );
       await collect(
         "Tier Assignment",
         "10-tier-assignment.png",
         page.url(),
         [],
-        [{ table: "applications" }]
+        [{ table: "applications" }],
       );
     } catch (err: any) {
       console.error("Application Package / Tier Assignment failed:", err.message);
@@ -411,7 +446,9 @@ async function main() {
       console.log("STEP: Follow-Up Engine");
       await page.goto("http://127.0.0.1:4173/outreach", { waitUntil: "networkidle" });
       await page.getByRole("button", { name: "Schedule Follow-up" }).click();
-      await page.getByPlaceholder("e.g. Day 3 automated follow-up check").fill("Automated outreach follow-up");
+      await page
+        .getByPlaceholder("e.g. Day 3 automated follow-up check")
+        .fill("Automated outreach follow-up");
       await page.locator('input[type="datetime-local"]').fill("2026-06-10T12:00");
       await page.getByRole("button", { name: "Schedule" }).click();
       await page.getByText("Automated outreach follow-up").waitFor({ timeout: 5000 });
@@ -420,7 +457,7 @@ async function main() {
         "11-follow-up-engine.png",
         page.url(),
         [],
-        [{ table: "followups" }]
+        [{ table: "followups" }],
       );
     } catch (err: any) {
       console.error("Follow-Up Engine failed:", err.message);
@@ -436,13 +473,15 @@ async function main() {
       await page.getByRole("button", { name: "Save" }).click();
       await page.getByText("Platform Engineer").waitFor({ timeout: 5000 });
       await page.getByRole("button", { name: "Generate AI interview prep" }).first().click();
-      await page.getByText("Interview prep generated", { exact: false }).waitFor({ timeout: 90000 });
+      await page
+        .getByText("Interview prep generated", { exact: false })
+        .waitFor({ timeout: 90000 });
       await collect(
         "Interview Prep",
         "12-interview-prep.png",
         page.url(),
         ["/api/interviews/prep"],
-        [{ table: "interview_preparation" }]
+        [{ table: "interview_preparation" }],
       );
 
       console.log("STEP: Interview Prep Page");
@@ -453,7 +492,7 @@ async function main() {
         "13-interview-prep-page.png",
         page.url(),
         [],
-        [{ table: "interview_preparation" }]
+        [{ table: "interview_preparation" }],
       );
 
       console.log("STEP: 14-interview-generated-content");
@@ -462,7 +501,7 @@ async function main() {
         "14-interview-generated-content.png",
         page.url(),
         [],
-        [{ table: "interview_preparation" }]
+        [{ table: "interview_preparation" }],
       );
 
       console.log("STEP: 15-interview-company-briefing");
@@ -473,7 +512,7 @@ async function main() {
         "15-interview-company-briefing.png",
         page.url(),
         [],
-        [{ table: "interview_preparation" }]
+        [{ table: "interview_preparation" }],
       );
       // Collapse
       await page.getByText("Company Briefing").first().click();
@@ -486,7 +525,7 @@ async function main() {
         "16-interview-role-analysis.png",
         page.url(),
         [],
-        [{ table: "interview_preparation" }]
+        [{ table: "interview_preparation" }],
       );
       // Collapse
       await page.getByText("Role Briefing").first().click();
@@ -499,7 +538,7 @@ async function main() {
         "17-interview-question-bank.png",
         page.url(),
         [],
-        [{ table: "interview_preparation" }]
+        [{ table: "interview_preparation" }],
       );
       // Collapse
       await page.getByText("Likely Questions").first().click();
@@ -507,7 +546,11 @@ async function main() {
       console.error("Interview Prep failed:", err.message);
     }
 
-    await fs.writeFile(path.join(outputDir, "evidence.json"), JSON.stringify(evidence, null, 2), "utf-8");
+    await fs.writeFile(
+      path.join(outputDir, "evidence.json"),
+      JSON.stringify(evidence, null, 2),
+      "utf-8",
+    );
     console.log("SUCCESS: All workflows verified and evidence stored.");
   } finally {
     await browser.close();

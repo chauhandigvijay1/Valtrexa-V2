@@ -13,7 +13,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
     process.env[key] = value;
   }
@@ -26,13 +30,18 @@ const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 const USER_ID = "c8dfc28a-fa3e-4e6d-8027-2f936d0192e0";
 const EMAIL = "chauhandigvijay121@gmail.com"; // Let's get the email of the persistent test user or verify it
 
-async function invokeRoute(routePath: string, init: { method?: string; body?: unknown; token?: string; headers?: Record<string, string> }) {
+async function invokeRoute(
+  routePath: string,
+  init: { method?: string; body?: unknown; token?: string; headers?: Record<string, string> },
+) {
   const mod = await import(pathToFileURL(path.resolve(process.cwd(), "api/[...route].ts")).href);
   const handler = mod.default;
   const headers = new Headers(init.headers ?? {});
   if (init.token) headers.set("authorization", `Bearer ${init.token}`);
   if (init.body !== undefined) headers.set("content-type", "application/json");
-  const normalizedPath = routePath.startsWith("/api/") ? routePath : `/api/${routePath.replace(/^\/+/, "")}`;
+  const normalizedPath = routePath.startsWith("/api/")
+    ? routePath
+    : `/api/${routePath.replace(/^\/+/, "")}`;
   const request = new Request(`http://localhost${normalizedPath}`, {
     method: init.method ?? "GET",
     headers,
@@ -49,9 +58,18 @@ async function invokeRoute(routePath: string, init: { method?: string; body?: un
 }
 
 async function getRowCounts() {
-  const { count: expCount } = await admin.from("experiences").select("*", { count: "exact", head: true }).eq("user_id", USER_ID);
-  const { count: eduCount } = await admin.from("education").select("*", { count: "exact", head: true }).eq("user_id", USER_ID);
-  const { count: projCount } = await admin.from("projects").select("*", { count: "exact", head: true }).eq("user_id", USER_ID);
+  const { count: expCount } = await admin
+    .from("experiences")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", USER_ID);
+  const { count: eduCount } = await admin
+    .from("education")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", USER_ID);
+  const { count: projCount } = await admin
+    .from("projects")
+    .select("*", { count: "exact", head: true })
+    .eq("user_id", USER_ID);
   return { experiences: expCount ?? 0, education: eduCount ?? 0, projects: projCount ?? 0 };
 }
 
@@ -63,10 +81,12 @@ async function main() {
   if (userError || !userData.user) {
     throw new Error(`Failed to get persistent test user: ${userError?.message}`);
   }
-  
+
   // Force update user password to a known value
   console.log("Resetting persistent test user's password...");
-  const { error: resetErr } = await admin.auth.admin.updateUserById(USER_ID, { password: "CareerCompass#123" });
+  const { error: resetErr } = await admin.auth.admin.updateUserById(USER_ID, {
+    password: "CareerCompass#123",
+  });
   if (resetErr) {
     throw new Error(`Failed to reset password: ${resetErr.message}`);
   }
@@ -106,15 +126,17 @@ async function main() {
     "\\subsection*{Education}",
     "B.Tech in Computer Science from IIT Delhi.",
     "AWS Certified Solutions Architect certification.",
-    "\\end{document}"
+    "\\end{document}",
   ].join("\n");
 
   // 5. Upload file directly to Supabase storage resumes bucket
   const storagePath = `${USER_ID}/resumes/${Date.now()}-resume.tex`;
-  const uploadRes = await admin.storage.from("resumes").upload(storagePath, Buffer.from(latexTemplate), {
-    contentType: "text/x-tex",
-    upsert: true,
-  });
+  const uploadRes = await admin.storage
+    .from("resumes")
+    .upload(storagePath, Buffer.from(latexTemplate), {
+      contentType: "text/x-tex",
+      upsert: true,
+    });
   if (uploadRes.error) {
     throw new Error(`Failed to upload resume to storage: ${uploadRes.error.message}`);
   }
@@ -138,7 +160,10 @@ async function main() {
   if (!processRes.ok) {
     console.error("API process failed:", processRes.status, processRes.data || processRes.raw);
   } else {
-    console.log("API process succeeded! Parse data:", JSON.stringify(processRes.data?.parse, null, 2));
+    console.log(
+      "API process succeeded! Parse data:",
+      JSON.stringify(processRes.data?.parse, null, 2),
+    );
   }
 
   // 7. Print Row Counts AFTER

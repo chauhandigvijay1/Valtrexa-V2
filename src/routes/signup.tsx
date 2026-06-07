@@ -52,22 +52,44 @@ function SignupPage() {
     <div className="min-h-screen grid place-items-center bg-background px-4">
       <Card className="w-full max-w-sm p-6 space-y-5">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Create your Career Compass Pro account</h1>
-          <p className="text-sm text-muted-foreground">Set up your workspace for resumes, jobs, and outreach.</p>
+          <h1 className="text-xl font-semibold tracking-tight">
+            Create your Career Compass Pro account
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            Set up your workspace for resumes, jobs, and outreach.
+          </p>
         </div>
 
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="name">Name</Label>
-            <Input id="name" value={name} onChange={(event) => setName(event.target.value)} required />
+            <Input
+              id="name"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              required
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required />
+            <Input
+              id="password"
+              type="password"
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
           </div>
           <Button type="submit" disabled={busy} className="w-full">
             {busy ? "Creating account…" : "Create account"}

@@ -11,7 +11,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
   }
   return env;
@@ -22,13 +26,16 @@ const env = loadDotEnv();
 const projectRef = new URL(env.SUPABASE_URL).hostname.split(".")[0];
 const SERVICE_KEY = env.SUPABASE_SERVICE_ROLE_KEY;
 
-const migrationPath = path.resolve(process.cwd(), "supabase/migrations/20260604100000_phase_recovery.sql");
+const migrationPath = path.resolve(
+  process.cwd(),
+  "supabase/migrations/20260604100000_phase_recovery.sql",
+);
 const sql = readFileSync(migrationPath, "utf-8");
 
 async function runSQL(query: string): Promise<{ ok: boolean; error?: string; data?: any }> {
   // Use the Supabase database query endpoint
   const url = `https://${projectRef}.supabase.co/rest/v1/rpc/`;
-  
+
   // Alternative: use the PostgREST query endpoint with a raw SQL function
   // First, try to create a temporary function for executing SQL
   const createFuncSQL = `
@@ -42,10 +49,10 @@ async function runSQL(query: string): Promise<{ ok: boolean; error?: string; dat
     END;
     $$;
   `;
-  
+
   // Try the raw database endpoint (port 5432 via pooler)
   // This requires pg client, let's use the REST approach differently
-  
+
   const response = await fetch(`https://${projectRef}.supabase.co/rest/v1/rpc/exec_migration`, {
     method: "POST",
     headers: {
@@ -70,8 +77,8 @@ async function main() {
   // Split SQL into individual statements
   const statements = sql
     .split(/;\s*\n/)
-    .map(s => s.trim())
-    .filter(s => s && !s.startsWith("--"));
+    .map((s) => s.trim())
+    .filter((s) => s && !s.startsWith("--"));
 
   // First try to create the exec_migration function
   const createFunc = await runSQL("SELECT 1");
@@ -80,11 +87,11 @@ async function main() {
     console.log("Will attempt to use the database pooler connection directly.\n");
   }
 
-  // Use pg module to connect directly  
+  // Use pg module to connect directly
   try {
     const { Pool } = await import("pg");
-    
-    // Supabase pooler connection 
+
+    // Supabase pooler connection
     const pool = new Pool({
       host: `db.${projectRef}.supabase.co`,
       port: 5432,

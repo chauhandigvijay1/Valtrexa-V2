@@ -45,18 +45,26 @@ const CODE_NOISE_PATTERNS = [
 ];
 
 function unique(values: Array<string | null | undefined>) {
-  return Array.from(new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value))));
+  return Array.from(
+    new Set(
+      values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)),
+    ),
+  );
 }
 
 function normalizeWhitespace(value: string) {
-  return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function hasCodeNoise(value: string) {
   const normalized = normalizeWhitespace(value.replace(/<[^>]+>/g, " "));
   if (!normalized) return false;
   const matchedSignals = CODE_NOISE_PATTERNS.filter((pattern) => pattern.test(normalized)).length;
-  const symbolDensity = (normalized.match(/[{}()[\];]/g)?.length ?? 0) / Math.max(normalized.length, 1);
+  const symbolDensity =
+    (normalized.match(/[{}()[\];]/g)?.length ?? 0) / Math.max(normalized.length, 1);
   return matchedSignals >= 2 || symbolDensity > 0.08;
 }
 
@@ -75,7 +83,9 @@ function cleanList(values: Array<string | null | undefined>, limit = 8) {
 }
 
 function safeObject(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : {};
 }
 
 export function parseStoredJson(value?: string | null) {
@@ -87,7 +97,10 @@ export function parseStoredJson(value?: string | null) {
   }
 }
 
-export function parseResearchIntelligence(record: ResearchRecord, painPoints: PainPointRecord[] = []): ResearchIntelligence {
+export function parseResearchIntelligence(
+  record: ResearchRecord,
+  painPoints: PainPointRecord[] = [],
+): ResearchIntelligence {
   const stored = parseStoredJson(record.file_url);
   const sections = (record.culture_notes ?? "")
     .split(/\n{2,}/)
@@ -115,35 +128,48 @@ export function parseResearchIntelligence(record: ResearchRecord, painPoints: Pa
         );
 
   const engineeringCultureNotes =
-    typeof stored.engineeringCultureNotes === "string" && cleanText(stored.engineeringCultureNotes, 800)
+    typeof stored.engineeringCultureNotes === "string" &&
+    cleanText(stored.engineeringCultureNotes, 800)
       ? cleanText(stored.engineeringCultureNotes, 800)
-      : sections.find((section) => !/^(Products|Hiring signals|Funding):/i.test(section)) ?? "";
+      : (sections.find((section) => !/^(Products|Hiring signals|Funding):/i.test(section)) ?? "");
 
   const fundingData =
-    safeObject(stored.fundingData && typeof stored.fundingData === "object" ? stored.fundingData : null) ||
-    safeObject(undefined);
+    safeObject(
+      stored.fundingData && typeof stored.fundingData === "object" ? stored.fundingData : null,
+    ) || safeObject(undefined);
 
-  const parsedPainPoints = painPoints.map((point) => ({ point, parsed: parsePainPoint(point.description, point.tags, point.source_url) }));
+  const parsedPainPoints = painPoints.map((point) => ({
+    point,
+    parsed: parsePainPoint(point.description, point.tags, point.source_url),
+  }));
 
-  const opportunities = unique([
-    ...products.map((product) => `Position experience around ${product}.`),
-    ...hiringSignals.map((signal) => `Lead with proof tied to ${signal}.`),
-    ...parsedPainPoints.map(({ parsed }) => parsed.suggestedSolution),
-  ].map((value) => cleanText(value, 220))).slice(0, 6);
+  const opportunities = unique(
+    [
+      ...products.map((product) => `Position experience around ${product}.`),
+      ...hiringSignals.map((signal) => `Lead with proof tied to ${signal}.`),
+      ...parsedPainPoints.map(({ parsed }) => parsed.suggestedSolution),
+    ].map((value) => cleanText(value, 220)),
+  ).slice(0, 6);
 
-  const risks = unique([
-    ...parsedPainPoints
-      .filter(({ point }) => point.severity >= 4)
-      .map(({ point }) => `${point.title} is currently a high-severity issue.`),
-    !record.recent_news?.trim() ? "Recent public-company signals are limited." : null,
-    !record.source_urls?.length ? "Research is relying on thin source coverage." : null,
-  ].map((value) => cleanText(value, 220))).slice(0, 6);
+  const risks = unique(
+    [
+      ...parsedPainPoints
+        .filter(({ point }) => point.severity >= 4)
+        .map(({ point }) => `${point.title} is currently a high-severity issue.`),
+      !record.recent_news?.trim() ? "Recent public-company signals are limited." : null,
+      !record.source_urls?.length ? "Research is relying on thin source coverage." : null,
+    ].map((value) => cleanText(value, 220)),
+  ).slice(0, 6);
 
-  const outreachAngles = unique([
-    ...parsedPainPoints.map(({ parsed }) => parsed.suggestedSolution),
-    ...hiringSignals.map((signal) => `Reference ${signal} and reduce ramp time.`),
-    engineeringCultureNotes ? `Mirror the engineering culture notes: ${engineeringCultureNotes}` : null,
-  ].map((value) => cleanText(value, 260))).slice(0, 6);
+  const outreachAngles = unique(
+    [
+      ...parsedPainPoints.map(({ parsed }) => parsed.suggestedSolution),
+      ...hiringSignals.map((signal) => `Reference ${signal} and reduce ramp time.`),
+      engineeringCultureNotes
+        ? `Mirror the engineering culture notes: ${engineeringCultureNotes}`
+        : null,
+    ].map((value) => cleanText(value, 260)),
+  ).slice(0, 6);
 
   return {
     products,
@@ -153,11 +179,18 @@ export function parseResearchIntelligence(record: ResearchRecord, painPoints: Pa
     opportunities,
     risks,
     outreachAngles,
-    painPointCandidates: cleanList(painPoints.map((point) => point.title), 6),
+    painPointCandidates: cleanList(
+      painPoints.map((point) => point.title),
+      6,
+    ),
   };
 }
 
-export function parsePainPoint(description?: string | null, tags?: string[] | null, sourceUrl?: string | null): ParsedPainPoint {
+export function parsePainPoint(
+  description?: string | null,
+  tags?: string[] | null,
+  sourceUrl?: string | null,
+): ParsedPainPoint {
   const raw = description ?? "";
   const [narrativePart, evidencePart = ""] = raw.split(/\n\nEvidence:\s*/i);
   const [evidence, suggestedSolution = ""] = evidencePart.split(/\n\nSuggested solution:\s*/i);

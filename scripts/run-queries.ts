@@ -12,7 +12,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
   }
   return env;
@@ -28,12 +32,22 @@ async function main() {
   const { data: certs } = await admin.from("certifications").select("*").limit(5);
   console.log(JSON.stringify(certs, null, 2));
 
-  console.log("\n2. select name, role, profile_url, source from recruiters where source='discovery';");
-  const { data: recs } = await admin.from("recruiters").select("name,role,profile_url,source").eq("source", "discovery");
+  console.log(
+    "\n2. select name, role, profile_url, source from recruiters where source='discovery';",
+  );
+  const { data: recs } = await admin
+    .from("recruiters")
+    .select("name,role,profile_url,source")
+    .eq("source", "discovery");
   console.log(JSON.stringify(recs, null, 2));
 
-  console.log("\n3. select company_quality_score, strategic_value_score, founder_detected from companies limit 10;");
-  const { data: comps } = await admin.from("companies").select("company_quality_score,strategic_value_score,founder_detected").limit(10);
+  console.log(
+    "\n3. select company_quality_score, strategic_value_score, founder_detected from companies limit 10;",
+  );
+  const { data: comps } = await admin
+    .from("companies")
+    .select("company_quality_score,strategic_value_score,founder_detected")
+    .limit(10);
   console.log(JSON.stringify(comps, null, 2));
 }
 

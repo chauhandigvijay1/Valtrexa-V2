@@ -14,7 +14,9 @@ async function handleResumeTailor(request: Request) {
     return json({ error: "Resume content unavailable." }, { status: 400 });
   }
 
-  const isLatex = normalizedVersion.file_type === "application/x-tex" || normalizedVersion.file_name?.endsWith(".tex");
+  const isLatex =
+    normalizedVersion.file_type === "application/x-tex" ||
+    normalizedVersion.file_name?.endsWith(".tex");
   const timestamp = Date.now();
 
   let storagePath = "";
@@ -24,30 +26,45 @@ async function handleResumeTailor(request: Request) {
 
   if (isLatex) {
     // 1. NATIVE LATEX WORKFLOW
-    const { data: texFile } = await supabaseAdmin.storage.from("resumes").download(normalizedVersion.storage_path);
-    if (!texFile) return json({ error: "Original .tex file not found in storage." }, { status: 404 });
+    const { data: texFile } = await supabaseAdmin.storage
+      .from("resumes")
+      .download(normalizedVersion.storage_path);
+    if (!texFile)
+      return json({ error: "Original .tex file not found in storage." }, { status: 404 });
     const texContent = await texFile.text();
 
     const mutatedTexResult = await withTimeout(
-      callOpenRouterText([
-        { role: "system", content: "You are a Native LaTeX Engine. Rewrite the provided LaTeX resume for the provided Job Description. Preserve ALL preamble, documentclass, packages, margins, spacing, styling, and section order exactly as provided. DO NOT use markdown. DO NOT invent experience. Return ONLY the raw complete mutated LaTeX document." },
-        { role: "user", content: `Job Description:\n${body.jobDescription.slice(0, 30000)}\n\nOriginal Resume:\n${texContent}` }
-      ], { userId: user.id }),
+      callOpenRouterText(
+        [
+          {
+            role: "system",
+            content:
+              "You are a Native LaTeX Engine. Rewrite the provided LaTeX resume for the provided Job Description. Preserve ALL preamble, documentclass, packages, margins, spacing, styling, and section order exactly as provided. DO NOT use markdown. DO NOT invent experience. Return ONLY the raw complete mutated LaTeX document.",
+          },
+          {
+            role: "user",
+            content: `Job Description:\n${body.jobDescription.slice(0, 30000)}\n\nOriginal Resume:\n${texContent}`,
+          },
+        ],
+        { userId: user.id },
+      ),
       55000,
-      "Tailored latex generation"
+      "Tailored latex generation",
     ).catch(() => ({ content: texContent }));
 
     let mutatedTex = (mutatedTexResult as any).content || texContent;
     // Strip markdown formatting if the model incorrectly wrapped it
     mutatedTex = mutatedTex.replace(/^```[a-z]*\n/gi, "").replace(/\n```$/g, "");
-    
+
     // Save .tex
     const texPath = `${user.id}/${body.resumeId}/tailored-${timestamp}.tex`;
-    await supabaseAdmin.storage.from("tailored-resumes").upload(texPath, Buffer.from(mutatedTex, "utf-8"), {
-      contentType: "application/x-tex",
-      upsert: false,
-    });
-    
+    await supabaseAdmin.storage
+      .from("tailored-resumes")
+      .upload(texPath, Buffer.from(mutatedTex, "utf-8"), {
+        contentType: "application/x-tex",
+        upsert: false,
+      });
+
     storagePath = texPath;
     finalAtsFriendly = mutatedTex; // Technically the raw .tex
 
@@ -60,10 +77,12 @@ async function handleResumeTailor(request: Request) {
       if (res.ok) {
         const pdfBuffer = await res.arrayBuffer();
         const pdfPath = `${user.id}/${body.resumeId}/tailored-${timestamp}.pdf`;
-        await supabaseAdmin.storage.from("tailored-resumes").upload(pdfPath, Buffer.from(pdfBuffer), {
-          contentType: "application/pdf",
-          upsert: false,
-        });
+        await supabaseAdmin.storage
+          .from("tailored-resumes")
+          .upload(pdfPath, Buffer.from(pdfBuffer), {
+            contentType: "application/pdf",
+            upsert: false,
+          });
       } else {
         console.error("PDF Compilation failed", res.status, await res.text());
       }
@@ -74,20 +93,20 @@ async function handleResumeTailor(request: Request) {
     // 3. LEGACY MARKDOWN WORKFLOW
     const tailored = await withTimeout(
       callOpenRouterJson<TailoredResume>(
-      [
-        {
-          role: "system",
-          content:
-            "Rewrite the provided resume for the job description. Preserve truthfulness. Do not invent experience. Return strict JSON only.",
-        },
-        {
-          role: "user",
-          content: `Resume:\n${sourceResume.slice(0, 60000)}\n\nJob Description:\n${body.jobDescription.slice(0, 30000)}`,
-        },
-      ],
-      "tailored_resume",
-      tailoredSchema,
-      { userId: user.id },
+        [
+          {
+            role: "system",
+            content:
+              "Rewrite the provided resume for the job description. Preserve truthfulness. Do not invent experience. Return strict JSON only.",
+          },
+          {
+            role: "user",
+            content: `Resume:\n${sourceResume.slice(0, 60000)}\n\nJob Description:\n${body.jobDescription.slice(0, 30000)}`,
+          },
+        ],
+        "tailored_resume",
+        tailoredSchema,
+        { userId: user.id },
       ),
       45000,
       "Tailored resume generation",
@@ -97,17 +116,23 @@ async function handleResumeTailor(request: Request) {
       usage: null,
       source: "env" as const,
     }));
-    const normalizedTailored = normalizeTailoredResumePayload(tailored.data, sourceResume, body.jobDescription);
-    
+    const normalizedTailored = normalizeTailoredResumePayload(
+      tailored.data,
+      sourceResume,
+      body.jobDescription,
+    );
+
     finalOptimized = normalizedTailored.optimizedResume;
     finalAtsFriendly = normalizedTailored.atsFriendlyResume;
     finalMissingSkills = normalizedTailored.missingSkills;
-    
+
     storagePath = `${user.id}/${body.resumeId}/tailored-${timestamp}.md`;
-    await supabaseAdmin.storage.from("tailored-resumes").upload(storagePath, Buffer.from(finalAtsFriendly, "utf-8"), {
+    await supabaseAdmin.storage
+      .from("tailored-resumes")
+      .upload(storagePath, Buffer.from(finalAtsFriendly, "utf-8"), {
         contentType: "text/markdown; charset=utf-8",
         upsert: false,
-    });
+      });
   }
 
   const insert = await supabaseAdmin
@@ -127,7 +152,10 @@ async function handleResumeTailor(request: Request) {
     .single();
 
   if (insert.error || !insert.data) {
-    return json({ error: insert.error?.message ?? "Failed to store tailored resume." }, { status: 400 });
+    return json(
+      { error: insert.error?.message ?? "Failed to store tailored resume." },
+      { status: 400 },
+    );
   }
 
   await emitWorkflowEvent({
@@ -135,7 +163,12 @@ async function handleResumeTailor(request: Request) {
     eventType: "resume_tailored",
     entityType: "tailored_resumes",
     entityId: insert.data.id,
-    payload: { resumeId: body.resumeId, resumeVersionId: versionData.id, jobId: body.jobId ?? null, storagePath },
+    payload: {
+      resumeId: body.resumeId,
+      resumeVersionId: versionData.id,
+      jobId: body.jobId ?? null,
+      storagePath,
+    },
   });
 
   return json(insert.data);

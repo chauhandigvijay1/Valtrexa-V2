@@ -12,7 +12,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
   }
   return env;
@@ -22,26 +26,53 @@ const env = loadDotEnv();
 const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
 const TABLES = [
-  "profiles", "candidate_profiles", "candidate_brain", "candidate_memory",
-  "skills", "education", "experiences", "projects",
-  "resumes", "resume_versions", "resume_parses", "resume_analyses", "tailored_resumes",
-  "jobs", "job_matches", "job_import_runs",
-  "applications", "interviews", "interview_preparation",
-  "recruiters", "recruiter_conversations",
-  "followups", "follow_ups",
-  "company_research", "painpoints", "companies",
-  "outreach_messages", "outreach_campaigns", "loom_scripts",
-  "workflow_events", "n8n_webhook_subscriptions",
-  "notification_queue", "alert_preferences",
-  "assessments", "daily_summaries", "ai_generations",
-  "integrations", "learning_loop",
+  "profiles",
+  "candidate_profiles",
+  "candidate_brain",
+  "candidate_memory",
+  "skills",
+  "education",
+  "experiences",
+  "projects",
+  "resumes",
+  "resume_versions",
+  "resume_parses",
+  "resume_analyses",
+  "tailored_resumes",
+  "jobs",
+  "job_matches",
+  "job_import_runs",
+  "applications",
+  "interviews",
+  "interview_preparation",
+  "recruiters",
+  "recruiter_conversations",
+  "followups",
+  "follow_ups",
+  "company_research",
+  "painpoints",
+  "companies",
+  "outreach_messages",
+  "outreach_campaigns",
+  "loom_scripts",
+  "workflow_events",
+  "n8n_webhook_subscriptions",
+  "notification_queue",
+  "alert_preferences",
+  "assessments",
+  "daily_summaries",
+  "ai_generations",
+  "integrations",
+  "learning_loop",
   "application_answers",
 ];
 
 async function main() {
   console.log("=== TABLE EXISTENCE & ROW COUNTS ===\n");
   for (const table of TABLES) {
-    const { data, error, count } = await admin.from(table).select("id", { count: "exact", head: true });
+    const { data, error, count } = await admin
+      .from(table)
+      .select("id", { count: "exact", head: true });
     if (error) {
       console.log(`❌ ${table}: ${error.message}`);
     } else {

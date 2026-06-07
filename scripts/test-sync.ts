@@ -12,7 +12,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
   }
   return env;
@@ -29,7 +33,7 @@ const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
 async function main() {
   const userId = "e178c157-318a-4a41-8aea-b964fff877f8"; // existing user ID from check-tables.ts
   const parsed = {
-    skills: ["React", "Next.js", "Node.js"]
+    skills: ["React", "Next.js", "Node.js"],
   };
 
   console.log("Attempting to delete skills for user...");
@@ -40,7 +44,7 @@ async function main() {
   const insRes = await admin.from("skills").insert({
     user_id: userId,
     name: "React",
-    level: "intermediate"
+    level: "intermediate",
   });
   console.log("Insert result:", insRes.error);
 }

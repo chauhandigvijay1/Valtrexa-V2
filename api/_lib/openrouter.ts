@@ -29,7 +29,11 @@ async function requestOpenRouter(body: string, apiKey: string) {
   });
 }
 
-async function requestWithFallback(bodyFactory: (model: string) => string, apiKey: string, preferredModel: string) {
+async function requestWithFallback(
+  bodyFactory: (model: string) => string,
+  apiKey: string,
+  preferredModel: string,
+) {
   const modelOrder = Array.from(new Set([preferredModel, ...FREE_MODEL_CHAIN]));
   let lastResponse: Response | null = null;
   let lastError: Error | null = null;
@@ -92,13 +96,17 @@ async function resolveOpenRouterCredentials(userId?: string) {
 
   return {
     apiKey,
-    model: isFreeModel(config.default_model?.trim()) ? config.default_model.trim() : FREE_MODEL_CHAIN[0],
+    model: isFreeModel(config.default_model?.trim())
+      ? config.default_model.trim()
+      : FREE_MODEL_CHAIN[0],
     source: "integration" as const,
   };
 }
 
 export function getOpenRouterModelChain(primary?: string | null) {
-  return Array.from(new Set([isFreeModel(primary) ? primary : FREE_MODEL_CHAIN[0], ...FREE_MODEL_CHAIN]));
+  return Array.from(
+    new Set([isFreeModel(primary) ? primary : FREE_MODEL_CHAIN[0], ...FREE_MODEL_CHAIN]),
+  );
 }
 
 export async function callOpenRouterText(
@@ -106,7 +114,8 @@ export async function callOpenRouterText(
   opts?: { model?: string; temperature?: number; userId?: string },
 ) {
   const credentials = await resolveOpenRouterCredentials(opts?.userId);
-  const preferredModel = (isFreeModel(opts?.model) ? opts?.model : credentials.model) ?? FREE_MODEL_CHAIN[0];
+  const preferredModel =
+    (isFreeModel(opts?.model) ? opts?.model : credentials.model) ?? FREE_MODEL_CHAIN[0];
   const { response, model: resolvedModel } = await requestWithFallback(
     (model) =>
       JSON.stringify({
@@ -155,7 +164,8 @@ export async function callOpenRouterJson<T>(
   opts?: { model?: string; userId?: string },
 ): Promise<{ data: T; model: string; usage: any; source: "env" | "integration" }> {
   const credentials = await resolveOpenRouterCredentials(opts?.userId);
-  const preferredModel = (isFreeModel(opts?.model) ? opts?.model : credentials.model) ?? FREE_MODEL_CHAIN[0];
+  const preferredModel =
+    (isFreeModel(opts?.model) ? opts?.model : credentials.model) ?? FREE_MODEL_CHAIN[0];
   const requestBody = (model: string) =>
     JSON.stringify({
       model,

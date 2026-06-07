@@ -13,7 +13,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
     process.env[key] = value;
   }
@@ -26,13 +30,18 @@ const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 const USER_ID = "c8dfc28a-fa3e-4e6d-8027-2f936d0192e0";
 const EMAIL = "chauhandigvijay121@gmail.com";
 
-async function invokeRoute(routePath: string, init: { method?: string; body?: unknown; token?: string; headers?: Record<string, string> }) {
+async function invokeRoute(
+  routePath: string,
+  init: { method?: string; body?: unknown; token?: string; headers?: Record<string, string> },
+) {
   const mod = await import(pathToFileURL(path.resolve(process.cwd(), "api/[...route].ts")).href);
   const handler = mod.default;
   const headers = new Headers(init.headers ?? {});
   if (init.token) headers.set("authorization", `Bearer ${init.token}`);
   if (init.body !== undefined) headers.set("content-type", "application/json");
-  const normalizedPath = routePath.startsWith("/api/") ? routePath : `/api/${routePath.replace(/^\/+/, "")}`;
+  const normalizedPath = routePath.startsWith("/api/")
+    ? routePath
+    : `/api/${routePath.replace(/^\/+/, "")}`;
   const request = new Request(`http://localhost${normalizedPath}`, {
     method: init.method ?? "GET",
     headers,
@@ -71,7 +80,11 @@ async function main() {
   console.log(`Signed in successfully!`);
 
   // 2. Ensure we have candidate profile
-  const { data: profile } = await admin.from("candidate_profiles").select("id").eq("user_id", USER_ID).maybeSingle();
+  const { data: profile } = await admin
+    .from("candidate_profiles")
+    .select("id")
+    .eq("user_id", USER_ID)
+    .maybeSingle();
   if (!profile) {
     console.log("Creating candidate profile...");
     await admin.from("candidate_profiles").insert({
@@ -82,13 +95,18 @@ async function main() {
 
   // 3. Create or get test job
   console.log("Creating test job...");
-  const { data: job, error: jobErr } = await admin.from("jobs").insert({
-    user_id: USER_ID,
-    company_name: "Supabase",
-    title: "Platform Engineer",
-    description: "We need a software engineer with TypeScript, React, Supabase, PostgreSQL, automation, and technical writing skills.",
-    match_score: 88,
-  }).select("*").single();
+  const { data: job, error: jobErr } = await admin
+    .from("jobs")
+    .insert({
+      user_id: USER_ID,
+      company_name: "Supabase",
+      title: "Platform Engineer",
+      description:
+        "We need a software engineer with TypeScript, React, Supabase, PostgreSQL, automation, and technical writing skills.",
+      match_score: 88,
+    })
+    .select("*")
+    .single();
 
   if (jobErr) {
     throw new Error(`Failed to create test job: ${jobErr.message}`);
@@ -97,13 +115,17 @@ async function main() {
 
   // 4. Create or get company research
   console.log("Creating company research...");
-  const { data: research, error: resErr } = await admin.from("company_research").insert({
-    user_id: USER_ID,
-    company_name: "Supabase",
-    tech_stack: ["TypeScript", "React", "Supabase", "PostgreSQL"],
-    culture_notes: "Open source, developer-focused, collaborative environment.",
-    summary: "Supabase is an open source Firebase alternative built on PostgreSQL.",
-  }).select("*").single();
+  const { data: research, error: resErr } = await admin
+    .from("company_research")
+    .insert({
+      user_id: USER_ID,
+      company_name: "Supabase",
+      tech_stack: ["TypeScript", "React", "Supabase", "PostgreSQL"],
+      culture_notes: "Open source, developer-focused, collaborative environment.",
+      summary: "Supabase is an open source Firebase alternative built on PostgreSQL.",
+    })
+    .select("*")
+    .single();
 
   if (resErr) {
     throw new Error(`Failed to create company research: ${resErr.message}`);
@@ -112,13 +134,17 @@ async function main() {
 
   // 5. Create or get application
   console.log("Creating application...");
-  const { data: application, error: appErr } = await admin.from("applications").insert({
-    user_id: USER_ID,
-    job_id: job.id,
-    company_name: "Supabase",
-    role_title: "Platform Engineer",
-    status: "applied",
-  }).select("*").single();
+  const { data: application, error: appErr } = await admin
+    .from("applications")
+    .insert({
+      user_id: USER_ID,
+      job_id: job.id,
+      company_name: "Supabase",
+      role_title: "Platform Engineer",
+      status: "applied",
+    })
+    .select("*")
+    .single();
 
   if (appErr) {
     throw new Error(`Failed to create application: ${appErr.message}`);

@@ -13,7 +13,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
     process.env[key] = value;
   }
@@ -26,7 +30,10 @@ const admin = createClient(env.SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 const USER_ID = "c8dfc28a-fa3e-4e6d-8027-2f936d0192e0";
 const EMAIL = "chauhandigvijay121@gmail.com";
 
-async function invokeRoute(routePath: string, init: { method?: string; body?: unknown; token?: string }) {
+async function invokeRoute(
+  routePath: string,
+  init: { method?: string; body?: unknown; token?: string },
+) {
   const mod = await import(pathToFileURL(path.resolve(process.cwd(), "api/[...route].ts")).href);
   const handler = mod.default;
   const headers = new Headers();
@@ -76,8 +83,11 @@ async function main() {
     { path: "n8n/events", method: "GET" },
     { path: "n8n/webhooks", method: "GET" },
     { path: "candidate-brain", method: "GET" },
-    { path: "applications/answers?applicationId=00000000-0000-0000-0000-000000000000", method: "GET" },
-    
+    {
+      path: "applications/answers?applicationId=00000000-0000-0000-0000-000000000000",
+      method: "GET",
+    },
+
     // POST routes (checking that they hit 400 Bad Request or 200 instead of 500/404)
     { path: "resumes/process", method: "POST", body: {} },
     { path: "resumes/analyze", method: "POST", body: {} },
@@ -98,13 +108,15 @@ async function main() {
     { path: "follow-ups", method: "POST", body: {} },
     { path: "follow-ups/auto-create", method: "POST", body: {} },
     { path: "recruiters/discover", method: "POST", body: {} },
-    { path: "admin/migrate", method: "POST", body: {} }
+    { path: "admin/migrate", method: "POST", body: {} },
   ];
 
   for (const r of routes) {
     const res = await invokeRoute(r.path, { method: r.method, body: r.body, token });
     const isPass = res.status < 500; // 400 is a pass because it means route exists but payload is invalid. 500/404 is a fail.
-    console.log(`${r.method} /api/${r.path.split("?")[0]} .... ${res.status} .... ${isPass ? "PASS" : "FAIL"}`);
+    console.log(
+      `${r.method} /api/${r.path.split("?")[0]} .... ${res.status} .... ${isPass ? "PASS" : "FAIL"}`,
+    );
     if (!isPass) {
       console.log(`   ERROR details:`, res.text || (res as any).error);
       if ((res as any).stack) console.log((res as any).stack);

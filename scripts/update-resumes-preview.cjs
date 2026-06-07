@@ -1,7 +1,7 @@
-const fs = require('fs');
-let c = fs.readFileSync('src/routes/_authenticated/resumes.tsx', 'utf8');
+const fs = require("fs");
+let c = fs.readFileSync("src/routes/_authenticated/resumes.tsx", "utf8");
 
-if (!c.includes('function PdfPreview')) {
+if (!c.includes("function PdfPreview")) {
   const comp = `
 function PdfPreview({ path, bucket }: { path: string; bucket: string }) {
   const [url, setUrl] = useState<string | null>(null);
@@ -28,10 +28,13 @@ function PdfPreview({ path, bucket }: { path: string; bucket: string }) {
                                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tailored resume version</div>
                                   <Textarea rows={14} readOnly value={resume.latestTailored.optimized_resume} />
                                 </>
-                              )}`
+                              )}`,
   );
-  
-  c = c.replace(/import \{ useMemo, useRef, useState \} from "react";/, 'import { useMemo, useRef, useState, useEffect } from "react";');
 
-  fs.writeFileSync('src/routes/_authenticated/resumes.tsx', c);
+  c = c.replace(
+    /import \{ useMemo, useRef, useState \} from "react";/,
+    'import { useMemo, useRef, useState, useEffect } from "react";',
+  );
+
+  fs.writeFileSync("src/routes/_authenticated/resumes.tsx", c);
 }

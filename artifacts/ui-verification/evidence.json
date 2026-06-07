@@ -16,9 +16,7 @@
         "summary": "",
         "created_at": "2026-06-04T12:37:56.142448+00:00",
         "updated_at": "2026-06-04T12:37:56.142448+00:00",
-        "preferred_roles": [
-          "Platform Engineer"
-        ],
+        "preferred_roles": ["Platform Engineer"],
         "preferred_locations": [],
         "remote_preference": "hybrid",
         "salary_expectation": null,
@@ -65,13 +63,7 @@
           "name": "Jane Engineer",
           "email": "jane.engineer@example.com",
           "phone": "+91 9876543210",
-          "skills": [
-            "TypeScript",
-            "React",
-            "Supabase",
-            "Node.js",
-            "PostgreSQL"
-          ],
+          "skills": ["TypeScript", "React", "Supabase", "Node.js", "PostgreSQL"],
           "experience": [
             {
               "company": "BreadButter",
@@ -160,10 +152,7 @@
         "job_id": null,
         "job_description": "We need a software engineer with TypeScript, React, Supabase, PostgreSQL, automation, and technical writing skills.",
         "ats_score": 80,
-        "missing_keywords": [
-          "automation",
-          "technical writing"
-        ],
+        "missing_keywords": ["automation", "technical writing"],
         "strengths": [
           "Proficient in TypeScript",
           "Experience with React",
@@ -190,10 +179,7 @@
             "Lack of specific mention of automation skills",
             "No reference to technical writing experience"
           ],
-          "missingKeywords": [
-            "automation",
-            "technical writing"
-          ],
+          "missingKeywords": ["automation", "technical writing"],
           "improvementSuggestions": [
             "Include specific examples of automation projects or workflows",
             "Highlight any technical writing experience or related projects"
@@ -212,10 +198,7 @@
         "job_id": null,
         "job_description": "We need a software engineer with TypeScript, React, Supabase, PostgreSQL, automation, and technical writing skills.",
         "ats_score": 80,
-        "missing_keywords": [
-          "automation",
-          "technical writing"
-        ],
+        "missing_keywords": ["automation", "technical writing"],
         "strengths": [
           "Proficient in TypeScript",
           "Experience with React",
@@ -242,10 +225,7 @@
             "Lack of specific mention of automation skills",
             "No reference to technical writing experience"
           ],
-          "missingKeywords": [
-            "automation",
-            "technical writing"
-          ],
+          "missingKeywords": ["automation", "technical writing"],
           "improvementSuggestions": [
             "Include specific examples of automation projects or workflows",
             "Highlight any technical writing experience or related projects"
@@ -342,13 +322,7 @@
         "company_name": "https://supabase.com",
         "summary": "Supabase is an open-source backend-as-a-service platform that provides developers with tools to build applications quickly and efficiently. It aims to simplify the development process by offering features such as real-time databases, authentication, and storage solutions.",
         "recent_news": "Supabase has recently faced disruptions in India due to a blocking order affecting access to its platform. This has raised concerns about the impact on the startup ecosystem in the region. Additionally, Supabase is projected to achieve $70 million in annual recurring revenue (ARR) by 2025, with a valuation of $2 billion.",
-        "tech_stack": [
-          "PostgreSQL",
-          "JavaScript",
-          "TypeScript",
-          "React",
-          "Node.js"
-        ],
+        "tech_stack": ["PostgreSQL", "JavaScript", "TypeScript", "React", "Node.js"],
         "culture_notes": "Supabase promotes an open-source culture, encouraging contributions from the community and fostering a collaborative environment among its engineering teams.\n\nProducts: Backend-as-a-Service, Real-time Database, Authentication Services, Storage Solutions, API Generation\n\nHiring signals: Looking for backend developers; Hiring for product management roles; Seeking engineers with experience in open-source technologies\n\nFunding: {\"status\":\"unknown\",\"source\":null}",
         "source_urls": [],
         "file_url": "{\"products\":[\"Backend-as-a-Service\",\"Real-time Database\",\"Authentication Services\",\"Storage Solutions\",\"API Generation\"],\"hiringSignals\":[\"Looking for backend developers\",\"Hiring for product management roles\",\"Seeking engineers with experience in open-source technologies\"],\"fundingData\":{\"status\":\"unknown\",\"source\":null},\"engineeringCultureNotes\":\"Supabase promotes an open-source culture, encouraging contributions from the community and fostering a collaborative environment among its engineering teams.\"}",
@@ -381,10 +355,7 @@
             "description": "Recent disruptions in India due to a blocking order have affected access to Supabase's platform, potentially limiting market expansion and user acquisition in a growing tech ecosystem.\n\nEvidence: Supabase has recently faced disruptions in India due to a blocking order affecting access to its platform.\n\nSuggested solution: Engage with local authorities and stakeholders to resolve access issues and explore alternative solutions to ensure platform availability in affected regions.",
             "source_url": null,
             "severity": 4,
-            "tags": [
-              "Market Reach",
-              "Recent News"
-            ],
+            "tags": ["Market Reach", "Recent News"],
             "created_at": "2026-06-04T12:38:56.692192+00:00",
             "updated_at": "2026-06-04T12:38:56.692192+00:00",
             "category": "Market Reach",
@@ -401,10 +372,7 @@
             "description": "Supabase is actively seeking engineers with experience in open-source technologies, indicating a competitive market for such talent, which may lead to difficulties in hiring qualified candidates.\n\nEvidence: Hiring for product management roles and seeking engineers with experience in open-source technologies.\n\nSuggested solution: Enhance employer branding and outreach efforts to attract talent, possibly by showcasing contributions to open-source projects and community involvement.",
             "source_url": null,
             "severity": 3,
-            "tags": [
-              "Talent Acquisition",
-              "Hiring Signals"
-            ],
+            "tags": ["Talent Acquisition", "Hiring Signals"],
             "created_at": "2026-06-04T12:38:56.88651+00:00",
             "updated_at": "2026-06-04T12:38:56.88651+00:00",
             "category": "Talent Acquisition",
@@ -421,10 +389,7 @@
             "description": "With a projected growth to $70 million in ARR by 2025, Supabase needs to scale its engineering team effectively to meet increasing demand for its services.\n\nEvidence: Supabase is projected to achieve $70 million in annual recurring revenue (ARR) by 2025, with a valuation of $2 billion.\n\nSuggested solution: Implement a structured recruitment strategy that focuses on rapid scaling while maintaining quality, possibly through partnerships with recruitment agencies or tech communities.",
             "source_url": null,
             "severity": 5,
-            "tags": [
-              "Team Scaling",
-              "Company Research"
-            ],
+            "tags": ["Team Scaling", "Company Research"],
             "created_at": "2026-06-04T12:38:57.050378+00:00",
             "updated_at": "2026-06-04T12:38:57.050378+00:00",
             "category": "Team Scaling",
@@ -443,13 +408,7 @@
         "company_name": "https://supabase.com",
         "summary": "Supabase is an open-source backend-as-a-service platform that provides developers with tools to build applications quickly and efficiently. It aims to simplify the development process by offering features such as real-time databases, authentication, and storage solutions.",
         "recent_news": "Supabase has recently faced disruptions in India due to a blocking order affecting access to its platform. This has raised concerns about the impact on the startup ecosystem in the region. Additionally, Supabase is projected to achieve $70 million in annual recurring revenue (ARR) by 2025, with a valuation of $2 billion.",
-        "tech_stack": [
-          "PostgreSQL",
-          "JavaScript",
-          "TypeScript",
-          "React",
-          "Node.js"
-        ],
+        "tech_stack": ["PostgreSQL", "JavaScript", "TypeScript", "React", "Node.js"],
         "culture_notes": "Supabase promotes an open-source culture, encouraging contributions from the community and fostering a collaborative environment among its engineering teams.\n\nProducts: Backend-as-a-Service, Real-time Database, Authentication Services, Storage Solutions, API Generation\n\nHiring signals: Looking for backend developers; Hiring for product management roles; Seeking engineers with experience in open-source technologies\n\nFunding: {\"status\":\"unknown\",\"source\":null}",
         "source_urls": [],
         "file_url": "{\"products\":[\"Backend-as-a-Service\",\"Real-time Database\",\"Authentication Services\",\"Storage Solutions\",\"API Generation\"],\"hiringSignals\":[\"Looking for backend developers\",\"Hiring for product management roles\",\"Seeking engineers with experience in open-source technologies\"],\"fundingData\":{\"status\":\"unknown\",\"source\":null},\"engineeringCultureNotes\":\"Supabase promotes an open-source culture, encouraging contributions from the community and fostering a collaborative environment among its engineering teams.\"}",

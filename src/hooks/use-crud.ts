@@ -6,15 +6,34 @@ import { PAGE_SIZE } from "@/components/crud-shell";
 import { apiPost } from "@/lib/api-client";
 
 type TableName =
-  | "projects" | "skills" | "resumes" | "jobs"
-  | "applications" | "recruiters" | "outreach_campaigns" | "interviews"
-  | "candidate_memory" | "recruiter_conversations" | "followups"
-  | "assessments" | "painpoints" | "company_research"
-  | "learning_loop" | "job_matches" | "interview_preparation"
-  | "outreach_messages" | "resume_parses" | "resume_analyses"
-  | "tailored_resumes" | "workflow_events" | "n8n_webhook_subscriptions"
-  | "job_import_runs" | "companies" | "candidate_profiles"
-  | "education" | "experiences";
+  | "projects"
+  | "skills"
+  | "resumes"
+  | "jobs"
+  | "applications"
+  | "recruiters"
+  | "outreach_campaigns"
+  | "interviews"
+  | "candidate_memory"
+  | "recruiter_conversations"
+  | "followups"
+  | "assessments"
+  | "painpoints"
+  | "company_research"
+  | "learning_loop"
+  | "job_matches"
+  | "interview_preparation"
+  | "outreach_messages"
+  | "resume_parses"
+  | "resume_analyses"
+  | "tailored_resumes"
+  | "workflow_events"
+  | "n8n_webhook_subscriptions"
+  | "job_import_runs"
+  | "companies"
+  | "candidate_profiles"
+  | "education"
+  | "experiences";
 
 const WORKFLOW_EVENT_BY_TABLE: Partial<Record<TableName, string>> = {
   recruiters: "recruiter_added",
@@ -61,11 +80,18 @@ export function useCrudSave<T extends { id?: string }>(table: TableName, queryKe
       if (!user) throw new Error("Not signed in");
       const { id, ...rest } = payload as any;
       if (id) {
-        const { error } = await supabase.from(table as any).update(rest).eq("id", id);
+        const { error } = await supabase
+          .from(table as any)
+          .update(rest)
+          .eq("id", id);
         if (error) throw error;
         return null;
       } else {
-        const { data, error } = await supabase.from(table as any).insert({ ...rest, user_id: user.id }).select("*").single();
+        const { data, error } = await supabase
+          .from(table as any)
+          .insert({ ...rest, user_id: user.id })
+          .select("*")
+          .single();
         if (error) throw error;
         return data;
       }
@@ -96,7 +122,10 @@ export function useCrudDelete(table: TableName, queryKeyPrefix: string) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from(table as any).delete().eq("id", id);
+      const { error } = await supabase
+        .from(table as any)
+        .delete()
+        .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {

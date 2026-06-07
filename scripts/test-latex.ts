@@ -9,28 +9,32 @@ async function compile(texContent: string): Promise<Buffer> {
   url.searchParams.set("command", "pdflatex");
 
   return new Promise((resolve, reject) => {
-    https.get(url.toString(), (res) => {
-      if (res.statusCode !== 200 && res.statusCode !== 302) {
-        let errData = "";
-        res.on("data", (c) => (errData += c));
-        res.on("end", () => reject(new Error(`Status ${res.statusCode}: ${errData}`)));
-        return;
-      }
-      
-      // Follow redirects if any
-      if (res.statusCode === 302 && res.headers.location) {
-        https.get(res.headers.location, (res2) => {
-          const chunks: Buffer[] = [];
-          res2.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-          res2.on("end", () => resolve(Buffer.concat(chunks)));
-        }).on("error", reject);
-        return;
-      }
+    https
+      .get(url.toString(), (res) => {
+        if (res.statusCode !== 200 && res.statusCode !== 302) {
+          let errData = "";
+          res.on("data", (c) => (errData += c));
+          res.on("end", () => reject(new Error(`Status ${res.statusCode}: ${errData}`)));
+          return;
+        }
 
-      const chunks: Buffer[] = [];
-      res.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
-      res.on("end", () => resolve(Buffer.concat(chunks)));
-    }).on("error", reject);
+        // Follow redirects if any
+        if (res.statusCode === 302 && res.headers.location) {
+          https
+            .get(res.headers.location, (res2) => {
+              const chunks: Buffer[] = [];
+              res2.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+              res2.on("end", () => resolve(Buffer.concat(chunks)));
+            })
+            .on("error", reject);
+          return;
+        }
+
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk) => chunks.push(Buffer.from(chunk)));
+        res.on("end", () => resolve(Buffer.concat(chunks)));
+      })
+      .on("error", reject);
   });
 }
 
@@ -42,7 +46,7 @@ async function main() {
     console.log("Compiled PDF size:", pdf.length, "bytes");
     await fs.writeFile("test-latexonline.pdf", pdf);
     console.log("Success.");
-  } catch(e) {
+  } catch (e) {
     console.error("Failed:", e);
   }
 }

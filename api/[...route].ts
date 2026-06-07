@@ -21,10 +21,20 @@ import {
   normalizeResumeVersion,
 } from "./_lib/compat.js";
 import { json, methodNotAllowed, readJson } from "./_lib/http.js";
-import { importAshby, importGreenhouse, importHtmlSource, importLever, type ImportedJob } from "./_lib/job-sources.js";
+import {
+  importAshby,
+  importGreenhouse,
+  importHtmlSource,
+  importLever,
+  type ImportedJob,
+} from "./_lib/job-sources.js";
 import { getProvider } from "./_lib/providers.js";
 import { callOpenRouterJson, callOpenRouterText } from "./_lib/openrouter.js";
-import { extractResumeText, parseResumeText, type ResumeStructuredData } from "./_lib/resume-parser.js";
+import {
+  extractResumeText,
+  parseResumeText,
+  type ResumeStructuredData,
+} from "./_lib/resume-parser.js";
 import { supabaseAdmin } from "./_lib/supabase.js";
 import { emitWorkflowEvent } from "./_lib/workflow-events.js";
 
@@ -45,9 +55,16 @@ async function syncCandidateBrain(userId: string, parsed: Record<string, any>, r
     parsed_resume: parsed,
   };
 
-  const existingProfile = await supabaseAdmin.from("candidate_profiles").select("id").eq("user_id", userId).maybeSingle();
+  const existingProfile = await supabaseAdmin
+    .from("candidate_profiles")
+    .select("id")
+    .eq("user_id", userId)
+    .maybeSingle();
   if (existingProfile.data?.id) {
-    await supabaseAdmin.from("candidate_profiles").update(profilePayload).eq("id", existingProfile.data.id);
+    await supabaseAdmin
+      .from("candidate_profiles")
+      .update(profilePayload)
+      .eq("id", existingProfile.data.id);
   } else {
     await supabaseAdmin.from("candidate_profiles").insert({ ...profilePayload, user_id: userId });
   }
@@ -67,7 +84,7 @@ async function syncCandidateBrain(userId: string, parsed: Record<string, any>, r
         await supabaseAdmin.from("skills").insert({
           user_id: userId,
           name: skillName.trim(),
-          level: "intermediate"
+          level: "intermediate",
         });
       }
     }
@@ -85,7 +102,7 @@ async function syncCandidateBrain(userId: string, parsed: Record<string, any>, r
           field: edu.field || edu.major || null,
           start_date: edu.start_date || edu.startDate || null,
           end_date: edu.end_date || edu.endDate || edu.year || null,
-          description: edu.description || null
+          description: edu.description || null,
         });
       }
     }
@@ -104,7 +121,7 @@ async function syncCandidateBrain(userId: string, parsed: Record<string, any>, r
           start_date: exp.start_date || exp.startDate || null,
           end_date: exp.end_date || exp.endDate || null,
           is_current: exp.is_current || exp.isCurrent || false,
-          description: exp.description || exp.summary || null
+          description: exp.description || exp.summary || null,
         });
       }
     }
@@ -121,7 +138,11 @@ async function syncCandidateBrain(userId: string, parsed: Record<string, any>, r
           description: proj.description || null,
           github_url: proj.github_url || proj.github || null,
           live_url: proj.live_url || proj.url || null,
-          tech_stack: Array.isArray(proj.tech_stack) ? proj.tech_stack : Array.isArray(proj.technologies) ? proj.technologies : null
+          tech_stack: Array.isArray(proj.tech_stack)
+            ? proj.tech_stack
+            : Array.isArray(proj.technologies)
+              ? proj.technologies
+              : null,
         });
       }
     }
@@ -148,7 +169,11 @@ type SourceRequest =
   | { source: "greenhouse"; boardToken: string }
   | { source: "lever"; site: string }
   | { source: "ashby"; boardUrl: string }
-  | { source: "linkedin" | "naukri" | "wellfound"; searchUrl: string; headers?: Record<string, string> };
+  | {
+      source: "linkedin" | "naukri" | "wellfound";
+      searchUrl: string;
+      headers?: Record<string, string>;
+    };
 
 type ResumeProcessBody = {
   resumeId?: string;
@@ -325,7 +350,15 @@ const researchSchema = {
     fundingData: { type: "object", additionalProperties: true },
     engineeringCultureNotes: { type: "string" },
   },
-  required: ["summary", "products", "recentNews", "hiringSignals", "techStack", "fundingData", "engineeringCultureNotes"],
+  required: [
+    "summary",
+    "products",
+    "recentNews",
+    "hiringSignals",
+    "techStack",
+    "fundingData",
+    "engineeringCultureNotes",
+  ],
 } as const;
 
 const painpointSchema = {
@@ -346,7 +379,15 @@ const painpointSchema = {
           suggestedSolution: { type: "string" },
           signalSource: { type: "string" },
         },
-        required: ["title", "category", "description", "evidence", "severity", "suggestedSolution", "signalSource"],
+        required: [
+          "title",
+          "category",
+          "description",
+          "evidence",
+          "severity",
+          "suggestedSolution",
+          "signalSource",
+        ],
       },
     },
   },
@@ -377,7 +418,9 @@ const loomSchema = {
 } as const;
 
 function asRecord(value: unknown): Record<string, any> {
-  return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, any>) : {};
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, any>)
+    : {};
 }
 
 function asString(value: unknown, fallback = "") {
@@ -385,7 +428,9 @@ function asString(value: unknown, fallback = "") {
 }
 
 function asStringArray(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string" && !!item.trim()) : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string" && !!item.trim())
+    : [];
 }
 
 function clampInteger(value: unknown, minimum: number, maximum: number, fallback: number) {
@@ -405,7 +450,10 @@ const CODE_NOISE_PATTERNS = [
 ];
 
 function normalizeWhitespace(value: string) {
-  return value.replace(/\u00a0/g, " ").replace(/\s+/g, " ").trim();
+  return value
+    .replace(/\u00a0/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function stripHtml(value: string) {
@@ -416,7 +464,8 @@ function hasCodeNoise(value: string) {
   const normalized = normalizeWhitespace(stripHtml(value));
   if (!normalized) return false;
   const matchedSignals = CODE_NOISE_PATTERNS.filter((pattern) => pattern.test(normalized)).length;
-  const symbolDensity = (normalized.match(/[{}()[\];]/g)?.length ?? 0) / Math.max(normalized.length, 1);
+  const symbolDensity =
+    (normalized.match(/[{}()[\];]/g)?.length ?? 0) / Math.max(normalized.length, 1);
   return matchedSignals >= 2 || symbolDensity > 0.08;
 }
 
@@ -470,7 +519,10 @@ function sanitizeFundingData(value: unknown, fallback: Record<string, unknown>) 
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`${label} timed out after ${timeoutMs}ms.`)), timeoutMs);
+    const timer = setTimeout(
+      () => reject(new Error(`${label} timed out after ${timeoutMs}ms.`)),
+      timeoutMs,
+    );
     promise.then(
       (value) => {
         clearTimeout(timer);
@@ -484,22 +536,39 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number, label: string) {
   });
 }
 
-function normalizeResearchPayload(value: unknown, input: {
-  companyName: string;
-  websiteText: string;
-  techStack: string[];
-  newsData: string;
-  sourceUrls: string[];
-}): ResearchResult {
+function normalizeResearchPayload(
+  value: unknown,
+  input: {
+    companyName: string;
+    websiteText: string;
+    techStack: string[];
+    newsData: string;
+    sourceUrls: string[];
+  },
+): ResearchResult {
   const fallback = fallbackCompanyResearch(input);
   const payload = asRecord(value);
   return {
     summary: sanitizeNarrative(asString(payload.summary), fallback.summary),
     products: sanitizeListItems(asStringArray(payload.products), fallback.products, 6),
-    recentNews: sanitizeNarrative(asString(payload.recentNews ?? payload.recent_news), fallback.recentNews),
-    hiringSignals: sanitizeListItems(asStringArray(payload.hiringSignals ?? payload.hiring_signals), fallback.hiringSignals, 6),
-    techStack: sanitizeListItems(asStringArray(payload.techStack ?? payload.tech_stack), fallback.techStack, 10),
-    fundingData: sanitizeFundingData(payload.fundingData ?? payload.funding_data, fallback.fundingData),
+    recentNews: sanitizeNarrative(
+      asString(payload.recentNews ?? payload.recent_news),
+      fallback.recentNews,
+    ),
+    hiringSignals: sanitizeListItems(
+      asStringArray(payload.hiringSignals ?? payload.hiring_signals),
+      fallback.hiringSignals,
+      6,
+    ),
+    techStack: sanitizeListItems(
+      asStringArray(payload.techStack ?? payload.tech_stack),
+      fallback.techStack,
+      10,
+    ),
+    fundingData: sanitizeFundingData(
+      payload.fundingData ?? payload.funding_data,
+      fallback.fundingData,
+    ),
     engineeringCultureNotes: sanitizeNarrative(
       asString(payload.engineeringCultureNotes ?? payload.engineering_culture_notes),
       fallback.engineeringCultureNotes,
@@ -507,7 +576,11 @@ function normalizeResearchPayload(value: unknown, input: {
   };
 }
 
-function normalizeTailoredResumePayload(value: unknown, resumeText: string, jobDescription: string): TailoredResume {
+function normalizeTailoredResumePayload(
+  value: unknown,
+  resumeText: string,
+  jobDescription: string,
+): TailoredResume {
   const payload = asRecord(value);
   const optimizedResume = asString(payload.optimizedResume ?? payload.optimized_resume);
   const atsFriendlyResume = asString(payload.atsFriendlyResume ?? payload.ats_friendly_resume);
@@ -520,7 +593,12 @@ function normalizeTailoredResumePayload(value: unknown, resumeText: string, jobD
   return fallbackTailoredResume(resumeText, jobDescription);
 }
 
-function normalizeMatchPayload(value: unknown, companyName: string, resumeText: string, jobDescription: string): MatchResult {
+function normalizeMatchPayload(
+  value: unknown,
+  companyName: string,
+  resumeText: string,
+  jobDescription: string,
+): MatchResult {
   const fallback = fallbackJobMatch(companyName, resumeText, jobDescription);
   const payload = asRecord(value);
   const fitSummary = asString(payload.fitSummary ?? payload.fit_summary);
@@ -560,8 +638,14 @@ function normalizePainPointPayload(
       const category = asString(point.category, "general");
       const description = sanitizeNarrative(asString(point.description));
       const evidence = sanitizeNarrative(asString(point.evidence));
-      const suggestedSolution = sanitizeNarrative(asString(point.suggestedSolution ?? point.suggested_solution));
-      const signalSource = sanitizeNarrative(asString(point.signalSource ?? point.signal_source, "company evidence"), "company evidence", 220);
+      const suggestedSolution = sanitizeNarrative(
+        asString(point.suggestedSolution ?? point.suggested_solution),
+      );
+      const signalSource = sanitizeNarrative(
+        asString(point.signalSource ?? point.signal_source, "company evidence"),
+        "company evidence",
+        220,
+      );
       if (!title || !description || !evidence || !suggestedSolution) return null;
       return {
         title,
@@ -631,8 +715,18 @@ type StoredPainPoint = {
 
 async function generatePainPointsForCompany(userId: string, body: PainPointBody) {
   const [researchResult, jobsResult] = await Promise.all([
-    supabaseAdmin.from("company_research").select("*").eq("user_id", userId).eq("company_name", body.companyName).maybeSingle(),
-    supabaseAdmin.from("jobs").select("title,description,source").eq("user_id", userId).eq("company_name", body.companyName).limit(10),
+    supabaseAdmin
+      .from("company_research")
+      .select("*")
+      .eq("user_id", userId)
+      .eq("company_name", body.companyName)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("jobs")
+      .select("title,description,source")
+      .eq("user_id", userId)
+      .eq("company_name", body.companyName)
+      .limit(10),
   ]);
 
   const researchMetadata = decodeResearchIntelligence(researchResult.data?.file_url);
@@ -650,25 +744,29 @@ async function generatePainPointsForCompany(userId: string, body: PainPointBody)
   const jobsText = JSON.stringify(jobsResult.data ?? []);
   const result = await withTimeout(
     callOpenRouterJson<PainPointResult>(
-    [
-      {
-        role: "system",
-        content:
-          "Infer hiring pain points from evidence only. Use job descriptions, company research, and public-company context already provided. Return strict JSON.",
-      },
-      {
-        role: "user",
-        content: `Company: ${body.companyName}\nResearch: ${researchText}\nJobs: ${jobsText}`,
-      },
-    ],
-    "painpoints",
-    painpointSchema,
-    { userId },
+      [
+        {
+          role: "system",
+          content:
+            "Infer hiring pain points from evidence only. Use job descriptions, company research, and public-company context already provided. Return strict JSON.",
+        },
+        {
+          role: "user",
+          content: `Company: ${body.companyName}\nResearch: ${researchText}\nJobs: ${jobsText}`,
+        },
+      ],
+      "painpoints",
+      painpointSchema,
+      { userId },
     ),
     35000,
     "Pain-point generation",
   ).catch(() => ({
-    data: fallbackPainPoints(body.companyName, researchResult.data as Record<string, unknown> | null, jobsResult.data ?? []),
+    data: fallbackPainPoints(
+      body.companyName,
+      researchResult.data as Record<string, unknown> | null,
+      jobsResult.data ?? [],
+    ),
     model: "local-fallback:painpoints",
     usage: null,
     source: "env" as const,
@@ -702,7 +800,12 @@ async function generatePainPointsForCompany(userId: string, body: PainPointBody)
       .maybeSingle();
 
     const mutation = existing.data?.id
-      ? await supabaseAdmin.from("painpoints").update(payload).eq("id", existing.data.id).select("*").single()
+      ? await supabaseAdmin
+          .from("painpoints")
+          .update(payload)
+          .eq("id", existing.data.id)
+          .select("*")
+          .single()
       : await supabaseAdmin.from("painpoints").insert(payload).select("*").single();
 
     if (mutation.error || !mutation.data) {
@@ -762,14 +865,25 @@ async function fetchWebsiteSummary(website?: string) {
       .map((_, element) => $(element).text())
       .get(),
   ];
-  const text = uniqueStrings(prioritizedBlocks).join(" ").slice(0, 12000) || sanitizeNarrative($("body").text(), "", 12000);
+  const text =
+    uniqueStrings(prioritizedBlocks).join(" ").slice(0, 12000) ||
+    sanitizeNarrative($("body").text(), "", 12000);
   const scripts = $("script[src]")
     .map((_, el) => $(el).attr("src") ?? "")
     .get()
     .join(" ");
-  const techStack = ["react", "next", "vite", "segment", "stripe", "tailwind", "sentry", "apollo", "graphql", "shopify"].filter((name) =>
-    scripts.toLowerCase().includes(name),
-  );
+  const techStack = [
+    "react",
+    "next",
+    "vite",
+    "segment",
+    "stripe",
+    "tailwind",
+    "sentry",
+    "apollo",
+    "graphql",
+    "shopify",
+  ].filter((name) => scripts.toLowerCase().includes(name));
   return { text, techStack, sourceUrls: [website] };
 }
 
@@ -828,7 +942,10 @@ async function handleResumeProcess(request: Request) {
   const body = await readJson<ResumeProcessBody>(request);
 
   if (body.isPrimary) {
-    let clearPrimary = supabaseAdmin.from("resumes").update({ is_primary: false }).eq("user_id", user.id);
+    let clearPrimary = supabaseAdmin
+      .from("resumes")
+      .update({ is_primary: false })
+      .eq("user_id", user.id);
     if (body.resumeId) {
       clearPrimary = clearPrimary.neq("id", body.resumeId);
     }
@@ -841,7 +958,11 @@ async function handleResumeProcess(request: Request) {
   const resumeResult = body.resumeId
     ? await supabaseAdmin
         .from("resumes")
-        .update({ title: body.title, description: body.description ?? null, is_primary: !!body.isPrimary })
+        .update({
+          title: body.title,
+          description: body.description ?? null,
+          is_primary: !!body.isPrimary,
+        })
         .eq("id", body.resumeId)
         .eq("user_id", user.id)
         .select("*")
@@ -858,13 +979,21 @@ async function handleResumeProcess(request: Request) {
         .single();
 
   if (resumeResult.error || !resumeResult.data) {
-    return json({ error: resumeResult.error?.message ?? "Failed to save resume." }, { status: 400 });
+    return json(
+      { error: resumeResult.error?.message ?? "Failed to save resume." },
+      { status: 400 },
+    );
   }
 
   const resume = resumeResult.data;
-  const { data: fileData, error: downloadError } = await supabaseAdmin.storage.from("resumes").download(body.storagePath);
+  const { data: fileData, error: downloadError } = await supabaseAdmin.storage
+    .from("resumes")
+    .download(body.storagePath);
   if (downloadError || !fileData) {
-    return json({ error: downloadError?.message ?? "Failed to download uploaded resume." }, { status: 400 });
+    return json(
+      { error: downloadError?.message ?? "Failed to download uploaded resume." },
+      { status: 400 },
+    );
   }
 
   const rawText = await extractResumeText(body.fileName, await fileData.arrayBuffer());
@@ -891,7 +1020,10 @@ async function handleResumeProcess(request: Request) {
   });
 
   if (versionInsert.error || !versionInsert.data) {
-    return json({ error: versionInsert.error?.message ?? "Failed to create resume version." }, { status: 400 });
+    return json(
+      { error: versionInsert.error?.message ?? "Failed to create resume version." },
+      { status: 400 },
+    );
   }
 
   const version = normalizeResumeVersion(versionInsert.data);
@@ -916,14 +1048,23 @@ async function handleResumeProcess(request: Request) {
     eventType: "resume_uploaded",
     entityType: "resume_versions",
     entityId: version.id,
-    payload: { resumeId: resume.id, resumeVersionId: version.id, title: resume.title, storagePath: body.storagePath },
+    payload: {
+      resumeId: resume.id,
+      resumeVersionId: version.id,
+      title: resume.title,
+      storagePath: body.storagePath,
+    },
   });
   await emitWorkflowEvent({
     userId: user.id,
     eventType: "resume_parsed",
     entityType: "resume_parses",
     entityId: version.id,
-    payload: { resumeId: resume.id, resumeVersionId: version.id, fullName: parsed.data.name ?? null },
+    payload: {
+      resumeId: resume.id,
+      resumeVersionId: version.id,
+      fullName: parsed.data.name ?? null,
+    },
   });
 
   return json({
@@ -935,8 +1076,20 @@ async function handleResumeProcess(request: Request) {
 
 async function getResumeVersion(userId: string, resumeId: string, resumeVersionId?: string) {
   const versionQuery = resumeVersionId
-    ? supabaseAdmin.from("resume_versions").select("*").eq("id", resumeVersionId).eq("user_id", userId).single()
-    : supabaseAdmin.from("resume_versions").select("*").eq("resume_id", resumeId).eq("user_id", userId).order("version", { ascending: false }).limit(1).single();
+    ? supabaseAdmin
+        .from("resume_versions")
+        .select("*")
+        .eq("id", resumeVersionId)
+        .eq("user_id", userId)
+        .single()
+    : supabaseAdmin
+        .from("resume_versions")
+        .select("*")
+        .eq("resume_id", resumeId)
+        .eq("user_id", userId)
+        .order("version", { ascending: false })
+        .limit(1)
+        .single();
 
   const versionResult = await versionQuery;
   if (versionResult.error || !versionResult.data) return null;
@@ -961,20 +1114,20 @@ async function handleResumeAnalyze(request: Request) {
 
   const analysis = await withTimeout(
     callOpenRouterJson<Analysis>(
-    [
-      {
-        role: "system",
-        content:
-          "You are an ATS resume auditor. Return strict JSON only. Missing keywords must be specific job-description terms absent or weak in the resume.",
-      },
-      {
-        role: "user",
-        content: `Resume:\n${rawText.slice(0, 60000)}\n\nJob Description:\n${body.jobDescription.slice(0, 30000)}`,
-      },
-    ],
-    "resume_analysis",
-    analysisSchema,
-    { userId: user.id },
+      [
+        {
+          role: "system",
+          content:
+            "You are an ATS resume auditor. Return strict JSON only. Missing keywords must be specific job-description terms absent or weak in the resume.",
+        },
+        {
+          role: "user",
+          content: `Resume:\n${rawText.slice(0, 60000)}\n\nJob Description:\n${body.jobDescription.slice(0, 30000)}`,
+        },
+      ],
+      "resume_analysis",
+      analysisSchema,
+      { userId: user.id },
     ),
     45000,
     "ATS analysis",
@@ -1004,7 +1157,10 @@ async function handleResumeAnalyze(request: Request) {
     .single();
 
   if (insertResult.error || !insertResult.data) {
-    return json({ error: insertResult.error?.message ?? "Failed to store ATS analysis." }, { status: 400 });
+    return json(
+      { error: insertResult.error?.message ?? "Failed to store ATS analysis." },
+      { status: 400 },
+    );
   }
 
   await emitWorkflowEvent({
@@ -1012,7 +1168,12 @@ async function handleResumeAnalyze(request: Request) {
     eventType: "ats_completed",
     entityType: "resume_analyses",
     entityId: insertResult.data.id,
-    payload: { resumeId: body.resumeId, resumeVersionId: versionData.id, jobId: body.jobId ?? null, atsScore: analysis.data.atsScore },
+    payload: {
+      resumeId: body.resumeId,
+      resumeVersionId: versionData.id,
+      jobId: body.jobId ?? null,
+      atsScore: analysis.data.atsScore,
+    },
   });
 
   return json(insertResult.data);
@@ -1034,7 +1195,9 @@ async function handleResumeTailor(request: Request) {
     return json({ error: "Resume content unavailable." }, { status: 400 });
   }
 
-  const isLatex = normalizedVersion.file_type === "application/x-tex" || normalizedVersion.file_name?.endsWith(".tex");
+  const isLatex =
+    normalizedVersion.file_type === "application/x-tex" ||
+    normalizedVersion.file_name?.endsWith(".tex");
   const timestamp = Date.now();
 
   let storagePath = "";
@@ -1049,29 +1212,46 @@ async function handleResumeTailor(request: Request) {
 
   if (isLatex) {
     // 1. NATIVE LATEX WORKFLOW
-    const { data: texFile, error: downloadError } = await supabaseAdmin.storage.from("resumes").download(normalizedVersion.storage_path);
+    const { data: texFile, error: downloadError } = await supabaseAdmin.storage
+      .from("resumes")
+      .download(normalizedVersion.storage_path);
     if (downloadError || !texFile) {
-      return json({ error: downloadError?.message ?? "Original .tex file not found in storage." }, { status: 404 });
+      return json(
+        { error: downloadError?.message ?? "Original .tex file not found in storage." },
+        { status: 404 },
+      );
     }
     const texContent = await texFile.text();
 
     const mutatedTexResult = await withTimeout(
-      callOpenRouterText([
-        { role: "system", content: "You are a Native LaTeX Engine. Rewrite the provided LaTeX resume for the provided Job Description. Preserve ALL preamble, documentclass, packages, margins, spacing, styling, and section order exactly as provided. DO NOT use markdown. DO NOT invent experience. Return ONLY the raw complete mutated LaTeX document." },
-        { role: "user", content: `Job Description:\n${body.jobDescription.slice(0, 30000)}\n\nOriginal Resume:\n${texContent}` }
-      ], { userId: user.id }),
+      callOpenRouterText(
+        [
+          {
+            role: "system",
+            content:
+              "You are a Native LaTeX Engine. Rewrite the provided LaTeX resume for the provided Job Description. Preserve ALL preamble, documentclass, packages, margins, spacing, styling, and section order exactly as provided. DO NOT use markdown. DO NOT invent experience. Return ONLY the raw complete mutated LaTeX document.",
+          },
+          {
+            role: "user",
+            content: `Job Description:\n${body.jobDescription.slice(0, 30000)}\n\nOriginal Resume:\n${texContent}`,
+          },
+        ],
+        { userId: user.id },
+      ),
       55000,
-      "Tailored latex generation"
+      "Tailored latex generation",
     ).catch(() => ({ content: texContent }));
 
     let mutatedTex = (mutatedTexResult as any).content || texContent;
     mutatedTex = mutatedTex.replace(/^```[a-z]*\n/gi, "").replace(/\n```$/g, "");
 
     const texPath = `${user.id}/${body.resumeId}/tailored-${timestamp}.tex`;
-    const uploadTex = await supabaseAdmin.storage.from("tailored-resumes").upload(texPath, Buffer.from(mutatedTex, "utf-8"), {
-      contentType: "application/x-tex",
-      upsert: false,
-    });
+    const uploadTex = await supabaseAdmin.storage
+      .from("tailored-resumes")
+      .upload(texPath, Buffer.from(mutatedTex, "utf-8"), {
+        contentType: "application/x-tex",
+        upsert: false,
+      });
 
     if (uploadTex.error) {
       return json({ error: uploadTex.error.message }, { status: 400 });
@@ -1089,10 +1269,12 @@ async function handleResumeTailor(request: Request) {
       if (compileRes.ok) {
         const pdfBuffer = await compileRes.arrayBuffer();
         const pdfPath = `${user.id}/${body.resumeId}/tailored-${timestamp}.pdf`;
-        const uploadPdf = await supabaseAdmin.storage.from("tailored-resumes").upload(pdfPath, Buffer.from(pdfBuffer), {
-          contentType: "application/pdf",
-          upsert: false,
-        });
+        const uploadPdf = await supabaseAdmin.storage
+          .from("tailored-resumes")
+          .upload(pdfPath, Buffer.from(pdfBuffer), {
+            contentType: "application/pdf",
+            upsert: false,
+          });
         if (!uploadPdf.error) {
           pdfStoragePath = pdfPath;
           pdfFileSize = pdfBuffer.byteLength;
@@ -1116,20 +1298,20 @@ async function handleResumeTailor(request: Request) {
     // 3. LEGACY MARKDOWN WORKFLOW
     const tailored = await withTimeout(
       callOpenRouterJson<TailoredResume>(
-      [
-        {
-          role: "system",
-          content:
-            "Rewrite the provided resume for the job description. Preserve truthfulness. Do not invent experience. Return strict JSON only.",
-        },
-        {
-          role: "user",
-          content: `Resume:\n${sourceResume.slice(0, 60000)}\n\nJob Description:\n${body.jobDescription.slice(0, 30000)}`,
-        },
-      ],
-      "tailored_resume",
-      tailoredSchema,
-      { userId: user.id },
+        [
+          {
+            role: "system",
+            content:
+              "Rewrite the provided resume for the job description. Preserve truthfulness. Do not invent experience. Return strict JSON only.",
+          },
+          {
+            role: "user",
+            content: `Resume:\n${sourceResume.slice(0, 60000)}\n\nJob Description:\n${body.jobDescription.slice(0, 30000)}`,
+          },
+        ],
+        "tailored_resume",
+        tailoredSchema,
+        { userId: user.id },
       ),
       45000,
       "Tailored resume generation",
@@ -1139,7 +1321,11 @@ async function handleResumeTailor(request: Request) {
       usage: null,
       source: "env" as const,
     }));
-    const normalizedTailored = normalizeTailoredResumePayload(tailored.data, sourceResume, body.jobDescription);
+    const normalizedTailored = normalizeTailoredResumePayload(
+      tailored.data,
+      sourceResume,
+      body.jobDescription,
+    );
 
     finalOptimized = normalizedTailored.optimizedResume;
     finalAtsFriendly = normalizedTailored.atsFriendlyResume;
@@ -1179,7 +1365,10 @@ async function handleResumeTailor(request: Request) {
     .single();
 
   if (insert.error || !insert.data) {
-    return json({ error: insert.error?.message ?? "Failed to store tailored resume." }, { status: 400 });
+    return json(
+      { error: insert.error?.message ?? "Failed to store tailored resume." },
+      { status: 400 },
+    );
   }
 
   await emitWorkflowEvent({
@@ -1187,7 +1376,12 @@ async function handleResumeTailor(request: Request) {
     eventType: "resume_tailored",
     entityType: "tailored_resumes",
     entityId: insert.data.id,
-    payload: { resumeId: body.resumeId, resumeVersionId: versionData.id, jobId: body.jobId ?? null, storagePath },
+    payload: {
+      resumeId: body.resumeId,
+      resumeVersionId: versionData.id,
+      jobId: body.jobId ?? null,
+      storagePath,
+    },
   });
 
   return json(insert.data);
@@ -1257,17 +1451,23 @@ async function handleResumeCenter(request: Request) {
   if (request.method !== "GET") return methodNotAllowed(["GET"]);
   const user = await requireApiUser(request);
 
-  const resumesResult = await supabaseAdmin.from("resumes").select("*").eq("user_id", user.id).order("updated_at", { ascending: false });
+  const resumesResult = await supabaseAdmin
+    .from("resumes")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false });
   if (resumesResult.error) {
     return json({ error: resumesResult.error.message }, { status: 400 });
   }
 
   const rows = [];
   for (const resume of resumesResult.data ?? []) {
-    const detailsResult = await handleResumeDetails(new Request(`http://localhost/api/resumes/details?resumeId=${resume.id}`, {
-      method: "GET",
-      headers: request.headers,
-    }));
+    const detailsResult = await handleResumeDetails(
+      new Request(`http://localhost/api/resumes/details?resumeId=${resume.id}`, {
+        method: "GET",
+        headers: request.headers,
+      }),
+    );
     if (!detailsResult.ok) continue;
     const details = await detailsResult.json();
     const latestVersion = details.versions?.[0] ?? null;
@@ -1300,11 +1500,19 @@ async function handleResumeParse(request: Request) {
   let rawText = normalizedVersion.parsed_text || normalizedVersion.content || "";
 
   if (!rawText && normalizedVersion.storage_path) {
-    const downloaded = await supabaseAdmin.storage.from("resumes").download(normalizedVersion.storage_path);
+    const downloaded = await supabaseAdmin.storage
+      .from("resumes")
+      .download(normalizedVersion.storage_path);
     if (downloaded.error || !downloaded.data) {
-      return json({ error: downloaded.error?.message ?? "Failed to download resume version." }, { status: 400 });
+      return json(
+        { error: downloaded.error?.message ?? "Failed to download resume version." },
+        { status: 400 },
+      );
     }
-    rawText = await extractResumeText(normalizedVersion.file_name ?? "resume.tex", await downloaded.data.arrayBuffer());
+    rawText = await extractResumeText(
+      normalizedVersion.file_name ?? "resume.tex",
+      await downloaded.data.arrayBuffer(),
+    );
   }
 
   if (!rawText) {
@@ -1328,13 +1536,21 @@ async function handleResumeParse(request: Request) {
 
   await syncCandidateBrain(user.id, parsed.data as Record<string, any>, rawText);
 
-  await supabaseAdmin.from("resume_versions").update({ parsed_text: rawText, parse_status: "completed" } as any).eq("id", normalizedVersion.id).eq("user_id", user.id);
+  await supabaseAdmin
+    .from("resume_versions")
+    .update({ parsed_text: rawText, parse_status: "completed" } as any)
+    .eq("id", normalizedVersion.id)
+    .eq("user_id", user.id);
   await emitWorkflowEvent({
     userId: user.id,
     eventType: "resume_parsed",
     entityType: "resume_parses",
     entityId: normalizedVersion.id,
-    payload: { resumeId: body.resumeId, resumeVersionId: normalizedVersion.id, fullName: parsed.data.name ?? null },
+    payload: {
+      resumeId: body.resumeId,
+      resumeVersionId: normalizedVersion.id,
+      fullName: parsed.data.name ?? null,
+    },
   });
 
   return json({ resumeVersionId: normalizedVersion.id, parse: parsed.data });
@@ -1345,10 +1561,23 @@ async function handleResumePrimary(request: Request) {
   const user = await requireApiUser(request);
   const body = await readJson<{ resumeId: string }>(request);
 
-  await supabaseAdmin.from("resumes").update({ is_primary: false }).eq("user_id", user.id).neq("id", body.resumeId);
-  const result = await supabaseAdmin.from("resumes").update({ is_primary: true }).eq("user_id", user.id).eq("id", body.resumeId).select("*").single();
+  await supabaseAdmin
+    .from("resumes")
+    .update({ is_primary: false })
+    .eq("user_id", user.id)
+    .neq("id", body.resumeId);
+  const result = await supabaseAdmin
+    .from("resumes")
+    .update({ is_primary: true })
+    .eq("user_id", user.id)
+    .eq("id", body.resumeId)
+    .select("*")
+    .single();
   if (result.error || !result.data) {
-    return json({ error: result.error?.message ?? "Failed to mark primary resume." }, { status: 400 });
+    return json(
+      { error: result.error?.message ?? "Failed to mark primary resume." },
+      { status: 400 },
+    );
   }
   return json(result.data);
 }
@@ -1359,16 +1588,35 @@ async function handleResumeDelete(request: Request) {
   const body = await readJson<{ resumeId: string }>(request);
 
   const [versionsResult, tailoredResult] = await Promise.all([
-    supabaseAdmin.from("resume_versions").select("*").eq("user_id", user.id).eq("resume_id", body.resumeId),
-    supabaseAdmin.from("tailored_resumes").select("*").eq("user_id", user.id).eq("resume_id", body.resumeId),
+    supabaseAdmin
+      .from("resume_versions")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("resume_id", body.resumeId),
+    supabaseAdmin
+      .from("tailored_resumes")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("resume_id", body.resumeId),
   ]);
 
-  const resumePaths = (versionsResult.data ?? []).map((item: any) => normalizeResumeVersion(item).storage_path).filter(Boolean);
-  const tailoredPaths = (tailoredResult.data ?? []).map((item: any) => item.storage_path).filter(Boolean);
+  const resumePaths = (versionsResult.data ?? [])
+    .map((item: any) => normalizeResumeVersion(item).storage_path)
+    .filter(Boolean);
+  const tailoredPaths = (tailoredResult.data ?? [])
+    .map((item: any) => item.storage_path)
+    .filter(Boolean);
   if (resumePaths.length) await supabaseAdmin.storage.from("resumes").remove(resumePaths);
-  if (tailoredPaths.length) await supabaseAdmin.storage.from("tailored-resumes").remove(tailoredPaths);
+  if (tailoredPaths.length)
+    await supabaseAdmin.storage.from("tailored-resumes").remove(tailoredPaths);
 
-  const deleteResult = await supabaseAdmin.from("resumes").delete().eq("user_id", user.id).eq("id", body.resumeId).select("id").maybeSingle();
+  const deleteResult = await supabaseAdmin
+    .from("resumes")
+    .delete()
+    .eq("user_id", user.id)
+    .eq("id", body.resumeId)
+    .select("id")
+    .maybeSingle();
   if (deleteResult.error) {
     return json({ error: deleteResult.error.message }, { status: 400 });
   }
@@ -1398,7 +1646,10 @@ async function handleJobsImport(request: Request) {
     const config = (integrationResult.data?.config ?? {}) as Record<string, string>;
     const hydratedSource =
       source.source === "greenhouse"
-        ? { source: "greenhouse" as const, boardToken: source.boardToken || config.board_token || "" }
+        ? {
+            source: "greenhouse" as const,
+            boardToken: source.boardToken || config.board_token || "",
+          }
         : source.source === "lever"
           ? { source: "lever" as const, site: source.site || config.site || "" }
           : source.source === "ashby"
@@ -1480,7 +1731,11 @@ async function handleJobsImport(request: Request) {
       userId: user.id,
       eventType: "jobs_imported",
       entityType: "job_import_runs",
-      payload: { source: hydratedSource.source, importedCount: jobs.length, jobIds: imported.map((job) => job.id) },
+      payload: {
+        source: hydratedSource.source,
+        importedCount: jobs.length,
+        jobIds: imported.map((job) => job.id),
+      },
     });
   }
 
@@ -1495,12 +1750,25 @@ async function handleJobsMatch(request: Request) {
   const [jobResult, versionResult] = await Promise.all([
     supabaseAdmin.from("jobs").select("*").eq("id", body.jobId).eq("user_id", user.id).single(),
     body.resumeVersionId
-      ? supabaseAdmin.from("resume_versions").select("*").eq("id", body.resumeVersionId).eq("user_id", user.id).single()
-      : supabaseAdmin.from("resume_versions").select("*").eq("resume_id", body.resumeId).eq("user_id", user.id).order("version", { ascending: false }).limit(1).single(),
+      ? supabaseAdmin
+          .from("resume_versions")
+          .select("*")
+          .eq("id", body.resumeVersionId)
+          .eq("user_id", user.id)
+          .single()
+      : supabaseAdmin
+          .from("resume_versions")
+          .select("*")
+          .eq("resume_id", body.resumeId)
+          .eq("user_id", user.id)
+          .order("version", { ascending: false })
+          .limit(1)
+          .single(),
   ]);
 
   if (jobResult.error || !jobResult.data) return json({ error: "Job not found." }, { status: 404 });
-  if (versionResult.error || !versionResult.data) return json({ error: "Resume version not found." }, { status: 404 });
+  if (versionResult.error || !versionResult.data)
+    return json({ error: "Resume version not found." }, { status: 404 });
 
   const normalizedVersion = normalizeResumeVersion(versionResult.data);
   const resumeText = normalizedVersion.parsed_text || normalizedVersion.content;
@@ -1510,24 +1778,28 @@ async function handleJobsMatch(request: Request) {
 
   const match = await withTimeout(
     callOpenRouterJson<MatchResult>(
-    [
-      {
-        role: "system",
-        content: "Score candidate-job fit and return strict JSON. Keep the score defensible.",
-      },
-      {
-        role: "user",
-        content: `Resume:\n${resumeText.slice(0, 60000)}\n\nJob Description:\n${jobResult.data.description.slice(0, 30000)}`,
-      },
-    ],
-    "job_match",
-    matchSchema,
-    { userId: user.id },
+      [
+        {
+          role: "system",
+          content: "Score candidate-job fit and return strict JSON. Keep the score defensible.",
+        },
+        {
+          role: "user",
+          content: `Resume:\n${resumeText.slice(0, 60000)}\n\nJob Description:\n${jobResult.data.description.slice(0, 30000)}`,
+        },
+      ],
+      "job_match",
+      matchSchema,
+      { userId: user.id },
     ),
     45000,
     "Job matching",
   ).catch(() => ({
-    data: fallbackJobMatch(jobResult.data.company_name ?? "the team", resumeText, jobResult.data.description),
+    data: fallbackJobMatch(
+      jobResult.data.company_name ?? "the team",
+      resumeText,
+      jobResult.data.description,
+    ),
     model: "local-fallback:job-match",
     usage: null,
     source: "env" as const,
@@ -1571,7 +1843,10 @@ async function handleJobsMatch(request: Request) {
       .select("*")
       .single();
     if (fallback.error || !fallback.data) {
-      return json({ error: fallback.error?.message ?? "Failed to save job match." }, { status: 400 });
+      return json(
+        { error: fallback.error?.message ?? "Failed to save job match." },
+        { status: 400 },
+      );
     }
     await emitWorkflowEvent({
       userId: user.id,
@@ -1587,7 +1862,11 @@ async function handleJobsMatch(request: Request) {
     return json({ error: insert.error?.message ?? "Failed to save job match." }, { status: 400 });
   }
 
-  await supabaseAdmin.from("jobs").update({ match_score: normalizedMatch.score }).eq("id", body.jobId).eq("user_id", user.id);
+  await supabaseAdmin
+    .from("jobs")
+    .update({ match_score: normalizedMatch.score })
+    .eq("id", body.jobId)
+    .eq("user_id", user.id);
   await emitWorkflowEvent({
     userId: user.id,
     eventType: "jobs_matched",
@@ -1610,7 +1889,7 @@ async function verifyHighValueTarget(userId: string, companyName: string) {
       JSON.stringify({
         error: `Strategic action gated. "${companyName}" is not classified as a High Value Target. Please mark this company as a High Value Target to unlock research, pain points, and campaigns.`,
       }),
-      { status: 403, headers: { "content-type": "application/json" } }
+      { status: 403, headers: { "content-type": "application/json" } },
     );
   }
 }
@@ -1625,20 +1904,20 @@ async function handleCompanyResearch(request: Request) {
 
   const research = await withTimeout(
     callOpenRouterJson<ResearchResult>(
-    [
-      {
-        role: "system",
-        content:
-          "Create company research from the provided website and news evidence only. If funding is not visible, return {\"status\":\"unknown\"}.",
-      },
-      {
-        role: "user",
-        content: `Company: ${body.companyName}\nWebsite content:\n${websiteData.text}\n\nDetected tech hints: ${websiteData.techStack.join(", ")}\n\nNews feed excerpt:\n${newsData}`,
-      },
-    ],
-    "company_research",
-    researchSchema,
-    { userId: user.id },
+      [
+        {
+          role: "system",
+          content:
+            'Create company research from the provided website and news evidence only. If funding is not visible, return {"status":"unknown"}.',
+        },
+        {
+          role: "user",
+          content: `Company: ${body.companyName}\nWebsite content:\n${websiteData.text}\n\nDetected tech hints: ${websiteData.techStack.join(", ")}\n\nNews feed excerpt:\n${newsData}`,
+        },
+      ],
+      "company_research",
+      researchSchema,
+      { userId: user.id },
     ),
     35000,
     "Company research generation",
@@ -1671,8 +1950,12 @@ async function handleCompanyResearch(request: Request) {
     tech_stack: Array.from(new Set([...normalizedResearch.techStack, ...websiteData.techStack])),
     culture_notes: [
       normalizedResearch.engineeringCultureNotes,
-      normalizedResearch.products.length ? `Products: ${normalizedResearch.products.join(", ")}` : "",
-      normalizedResearch.hiringSignals.length ? `Hiring signals: ${normalizedResearch.hiringSignals.join("; ")}` : "",
+      normalizedResearch.products.length
+        ? `Products: ${normalizedResearch.products.join(", ")}`
+        : "",
+      normalizedResearch.hiringSignals.length
+        ? `Hiring signals: ${normalizedResearch.hiringSignals.join("; ")}`
+        : "",
       `Funding: ${JSON.stringify(normalizedResearch.fundingData)}`,
     ]
       .filter(Boolean)
@@ -1694,11 +1977,19 @@ async function handleCompanyResearch(request: Request) {
     .maybeSingle();
 
   const upsert = existing.data?.id
-    ? await supabaseAdmin.from("company_research").update(basePayload).eq("id", existing.data.id).select("*").single()
+    ? await supabaseAdmin
+        .from("company_research")
+        .update(basePayload)
+        .eq("id", existing.data.id)
+        .select("*")
+        .single()
     : await supabaseAdmin.from("company_research").insert(basePayload).select("*").single();
 
   if (upsert.error || !upsert.data) {
-    return json({ error: upsert.error?.message ?? "Failed to save company research." }, { status: 400 });
+    return json(
+      { error: upsert.error?.message ?? "Failed to save company research." },
+      { status: 400 },
+    );
   }
 
   await emitWorkflowEvent({
@@ -1733,7 +2024,10 @@ async function handlePainPoints(request: Request) {
     const inserted = await generatePainPointsForCompany(user.id, body);
     return json({ painPoints: inserted });
   } catch (error) {
-    return json({ error: error instanceof Error ? error.message : "Failed to save pain points." }, { status: 400 });
+    return json(
+      { error: error instanceof Error ? error.message : "Failed to save pain points." },
+      { status: 400 },
+    );
   }
 }
 
@@ -1746,35 +2040,51 @@ async function handleOutreach(request: Request) {
   const [resumeParse, painPoints, recruiter] = await Promise.all([
     getLatestResumeParseCompat(user.id, body.resumeId),
     body.painPointIds?.length
-      ? supabaseAdmin.from("painpoints").select("*").eq("user_id", user.id).in("id", body.painPointIds)
-      : supabaseAdmin.from("painpoints").select("*").eq("user_id", user.id).eq("company_name", body.companyName).limit(5),
-    body.recruiterId ? supabaseAdmin.from("recruiters").select("*").eq("user_id", user.id).eq("id", body.recruiterId).maybeSingle() : Promise.resolve({ data: null, error: null }),
+      ? supabaseAdmin
+          .from("painpoints")
+          .select("*")
+          .eq("user_id", user.id)
+          .in("id", body.painPointIds)
+      : supabaseAdmin
+          .from("painpoints")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("company_name", body.companyName)
+          .limit(5),
+    body.recruiterId
+      ? supabaseAdmin
+          .from("recruiters")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("id", body.recruiterId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ]);
 
   if (!resumeParse) return json({ error: "Resume parse not found." }, { status: 404 });
 
   const result = await withTimeout(
     callOpenRouterJson<OutreachResult>(
-    [
-      {
-        role: "system",
-        content:
-          "Write concise outreach grounded in the candidate profile and company pain points. Avoid generic fluff. Return strict JSON only.",
-      },
-      {
-        role: "user",
-        content: JSON.stringify({
-          type: body.type,
-          companyName: body.companyName,
-          recruiter: recruiter.data,
-          resume: resumeParse.parsed_data,
-          painPoints: painPoints.data ?? [],
-        }),
-      },
-    ],
-    "outreach_message",
-    outreachSchema,
-    { userId: user.id },
+      [
+        {
+          role: "system",
+          content:
+            "Write concise outreach grounded in the candidate profile and company pain points. Avoid generic fluff. Return strict JSON only.",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            type: body.type,
+            companyName: body.companyName,
+            recruiter: recruiter.data,
+            resume: resumeParse.parsed_data,
+            painPoints: painPoints.data ?? [],
+          }),
+        },
+      ],
+      "outreach_message",
+      outreachSchema,
+      { userId: user.id },
     ),
     45000,
     "Outreach generation",
@@ -1804,7 +2114,10 @@ async function handleOutreach(request: Request) {
     .single();
 
   if (insert.error || !insert.data) {
-    return json({ error: insert.error?.message ?? "Failed to save outreach message." }, { status: 400 });
+    return json(
+      { error: insert.error?.message ?? "Failed to save outreach message." },
+      { status: 400 },
+    );
   }
 
   await emitWorkflowEvent({
@@ -1812,7 +2125,11 @@ async function handleOutreach(request: Request) {
     eventType: "outreach_generated",
     entityType: "outreach_messages",
     entityId: insert.data.id,
-    payload: { companyName: body.companyName, kind: body.type, recruiterId: body.recruiterId ?? null },
+    payload: {
+      companyName: body.companyName,
+      kind: body.type,
+      recruiterId: body.recruiterId ?? null,
+    },
   });
 
   return json({
@@ -1867,7 +2184,11 @@ async function handleOutreachCampaign(request: Request) {
     ).data?.id ||
     null;
 
-  const allCampaigns = await supabaseAdmin.from("outreach_campaigns").select("*").eq("user_id", user.id).order("updated_at", { ascending: false });
+  const allCampaigns = await supabaseAdmin
+    .from("outreach_campaigns")
+    .select("*")
+    .eq("user_id", user.id)
+    .order("updated_at", { ascending: false });
   if (allCampaigns.error) {
     return json({ error: allCampaigns.error.message }, { status: 400 });
   }
@@ -1916,7 +2237,10 @@ async function handleOutreachCampaign(request: Request) {
         .single();
 
   if (campaignMutation.error || !campaignMutation.data) {
-    return json({ error: campaignMutation.error?.message ?? "Failed to create campaign." }, { status: 400 });
+    return json(
+      { error: campaignMutation.error?.message ?? "Failed to create campaign." },
+      { status: 400 },
+    );
   }
 
   const authHeader = request.headers.get("authorization") ?? "";
@@ -2019,7 +2343,10 @@ async function handleOutreachCampaign(request: Request) {
     .single();
 
   if (finalizedCampaign.error || !finalizedCampaign.data) {
-    return json({ error: finalizedCampaign.error?.message ?? "Failed to finalize campaign." }, { status: 400 });
+    return json(
+      { error: finalizedCampaign.error?.message ?? "Failed to finalize campaign." },
+      { status: 400 },
+    );
   }
 
   await emitWorkflowEvent({
@@ -2054,34 +2381,51 @@ async function handleLoom(request: Request) {
 
   const [resumeParse, recruiter, painPoints] = await Promise.all([
     getLatestResumeParseCompat(user.id, body.resumeId),
-    body.recruiterId ? supabaseAdmin.from("recruiters").select("*").eq("user_id", user.id).eq("id", body.recruiterId).maybeSingle() : Promise.resolve({ data: null, error: null }),
+    body.recruiterId
+      ? supabaseAdmin
+          .from("recruiters")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("id", body.recruiterId)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
     body.painPointIds?.length
-      ? supabaseAdmin.from("painpoints").select("*").eq("user_id", user.id).in("id", body.painPointIds)
-      : supabaseAdmin.from("painpoints").select("*").eq("user_id", user.id).eq("company_name", body.companyName).limit(5),
+      ? supabaseAdmin
+          .from("painpoints")
+          .select("*")
+          .eq("user_id", user.id)
+          .in("id", body.painPointIds)
+      : supabaseAdmin
+          .from("painpoints")
+          .select("*")
+          .eq("user_id", user.id)
+          .eq("company_name", body.companyName)
+          .limit(5),
   ]);
 
   if (!resumeParse) return json({ error: "Resume parse not found." }, { status: 404 });
 
   const result = await withTimeout(
     callOpenRouterJson<LoomScript>(
-    [
-      {
-        role: "system",
-        content: "Write a personalized short Loom script grounded in evidence. Return strict JSON only.",
-      },
-      {
-        role: "user",
-        content: JSON.stringify({
-          companyName: body.companyName,
-          recruiter: recruiter.data,
-          resume: resumeParse.parsed_data,
-          painPoints: painPoints.data ?? [],
-        }),
-      },
-    ],
-    "loom_script",
-    loomSchema,
-    { userId: user.id },
+      [
+        {
+          role: "system",
+          content:
+            "Write a personalized short Loom script grounded in evidence. Return strict JSON only.",
+        },
+        {
+          role: "user",
+          content: JSON.stringify({
+            companyName: body.companyName,
+            recruiter: recruiter.data,
+            resume: resumeParse.parsed_data,
+            painPoints: painPoints.data ?? [],
+          }),
+        },
+      ],
+      "loom_script",
+      loomSchema,
+      { userId: user.id },
     ),
     45000,
     "Loom generation",
@@ -2123,7 +2467,10 @@ async function handleLoom(request: Request) {
     .single();
 
   if (insert.error || !insert.data) {
-    return json({ error: insert.error?.message ?? "Failed to persist Loom script." }, { status: 400 });
+    return json(
+      { error: insert.error?.message ?? "Failed to persist Loom script." },
+      { status: 400 },
+    );
   }
 
   await emitWorkflowEvent({
@@ -2131,7 +2478,11 @@ async function handleLoom(request: Request) {
     eventType: "loom_generated",
     entityType: "loom_scripts",
     entityId: insert.data.id,
-    payload: { companyName: body.companyName, recruiterId: body.recruiterId ?? null, resumeId: body.resumeId },
+    payload: {
+      companyName: body.companyName,
+      recruiterId: body.recruiterId ?? null,
+      resumeId: body.resumeId,
+    },
   });
 
   return json({
@@ -2153,7 +2504,9 @@ async function getAnalyticsPayload(userId: string) {
   const appRows = applications.data ?? [];
   const interviewRows = interviews.data ?? [];
   const total = appRows.length;
-  const offers = appRows.filter((row) => row.status === "offer" || row.status === "accepted").length;
+  const offers = appRows.filter(
+    (row) => row.status === "offer" || row.status === "accepted",
+  ).length;
   const rejections = appRows.filter((row) => row.status === "rejected").length;
   const responses = appRows.filter((row) => !["saved", "applied"].includes(row.status)).length;
   const interviewsCount = interviewRows.length;
@@ -2172,7 +2525,10 @@ async function handleAnalyticsSummary(request: Request) {
   if (request.method !== "GET") return methodNotAllowed(["GET"]);
   const user = await requireApiUser(request);
   const payload = await getAnalyticsPayload(user.id);
-  const appResult = await supabaseAdmin.from("applications").select("status").eq("user_id", user.id);
+  const appResult = await supabaseAdmin
+    .from("applications")
+    .select("status")
+    .eq("user_id", user.id);
   const appRows = appResult.data ?? [];
   return json({
     ...payload,
@@ -2198,7 +2554,10 @@ async function handleAnalyticsDailySummary(request: Request) {
   });
 
   if (upsert.error || !upsert.data) {
-    return json({ error: upsert.error?.message ?? "Failed to generate daily summary." }, { status: 400 });
+    return json(
+      { error: upsert.error?.message ?? "Failed to generate daily summary." },
+      { status: 400 },
+    );
   }
 
   return json(upsert.data);
@@ -2207,7 +2566,12 @@ async function handleAnalyticsDailySummary(request: Request) {
 async function handleEvents(request: Request) {
   const user = await requireApiUser(request);
   if (request.method === "POST") {
-    const body = await readJson<{ eventType: string; entityType: string; entityId?: string | null; payload?: Record<string, unknown> }>(request);
+    const body = await readJson<{
+      eventType: string;
+      entityType: string;
+      entityId?: string | null;
+      payload?: Record<string, unknown>;
+    }>(request);
     const result = await emitWorkflowEvent({
       userId: user.id,
       eventType: body.eventType,
@@ -2255,16 +2619,17 @@ async function handleCandidateBrain(request: Request) {
   const user = await requireApiUser(request);
 
   if (request.method === "GET") {
-    const [profile, baseProfile, memory, skills, projects, education, experiences, certifications] = await Promise.all([
-      supabaseAdmin.from("candidate_profiles").select("*").eq("user_id", user.id).maybeSingle(),
-      supabaseAdmin.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-      supabaseAdmin.from("candidate_memory").select("*").eq("user_id", user.id),
-      supabaseAdmin.from("skills").select("*").eq("user_id", user.id),
-      supabaseAdmin.from("projects").select("*").eq("user_id", user.id),
-      supabaseAdmin.from("education").select("*").eq("user_id", user.id),
-      supabaseAdmin.from("experiences").select("*").eq("user_id", user.id),
-      supabaseAdmin.from("certifications").select("*").eq("user_id", user.id),
-    ]);
+    const [profile, baseProfile, memory, skills, projects, education, experiences, certifications] =
+      await Promise.all([
+        supabaseAdmin.from("candidate_profiles").select("*").eq("user_id", user.id).maybeSingle(),
+        supabaseAdmin.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+        supabaseAdmin.from("candidate_memory").select("*").eq("user_id", user.id),
+        supabaseAdmin.from("skills").select("*").eq("user_id", user.id),
+        supabaseAdmin.from("projects").select("*").eq("user_id", user.id),
+        supabaseAdmin.from("education").select("*").eq("user_id", user.id),
+        supabaseAdmin.from("experiences").select("*").eq("user_id", user.id),
+        supabaseAdmin.from("certifications").select("*").eq("user_id", user.id),
+      ]);
 
     return json({
       profile: profile.data || {},
@@ -2300,11 +2665,20 @@ async function handleCandidateBrain(request: Request) {
         communication_style: body.profile.communication_style ?? null,
       };
 
-      const existing = await supabaseAdmin.from("candidate_profiles").select("id").eq("user_id", user.id).maybeSingle();
+      const existing = await supabaseAdmin
+        .from("candidate_profiles")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
       if (existing.data?.id) {
-        await supabaseAdmin.from("candidate_profiles").update(profilePayload).eq("id", existing.data.id);
+        await supabaseAdmin
+          .from("candidate_profiles")
+          .update(profilePayload)
+          .eq("id", existing.data.id);
       } else {
-        await supabaseAdmin.from("candidate_profiles").insert({ ...profilePayload, user_id: user.id });
+        await supabaseAdmin
+          .from("candidate_profiles")
+          .insert({ ...profilePayload, user_id: user.id });
       }
     }
 
@@ -2420,16 +2794,17 @@ async function handleCandidateBrain(request: Request) {
     }
 
     // Return the fresh unified state
-    const [profile, baseProfile, memory, skills, projects, education, experiences, certifications] = await Promise.all([
-      supabaseAdmin.from("candidate_profiles").select("*").eq("user_id", user.id).maybeSingle(),
-      supabaseAdmin.from("profiles").select("*").eq("id", user.id).maybeSingle(),
-      supabaseAdmin.from("candidate_memory").select("*").eq("user_id", user.id),
-      supabaseAdmin.from("skills").select("*").eq("user_id", user.id),
-      supabaseAdmin.from("projects").select("*").eq("user_id", user.id),
-      supabaseAdmin.from("education").select("*").eq("user_id", user.id),
-      supabaseAdmin.from("experiences").select("*").eq("user_id", user.id),
-      supabaseAdmin.from("certifications").select("*").eq("user_id", user.id),
-    ]);
+    const [profile, baseProfile, memory, skills, projects, education, experiences, certifications] =
+      await Promise.all([
+        supabaseAdmin.from("candidate_profiles").select("*").eq("user_id", user.id).maybeSingle(),
+        supabaseAdmin.from("profiles").select("*").eq("id", user.id).maybeSingle(),
+        supabaseAdmin.from("candidate_memory").select("*").eq("user_id", user.id),
+        supabaseAdmin.from("skills").select("*").eq("user_id", user.id),
+        supabaseAdmin.from("projects").select("*").eq("user_id", user.id),
+        supabaseAdmin.from("education").select("*").eq("user_id", user.id),
+        supabaseAdmin.from("experiences").select("*").eq("user_id", user.id),
+        supabaseAdmin.from("certifications").select("*").eq("user_id", user.id),
+      ]);
 
     return json({
       profile: profile.data || {},
@@ -2449,31 +2824,70 @@ async function handleCandidateBrain(request: Request) {
 async function handleApplicationPackage(request: Request) {
   if (request.method !== "POST") return methodNotAllowed(["POST"]);
   const user = await requireApiUser(request);
-  const body = await readJson<{ jobId: string; companyName: string; applicationId: string }>(request);
-  
+  const body = await readJson<{ jobId: string; companyName: string; applicationId: string }>(
+    request,
+  );
+
   const [brain, job, research, application] = await Promise.all([
     supabaseAdmin.from("candidate_profiles").select("*").eq("user_id", user.id).maybeSingle(),
-    supabaseAdmin.from("jobs").select("*").eq("user_id", user.id).eq("id", body.jobId).maybeSingle(),
-    supabaseAdmin.from("company_research").select("*").eq("user_id", user.id).eq("company_name", body.companyName).maybeSingle(),
-    supabaseAdmin.from("applications").select("*").eq("id", body.applicationId).eq("user_id", user.id).single(),
+    supabaseAdmin
+      .from("jobs")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("id", body.jobId)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("company_research")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("company_name", body.companyName)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("applications")
+      .select("*")
+      .eq("id", body.applicationId)
+      .eq("user_id", user.id)
+      .single(),
   ]);
 
   const score = job.data?.match_score ?? 0;
   const tier = score >= 85 ? "A" : score >= 70 ? "B" : score >= 50 ? "C" : "D";
-  
-  await supabaseAdmin.from("applications").update({ tier, match_score: score, package_generated: true } as any).eq("id", body.applicationId).eq("user_id", user.id);
+
+  await supabaseAdmin
+    .from("applications")
+    .update({ tier, match_score: score, package_generated: true } as any)
+    .eq("id", body.applicationId)
+    .eq("user_id", user.id);
 
   try {
     const qaResult = await callOpenRouterJson<{ qa: { question: string; answer: string }[] }>(
       [
-        { role: "system", content: "Generate 5 likely custom application questions based on the job description and answer them perfectly using the candidate's background. Return strict JSON {\"qa\": [{\"question\": \"\", \"answer\": \"\"}]}" },
-        { role: "user", content: `Candidate:\n${JSON.stringify(brain.data ?? {})}\n\nJob:\n${job.data?.description ?? ""}\n\nCompany:\n${JSON.stringify(research.data ?? {})}` }
+        {
+          role: "system",
+          content:
+            'Generate 5 likely custom application questions based on the job description and answer them perfectly using the candidate\'s background. Return strict JSON {"qa": [{"question": "", "answer": ""}]}',
+        },
+        {
+          role: "user",
+          content: `Candidate:\n${JSON.stringify(brain.data ?? {})}\n\nJob:\n${job.data?.description ?? ""}\n\nCompany:\n${JSON.stringify(research.data ?? {})}`,
+        },
       ],
       "application_qa",
-      { type: "object", properties: { qa: { type: "array", items: { type: "object", properties: { question: { type: "string" }, answer: { type: "string" } } } } } },
-      { userId: user.id }
+      {
+        type: "object",
+        properties: {
+          qa: {
+            type: "array",
+            items: {
+              type: "object",
+              properties: { question: { type: "string" }, answer: { type: "string" } },
+            },
+          },
+        },
+      },
+      { userId: user.id },
     );
-    
+
     // Store generated answers in application_answers table
     const storedAnswers = [];
     for (const qa of qaResult.data.qa ?? []) {
@@ -2522,12 +2936,24 @@ async function handleApplicationPackage(request: Request) {
 async function handleInterviewPrep(request: Request) {
   if (request.method !== "POST") return methodNotAllowed(["POST"]);
   const user = await requireApiUser(request);
-  const body = await readJson<{ interviewId: string; companyName: string; roleTitle: string }>(request);
+  const body = await readJson<{ interviewId: string; companyName: string; roleTitle: string }>(
+    request,
+  );
 
   const [brain, research, existing] = await Promise.all([
     supabaseAdmin.from("candidate_profiles").select("*").eq("user_id", user.id).maybeSingle(),
-    supabaseAdmin.from("company_research").select("*").eq("user_id", user.id).eq("company_name", body.companyName).maybeSingle(),
-    supabaseAdmin.from("interview_preparation").select("id").eq("user_id", user.id).eq("interview_id", body.interviewId).maybeSingle()
+    supabaseAdmin
+      .from("company_research")
+      .select("*")
+      .eq("user_id", user.id)
+      .eq("company_name", body.companyName)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("interview_preparation")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("interview_id", body.interviewId)
+      .maybeSingle(),
   ]);
 
   if (existing.data?.id) {
@@ -2541,12 +2967,13 @@ async function handleInterviewPrep(request: Request) {
       [
         {
           role: "system",
-          content: "Generate an interview preparation briefing with exactly 5 topics: 'Company Briefing', 'Role Briefing', 'Project Mapping', 'Likely Questions', and 'Preparation Notes'. For each topic, provide detailed notes/content and 2-3 relevant resource, documentation, or practice URLs (e.g. Supabase docs, LeetCode, GitHub, company engineering blog). Return strict JSON with a 'topics' array containing objects with 'title', 'content', and 'resources' fields."
+          content:
+            "Generate an interview preparation briefing with exactly 5 topics: 'Company Briefing', 'Role Briefing', 'Project Mapping', 'Likely Questions', and 'Preparation Notes'. For each topic, provide detailed notes/content and 2-3 relevant resource, documentation, or practice URLs (e.g. Supabase docs, LeetCode, GitHub, company engineering blog). Return strict JSON with a 'topics' array containing objects with 'title', 'content', and 'resources' fields.",
         },
         {
           role: "user",
-          content: `Company: ${body.companyName}\nRole: ${body.roleTitle}\n\nCandidate Brain: ${JSON.stringify(brain.data ?? {})}\n\nCompany Research: ${JSON.stringify(research.data ?? {})}`
-        }
+          content: `Company: ${body.companyName}\nRole: ${body.roleTitle}\n\nCandidate Brain: ${JSON.stringify(brain.data ?? {})}\n\nCompany Research: ${JSON.stringify(research.data ?? {})}`,
+        },
       ],
       "interview_prep",
       {
@@ -2559,15 +2986,15 @@ async function handleInterviewPrep(request: Request) {
               properties: {
                 title: { type: "string" },
                 content: { type: "string" },
-                resources: { type: "array", items: { type: "string" } }
+                resources: { type: "array", items: { type: "string" } },
               },
-              required: ["title", "content", "resources"]
-            }
-          }
+              required: ["title", "content", "resources"],
+            },
+          },
         },
-        required: ["topics"]
+        required: ["topics"],
       },
-      { userId: user.id }
+      { userId: user.id },
     );
 
     for (const topic of prepResult.data.topics) {
@@ -2577,16 +3004,16 @@ async function handleInterviewPrep(request: Request) {
         topic: topic.title,
         notes: topic.content,
         completed: false,
-        resources: topic.resources || []
+        resources: topic.resources || [],
       } as any);
     }
-    
+
     await emitWorkflowEvent({
       userId: user.id,
       eventType: "interview_prep_generated",
       entityType: "interviews",
       entityId: body.interviewId,
-      payload: { companyName: body.companyName }
+      payload: { companyName: body.companyName },
     });
 
     return json({ success: true, topics: prepResult.data.topics });
@@ -2599,7 +3026,7 @@ async function handleCompanyRoute(request: Request) {
   if (request.method !== "POST") return methodNotAllowed(["POST"]);
   const user = await requireApiUser(request);
   const body = await readJson<{ companyName: string }>(request);
-  
+
   if (!body.companyName) {
     return json({ error: "companyName is required" }, { status: 400 });
   }
@@ -2625,7 +3052,10 @@ async function handleCompanyRoute(request: Request) {
   }
 
   if (!resumeId) {
-    return json({ error: "Please upload a resume first to run the High Value Target pipeline." }, { status: 400 });
+    return json(
+      { error: "Please upload a resume first to run the High Value Target pipeline." },
+      { status: 400 },
+    );
   }
 
   // 2. Assess company (Quality Score, Strategic Value Score, Founder detection)
@@ -2659,8 +3089,15 @@ Return a strict JSON object with:
     founder: { name: string; profile_url: string } | null;
   }>(
     [
-      { role: "system", content: "You are a company assessment and founder detection engine. Ground your assessments in real information. Never fabricate founder names or profile URLs. If they cannot be verified, return null for founder." },
-      { role: "user", content: `${prompt}\n\nExisting Research context (if any):\n${JSON.stringify(existingResearch ?? {})}` }
+      {
+        role: "system",
+        content:
+          "You are a company assessment and founder detection engine. Ground your assessments in real information. Never fabricate founder names or profile URLs. If they cannot be verified, return null for founder.",
+      },
+      {
+        role: "user",
+        content: `${prompt}\n\nExisting Research context (if any):\n${JSON.stringify(existingResearch ?? {})}`,
+      },
     ],
     "company_assessment",
     {
@@ -2672,20 +3109,20 @@ Return a strict JSON object with:
           type: ["object", "null"],
           properties: {
             name: { type: "string" },
-            profile_url: { type: "string" }
+            profile_url: { type: "string" },
           },
-          required: ["name", "profile_url"]
-        }
+          required: ["name", "profile_url"],
+        },
       },
-      required: ["company_quality_score", "strategic_value_score", "founder"]
+      required: ["company_quality_score", "strategic_value_score", "founder"],
     },
-    { userId: user.id }
+    { userId: user.id },
   ).catch(() => ({
     data: {
       company_quality_score: 60,
       strategic_value_score: 60,
-      founder: null
-    }
+      founder: null,
+    },
   }));
 
   const qualityScore = assessment.data.company_quality_score;
@@ -2708,7 +3145,7 @@ Return a strict JSON object with:
     company_quality_score: qualityScore,
     hiring_activity_score: strategicValueScore,
     strategic_value_score: strategicValueScore,
-    founder_detected: founder !== null
+    founder_detected: founder !== null,
   };
 
   let companyId: string;
@@ -2716,9 +3153,16 @@ Return a strict JSON object with:
     companyId = existingCompany.data.id;
     await supabaseAdmin.from("companies").update(companyPayload).eq("id", companyId);
   } else {
-    const insertResult = await supabaseAdmin.from("companies").insert(companyPayload).select("id").single();
+    const insertResult = await supabaseAdmin
+      .from("companies")
+      .insert(companyPayload)
+      .select("id")
+      .single();
     if (insertResult.error || !insertResult.data) {
-      return json({ error: insertResult.error?.message ?? "Failed to save company target values." }, { status: 400 });
+      return json(
+        { error: insertResult.error?.message ?? "Failed to save company target values." },
+        { status: 400 },
+      );
     }
     companyId = insertResult.data.id;
   }
@@ -2730,7 +3174,7 @@ Return a strict JSON object with:
       company_quality_score: qualityScore,
       strategic_value_score: strategicValueScore,
       founder: null,
-      message: "Normal Application Flow. strategic action blocks are active."
+      message: "Normal Application Flow. strategic action blocks are active.",
     });
   }
 
@@ -2755,14 +3199,18 @@ Return a strict JSON object with:
       source: "discovery",
       discovered_via: "Founder Detection",
       relevance_score: 1.0,
-      notes: "Auto-detected Founder contact."
+      notes: "Auto-detected Founder contact.",
     };
 
     if (existingRecruiter.data?.id) {
       recruiterId = existingRecruiter.data.id;
       await supabaseAdmin.from("recruiters").update(recruiterPayload).eq("id", recruiterId);
     } else {
-      const recResult = await supabaseAdmin.from("recruiters").insert(recruiterPayload).select("id").single();
+      const recResult = await supabaseAdmin
+        .from("recruiters")
+        .insert(recruiterPayload)
+        .select("id")
+        .single();
       if (!recResult.error && recResult.data) {
         recruiterId = recResult.data.id;
       }
@@ -2784,8 +3232,8 @@ Return a strict JSON object with:
   const researchResponse = await handleCompanyResearch(
     requestInit("company-research/generate", {
       companyName: body.companyName,
-      companyId: companyId
-    })
+      companyId: companyId,
+    }),
   );
   if (!researchResponse.ok) return researchResponse;
   const researchData = await researchResponse.json();
@@ -2795,8 +3243,8 @@ Return a strict JSON object with:
     requestInit("loom/script", {
       companyName: body.companyName,
       resumeId: resumeId,
-      recruiterId: recruiterId ?? undefined
-    })
+      recruiterId: recruiterId ?? undefined,
+    }),
   );
   if (!loomResponse.ok) return loomResponse;
   const loomData = await loomResponse.json();
@@ -2806,8 +3254,8 @@ Return a strict JSON object with:
     requestInit("outreach/campaign", {
       companyName: body.companyName,
       resumeId: resumeId,
-      recruiterId: recruiterId ?? undefined
-    })
+      recruiterId: recruiterId ?? undefined,
+    }),
   );
   if (!campaignResponse.ok) return campaignResponse;
   const campaignData = await campaignResponse.json();
@@ -2820,29 +3268,37 @@ Return a strict JSON object with:
     founder: founder,
     research: researchData,
     loom: loomData,
-    campaign: campaignData
+    campaign: campaignData,
   });
 }
 
 async function handleCompanyTarget(request: Request) {
   const user = await requireApiUser(request);
-  
+
   if (request.method === "GET") {
     const url = new URL(request.url);
     const companyName = url.searchParams.get("companyName");
     if (!companyName) return json({ error: "companyName is required" }, { status: 400 });
-    
+
     const { data, error } = await supabaseAdmin
       .from("companies")
       .select("*")
       .eq("user_id", user.id)
       .ilike("name", companyName)
       .maybeSingle();
-      
+
     if (error) return json({ error: error.message }, { status: 400 });
-    return json(data ?? { name: companyName, target_value: "normal", company_quality_score: 0, hiring_activity_score: 0, strategic_value_score: 0 });
+    return json(
+      data ?? {
+        name: companyName,
+        target_value: "normal",
+        company_quality_score: 0,
+        hiring_activity_score: 0,
+        strategic_value_score: 0,
+      },
+    );
   }
-  
+
   if (request.method === "POST" || request.method === "PUT") {
     const body = await readJson<{
       companyName: string;
@@ -2851,14 +3307,14 @@ async function handleCompanyTarget(request: Request) {
       hiringActivityScore?: number;
       strategicValueScore?: number;
     }>(request);
-    
+
     const existing = await supabaseAdmin
       .from("companies")
       .select("id")
       .eq("user_id", user.id)
       .ilike("name", body.companyName)
       .maybeSingle();
-      
+
     const payload = {
       user_id: user.id,
       name: body.companyName,
@@ -2867,7 +3323,7 @@ async function handleCompanyTarget(request: Request) {
       hiring_activity_score: body.hiringActivityScore ?? 0,
       strategic_value_score: body.strategicValueScore ?? 0,
     };
-    
+
     let result;
     if (existing.data?.id) {
       result = await supabaseAdmin
@@ -2877,17 +3333,13 @@ async function handleCompanyTarget(request: Request) {
         .select("*")
         .single();
     } else {
-      result = await supabaseAdmin
-        .from("companies")
-        .insert(payload)
-        .select("*")
-        .single();
+      result = await supabaseAdmin.from("companies").insert(payload).select("*").single();
     }
-    
+
     if (result.error) return json({ error: result.error.message }, { status: 400 });
     return json(result.data);
   }
-  
+
   return methodNotAllowed(["GET", "POST", "PUT"]);
 }
 
@@ -2911,7 +3363,12 @@ async function handleFollowUps(request: Request) {
   }
 
   if (request.method === "POST") {
-    const body = await readJson<{ applicationId?: string; recruiterId?: string; dueAt: string; note?: string }>(request);
+    const body = await readJson<{
+      applicationId?: string;
+      recruiterId?: string;
+      dueAt: string;
+      note?: string;
+    }>(request);
     const { data, error } = await supabaseAdmin
       .from("followups")
       .insert({
@@ -2920,7 +3377,7 @@ async function handleFollowUps(request: Request) {
         recruiter_id: body.recruiterId || null,
         due_at: body.dueAt,
         note: body.note || null,
-        done: false
+        done: false,
       })
       .select("*")
       .single();
@@ -2929,7 +3386,9 @@ async function handleFollowUps(request: Request) {
   }
 
   if (request.method === "PUT") {
-    const body = await readJson<{ id: string; done?: boolean; note?: string; dueAt?: string }>(request);
+    const body = await readJson<{ id: string; done?: boolean; note?: string; dueAt?: string }>(
+      request,
+    );
     const updatePayload: any = {};
     if (body.done !== undefined) updatePayload.done = body.done;
     if (body.note !== undefined) updatePayload.note = body.note;
@@ -2997,7 +3456,8 @@ async function handleRecruiterDiscovery(request: Request) {
       [
         {
           role: "system",
-          content: "You are a recruiter discovery engine. Based on the company name, role, and research context, generate a list of likely recruiters, hiring managers, and engineering managers involved in hiring. Return strict JSON with realistic names, titles, classified roles ('Recruiter', 'Hiring Manager', or 'Engineering Manager') and verified profile URLs if they exist in the context (else return null, NEVER fabricate recruiter profile URLs).",
+          content:
+            "You are a recruiter discovery engine. Based on the company name, role, and research context, generate a list of likely recruiters, hiring managers, and engineering managers involved in hiring. Return strict JSON with realistic names, titles, classified roles ('Recruiter', 'Hiring Manager', or 'Engineering Manager') and verified profile URLs if they exist in the context (else return null, NEVER fabricate recruiter profile URLs).",
         },
         {
           role: "user",
@@ -3015,7 +3475,10 @@ async function handleRecruiterDiscovery(request: Request) {
               properties: {
                 name: { type: "string" },
                 title: { type: "string" },
-                role: { type: "string", enum: ["Recruiter", "Hiring Manager", "Engineering Manager"] },
+                role: {
+                  type: "string",
+                  enum: ["Recruiter", "Hiring Manager", "Engineering Manager"],
+                },
                 profile_url: { type: ["string", "null"] },
                 reason: { type: "string" },
                 searchQuery: { type: "string" },
@@ -3065,7 +3528,7 @@ async function handleRecruiterDiscovery(request: Request) {
           title: rec.title,
           role: rec.role,
           profile_url: rec.profile_url ?? null,
-          relevance_score: 0.90,
+          relevance_score: 0.9,
           notes: `${rec.title}\n\n${rec.reason}\n\nSearch: ${rec.searchQuery}`,
         })
         .eq("id", existing.data.id)
@@ -3086,7 +3549,7 @@ async function handleRecruiterDiscovery(request: Request) {
         profile_url: rec.profile_url ?? null,
         source: "discovery",
         discovered_via: "AI Discovery",
-        relevance_score: 0.90,
+        relevance_score: 0.9,
         notes: `${rec.title}\n\n${rec.reason}\n\nSearch: ${rec.searchQuery}`,
       })
       .select("*")
@@ -3102,7 +3565,10 @@ async function handleRecruiterDiscovery(request: Request) {
       userId: user.id,
       eventType: "recruiter_discovery_completed",
       entityType: "recruiters",
-      payload: { companyName: body.companyName, recruiterIds: insertedRecruiters.map((r: any) => r.id) },
+      payload: {
+        companyName: body.companyName,
+        recruiterIds: insertedRecruiters.map((r: any) => r.id),
+      },
     });
   }
 
@@ -3217,8 +3683,14 @@ async function handleFollowUpAutoCreate(request: Request) {
   }>(request);
 
   const followUpConfig: Record<string, { days: number; note: string }> = {
-    applied: { days: 5, note: `Follow up on application at ${body.companyName} — check if reviewed` },
-    screening: { days: 3, note: `Follow up after screening at ${body.companyName} — request next steps` },
+    applied: {
+      days: 5,
+      note: `Follow up on application at ${body.companyName} — check if reviewed`,
+    },
+    screening: {
+      days: 3,
+      note: `Follow up after screening at ${body.companyName} — request next steps`,
+    },
     interview: { days: 2, note: `Send thank-you note after interview at ${body.companyName}` },
     offer: { days: 1, note: `Respond to offer from ${body.companyName}` },
   };
@@ -3245,7 +3717,11 @@ async function handleFollowUpAutoCreate(request: Request) {
     eventType: "followup_auto_created",
     entityType: "followups",
     entityId: data.id,
-    payload: { applicationId: body.applicationId, companyName: body.companyName, action: body.action },
+    payload: {
+      applicationId: body.applicationId,
+      companyName: body.companyName,
+      action: body.action,
+    },
   });
 
   return json(data);

@@ -10,7 +10,17 @@ export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
 });
 
-function Stat({ icon: Icon, label, value, accent }: { icon: any; label: string; value: string | number; accent?: string }) {
+function Stat({
+  icon: Icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: any;
+  label: string;
+  value: string | number;
+  accent?: string;
+}) {
   return (
     <Card className="p-5">
       <div className="flex items-center justify-between">
@@ -25,16 +35,24 @@ function Stat({ icon: Icon, label, value, accent }: { icon: any; label: string; 
 function Dashboard() {
   const { data } = useQuery({
     queryKey: ["dashboard-stats"],
-    queryFn: () => apiGet<{
-      applications: number;
-      interviews: number;
-      offers: number;
-      rejections: number;
-      responseRate: number;
-      interviewRate: number;
-    }>("/api/analytics/summary"),
+    queryFn: () =>
+      apiGet<{
+        applications: number;
+        interviews: number;
+        offers: number;
+        rejections: number;
+        responseRate: number;
+        interviewRate: number;
+      }>("/api/analytics/summary"),
   });
-  const s = data ?? { applications: 0, interviews: 0, offers: 0, rejections: 0, responseRate: 0, interviewRate: 0 };
+  const s = data ?? {
+    applications: 0,
+    interviews: 0,
+    offers: 0,
+    rejections: 0,
+    responseRate: 0,
+    interviewRate: 0,
+  };
   return (
     <div>
       <PageHeader title="Dashboard" description="Your career pipeline at a glance." />
@@ -51,4 +69,3 @@ function Dashboard() {
     </div>
   );
 }
-

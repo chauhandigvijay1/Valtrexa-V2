@@ -12,7 +12,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
   }
   return env;
@@ -49,7 +53,8 @@ B.Tech in CS from IIT Delhi. Specialization in Algorithms.
 \\end{document}`;
 
 async function compileLatex(tex: string): Promise<Buffer> {
-  const compileUrl = "https://latexonline.cc/compile?command=pdflatex&text=" + encodeURIComponent(tex);
+  const compileUrl =
+    "https://latexonline.cc/compile?command=pdflatex&text=" + encodeURIComponent(tex);
   const res = await fetch(compileUrl, { signal: AbortSignal.timeout(30000) });
   if (!res.ok) {
     throw new Error(`latexonline.cc returned ${res.status}: ${await res.text()}`);
@@ -61,7 +66,7 @@ async function compileLatex(tex: string): Promise<Buffer> {
 function parsePreambles(tex: string) {
   const docClassMatch = tex.match(/\\documentclass(\[[^\]]*\])?\{[^\}]*\}/);
   const docclass = docClassMatch ? docClassMatch[0] : "";
-  
+
   const packages: string[] = [];
   const matches = tex.matchAll(/\\usepackage(\[[^\]]*\])?\{([^\}]*)\}/g);
   for (const m of matches) {
@@ -101,13 +106,14 @@ async function runTailorViaAI(original: string, jobDescription: string): Promise
         messages: [
           {
             role: "system",
-            content: "You are a Native LaTeX Engine. Rewrite the provided LaTeX resume for the provided Job Description. Preserve ALL preamble, documentclass, packages, margins, spacing, styling, and section order exactly as provided. DO NOT use markdown. Return ONLY the raw complete mutated LaTeX document."
+            content:
+              "You are a Native LaTeX Engine. Rewrite the provided LaTeX resume for the provided Job Description. Preserve ALL preamble, documentclass, packages, margins, spacing, styling, and section order exactly as provided. DO NOT use markdown. Return ONLY the raw complete mutated LaTeX document.",
           },
           {
             role: "user",
-            content: `Job Description:\n${jobDescription}\n\nOriginal Resume:\n${original}`
-          }
-        ]
+            content: `Job Description:\n${jobDescription}\n\nOriginal Resume:\n${original}`,
+          },
+        ],
       }),
       signal: AbortSignal.timeout(45000),
     });
@@ -116,7 +122,10 @@ async function runTailorViaAI(original: string, jobDescription: string): Promise
     const payload = await response.json();
     let content = payload?.choices?.[0]?.message?.content;
     if (content) {
-      content = content.replace(/^```[a-z]*\n/gi, "").replace(/\n```$/g, "").trim();
+      content = content
+        .replace(/^```[a-z]*\n/gi, "")
+        .replace(/\n```$/g, "")
+        .trim();
       return content;
     }
   } catch (err: any) {
@@ -127,12 +136,13 @@ async function runTailorViaAI(original: string, jobDescription: string): Promise
 
 async function main() {
   console.log("=== RESUME INTEGRITY VERIFICATION ===");
-  const jobDescription = "Looking for a Senior Software Engineer at BreadButter with experience in robust systems, Career Compass Pro, and algorithms.";
-  
+  const jobDescription =
+    "Looking for a Senior Software Engineer at BreadButter with experience in robust systems, Career Compass Pro, and algorithms.";
+
   console.log("1. Original LaTeX document prepared.");
   console.log("2. Generating tailored version...");
   const tailoredTex = await runTailorViaAI(originalTex, jobDescription);
-  
+
   console.log("3. Compiling Original and Tailored LaTeX documents to PDF...");
   let originalPdf: Buffer, tailoredPdf: Buffer;
   try {
@@ -156,20 +166,32 @@ async function main() {
   const tailPreamble = parsePreambles(tailoredTex);
 
   const docclassMatches = origPreamble.docclass === tailPreamble.docclass;
-  console.log(docclassMatches ? "✓ Same documentclass:" : "✗ Documentclass mismatch:", tailPreamble.docclass);
+  console.log(
+    docclassMatches ? "✓ Same documentclass:" : "✗ Documentclass mismatch:",
+    tailPreamble.docclass,
+  );
 
-  const packagesMatches = JSON.stringify(origPreamble.packages) === JSON.stringify(tailPreamble.packages);
+  const packagesMatches =
+    JSON.stringify(origPreamble.packages) === JSON.stringify(tailPreamble.packages);
   console.log(packagesMatches ? "✓ Same packages:" : "✗ Packages mismatch:", tailPreamble.packages);
 
   const origSections = countSections(originalTex);
   const tailSections = countSections(tailoredTex);
   const sectionsMatches = origSections === tailSections;
-  console.log(sectionsMatches ? `✓ Same section count: ${tailSections}` : `✗ Section count mismatch: original=${origSections}, tailored=${tailSections}`);
+  console.log(
+    sectionsMatches
+      ? `✓ Same section count: ${tailSections}`
+      : `✗ Section count mismatch: original=${origSections}, tailored=${tailSections}`,
+  );
 
   const origEnvs = countEnvironments(originalTex);
   const tailEnvs = countEnvironments(tailoredTex);
   const envsMatches = origEnvs === tailEnvs;
-  console.log(envsMatches ? `✓ Same environment count: ${tailEnvs}` : `✗ Environment count mismatch: original=${origEnvs}, tailored=${tailEnvs}`);
+  console.log(
+    envsMatches
+      ? `✓ Same environment count: ${tailEnvs}`
+      : `✗ Environment count mismatch: original=${origEnvs}, tailored=${tailEnvs}`,
+  );
 
   // PDF Page Count (checks validity)
   let pageCountSucceeded = true;

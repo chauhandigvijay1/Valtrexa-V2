@@ -201,10 +201,17 @@ export function fallbackResumeAnalysis(resumeText: string, jobDescription: strin
       ? matched.slice(0, 5).map((keyword) => `Resume already signals ${keyword}.`)
       : ["Resume structure is present but the strongest role keywords are underrepresented."],
     weaknesses: missing.length
-      ? missing.slice(0, 5).map((keyword) => `${keyword} is missing or too weak in the current resume.`)
+      ? missing
+          .slice(0, 5)
+          .map((keyword) => `${keyword} is missing or too weak in the current resume.`)
       : ["No major keyword gaps were detected in the fallback analysis."],
     improvementSuggestions: missing.length
-      ? missing.slice(0, 5).map((keyword) => `Add quantified evidence that proves ${keyword} experience where accurate.`)
+      ? missing
+          .slice(0, 5)
+          .map(
+            (keyword) =>
+              `Add quantified evidence that proves ${keyword} experience where accurate.`,
+          )
       : ["Keep the summary and experience bullets aligned with the target role language."],
   };
 }
@@ -229,7 +236,9 @@ export function fallbackTailoredResume(resumeText: string, jobDescription: strin
       "# ATS-Ready Resume",
       "",
       "## Target Keywords",
-      analysis.missingKeywords.length ? analysis.missingKeywords.join(", ") : "No missing keywords detected.",
+      analysis.missingKeywords.length
+        ? analysis.missingKeywords.join(", ")
+        : "No missing keywords detected.",
       "",
       "## Source Resume",
       resumeText.trim(),
@@ -246,7 +255,15 @@ export function fallbackJobMatch(companyName: string, resumeText: string, jobDes
       .map((item) => item.match(/signals (.+)\./)?.[1])
       .filter((item): item is string => Boolean(item)),
     skillsMissing: analysis.missingKeywords,
-    fitSummary: buildFitSummary(companyName, analysis.missingKeywords.length ? analysis.strengths.map((item) => item.replace(/^Resume already signals /, "").replace(/\.$/, "")) : [], analysis.missingKeywords),
+    fitSummary: buildFitSummary(
+      companyName,
+      analysis.missingKeywords.length
+        ? analysis.strengths.map((item) =>
+            item.replace(/^Resume already signals /, "").replace(/\.$/, ""),
+          )
+        : [],
+      analysis.missingKeywords,
+    ),
     gapAnalysis: analysis.improvementSuggestions.join(" "),
   };
 }
@@ -281,7 +298,8 @@ export function fallbackCompanyResearch(input: CompanyResearchFallbackInput) {
       websiteSentences[0] ??
       `Fallback research for ${input.companyName} is based on the provided domain evidence and public news excerpts.`,
     products,
-    recentNews: newsSentences.join(" ") || `No recent news excerpt was available for ${input.companyName}.`,
+    recentNews:
+      newsSentences.join(" ") || `No recent news excerpt was available for ${input.companyName}.`,
     hiringSignals,
     techStack: unique(input.techStack).slice(0, 8),
     fundingData: { status: "unknown", source: input.sourceUrls[0] ?? null },
@@ -291,7 +309,11 @@ export function fallbackCompanyResearch(input: CompanyResearchFallbackInput) {
   };
 }
 
-export function fallbackPainPoints(companyName: string, research: Record<string, unknown> | null, jobs: PainPointSeed[]) {
+export function fallbackPainPoints(
+  companyName: string,
+  research: Record<string, unknown> | null,
+  jobs: PainPointSeed[],
+) {
   const jobText = jobs
     .map((job) => [job.title, job.description].filter(Boolean).join(" "))
     .join(" ");
@@ -344,7 +366,9 @@ export function fallbackOutreach(input: {
   const firstPainPoint = input.painPoints[0]?.title ?? `the ${input.companyName} team priorities`;
   const subject = `${name} | can help with ${firstPainPoint}`;
   const recruiterName = input.recruiter?.name ? ` ${input.recruiter.name}` : "";
-  const skills = Array.isArray(input.resume.skills) ? input.resume.skills.slice(0, 5).join(", ") : "relevant engineering delivery";
+  const skills = Array.isArray(input.resume.skills)
+    ? input.resume.skills.slice(0, 5).join(", ")
+    : "relevant engineering delivery";
 
   return {
     subject,
@@ -369,13 +393,17 @@ export function fallbackLoomScript(input: {
   painPoints: Array<Record<string, any>>;
 }) {
   const name = candidateName(input.resume);
-  const firstPainPoint = input.painPoints[0]?.title ?? `the current hiring priorities at ${input.companyName}`;
-  const skills = Array.isArray(input.resume.skills) ? input.resume.skills.slice(0, 4).join(", ") : "product engineering";
+  const firstPainPoint =
+    input.painPoints[0]?.title ?? `the current hiring priorities at ${input.companyName}`;
+  const skills = Array.isArray(input.resume.skills)
+    ? input.resume.skills.slice(0, 4).join(", ")
+    : "product engineering";
 
   const hook = `Hi, I’m ${name}, and I recorded this because ${input.companyName} seems to be investing in ${firstPainPoint}.`;
   const problemStatement = `From the available job and company signals, the team likely needs faster execution and lower coordination drag around that area.`;
   const solutionPitch = `My background in ${skills} is relevant because I’ve shipped production work that removes that kind of bottleneck without inflating scope.`;
-  const cta = "If that maps to a real team priority, I’d value a short conversation to compare notes.";
+  const cta =
+    "If that maps to a real team priority, I’d value a short conversation to compare notes.";
 
   return {
     hook,

@@ -9,7 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { apiGet, apiPost } from "@/lib/api-client";
@@ -17,7 +23,8 @@ import { lineDelta } from "@/lib/workflow-intelligence";
 import { toast } from "sonner";
 import { Download, FileText, Sparkles, Star, Trash2, Upload, Wand2 } from "lucide-react";
 
-const ACCEPT = ".pdf,.docx,.tex,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/x-tex";
+const ACCEPT =
+  ".pdf,.docx,.tex,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,text/x-tex";
 
 type ResumeCenterRow = {
   id: string;
@@ -71,8 +78,15 @@ function ResumesPage() {
   const qc = useQueryClient();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [dragActive, setDragActive] = useState(false);
-  const [uploadState, setUploadState] = useState<{ fileName: string; progress: number; stage: string } | null>(null);
-  const [generationDialog, setGenerationDialog] = useState<{ resume: ResumeCenterRow; mode: GenerationMode } | null>(null);
+  const [uploadState, setUploadState] = useState<{
+    fileName: string;
+    progress: number;
+    stage: string;
+  } | null>(null);
+  const [generationDialog, setGenerationDialog] = useState<{
+    resume: ResumeCenterRow;
+    mode: GenerationMode;
+  } | null>(null);
   const [jobDescription, setJobDescription] = useState("");
   const [focusedResumeId, setFocusedResumeId] = useState<string | null>(null);
 
@@ -85,7 +99,9 @@ function ResumesPage() {
 
   const openGenerationDialog = (resume: ResumeCenterRow, mode: GenerationMode) => {
     setFocusedResumeId(resume.id);
-    setJobDescription(resume.latestAnalysis?.job_description ?? resume.latestTailored?.job_description ?? "");
+    setJobDescription(
+      resume.latestAnalysis?.job_description ?? resume.latestTailored?.job_description ?? "",
+    );
     setGenerationDialog({ resume, mode });
   };
 
@@ -94,7 +110,11 @@ function ResumesPage() {
       if (!user) throw new Error("Not signed in");
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "bin";
       const storagePath = `${user.id}/resumes/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
-      const title = file.name.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ").trim() || "Resume";
+      const title =
+        file.name
+          .replace(/\.[^.]+$/, "")
+          .replace(/[_-]+/g, " ")
+          .trim() || "Resume";
 
       const ticker = window.setInterval(() => {
         setUploadState((current) => {
@@ -105,7 +125,9 @@ function ResumesPage() {
 
       try {
         setUploadState({ fileName: file.name, progress: 8, stage: "Uploading resume" });
-        const upload = await supabase.storage.from("resumes").upload(storagePath, file, { upsert: false, contentType: file.type || undefined });
+        const upload = await supabase.storage
+          .from("resumes")
+          .upload(storagePath, file, { upsert: false, contentType: file.type || undefined });
         if (upload.error) throw upload.error;
 
         setUploadState({ fileName: file.name, progress: 88, stage: "Parsing resume" });
@@ -136,7 +158,11 @@ function ResumesPage() {
   });
 
   const parseMutation = useMutation({
-    mutationFn: async (resume: ResumeCenterRow) => apiPost("/api/resumes/parse", { resumeId: resume.id, resumeVersionId: resume.latestVersion?.id }),
+    mutationFn: async (resume: ResumeCenterRow) =>
+      apiPost("/api/resumes/parse", {
+        resumeId: resume.id,
+        resumeVersionId: resume.latestVersion?.id,
+      }),
     onSuccess: async (_, resume) => {
       setFocusedResumeId(resume.id);
       await refreshCenter();
@@ -175,7 +201,9 @@ function ResumesPage() {
       setFocusedResumeId(variables.resume.id);
       setGenerationDialog(null);
       setJobDescription("");
-      toast.success(variables.mode === "analyze" ? "ATS analysis completed." : "Tailored resume generated.");
+      toast.success(
+        variables.mode === "analyze" ? "ATS analysis completed." : "Tailored resume generated.",
+      );
     },
     onError: (error: Error) => toast.error(error.message),
   });
@@ -201,7 +229,10 @@ function ResumesPage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Resume Intelligence Center" description="Upload once, parse into structure, review ATS breakdowns, preview tailored output, and reuse the same resume everywhere else." />
+      <PageHeader
+        title="Resume Intelligence Center"
+        description="Upload once, parse into structure, review ATS breakdowns, preview tailored output, and reuse the same resume everywhere else."
+      />
 
       <div className="grid gap-4 md:grid-cols-4">
         <MetricCard label="Resumes" value={summary.total} />
@@ -222,7 +253,10 @@ function ResumesPage() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <div className="text-lg font-semibold">Upload Resume</div>
-            <div className="text-sm text-muted-foreground">Supported formats: PDF, DOCX, TEX. Uploading triggers storage, parsing, and immediate downstream readiness.</div>
+            <div className="text-sm text-muted-foreground">
+              Supported formats: PDF, DOCX, TEX. Uploading triggers storage, parsing, and immediate
+              downstream readiness.
+            </div>
           </div>
           <div className="flex gap-2">
             <Button variant="outline" onClick={browse}>
@@ -262,12 +296,25 @@ function ResumesPage() {
 
       <div className="space-y-4">
         {(center.data?.rows ?? []).map((resume) => {
-          const analysisInsights = resume.latestAnalysis ? deriveAnalysisInsights(resume.latestAnalysis, resume.parse?.skills ?? []) : null;
-          const tailoredDiff = resume.latestTailored ? lineDelta(resume.latestVersion?.parsed_text ?? "", resume.latestTailored.ats_friendly_resume) : null;
-          const showDetails = focusedResumeId === resume.id || Boolean(resume.latestAnalysis) || Boolean(resume.latestTailored);
+          const analysisInsights = resume.latestAnalysis
+            ? deriveAnalysisInsights(resume.latestAnalysis, resume.parse?.skills ?? [])
+            : null;
+          const tailoredDiff = resume.latestTailored
+            ? lineDelta(
+                resume.latestVersion?.parsed_text ?? "",
+                resume.latestTailored.ats_friendly_resume,
+              )
+            : null;
+          const showDetails =
+            focusedResumeId === resume.id ||
+            Boolean(resume.latestAnalysis) ||
+            Boolean(resume.latestTailored);
 
           return (
-            <Card key={resume.id} className={`space-y-4 p-5 ${focusedResumeId === resume.id ? "border-primary/50 shadow-sm" : ""}`}>
+            <Card
+              key={resume.id}
+              className={`space-y-4 p-5 ${focusedResumeId === resume.id ? "border-primary/50 shadow-sm" : ""}`}
+            >
               <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2">
@@ -280,45 +327,93 @@ function ResumesPage() {
                       </Badge>
                     )}
                     <Badge variant="outline">{resume.processing_state}</Badge>
-                    {resume.latestAnalysis && <Badge variant="secondary">ATS {resume.latestAnalysis.ats_score}%</Badge>}
+                    {resume.latestAnalysis && (
+                      <Badge variant="secondary">ATS {resume.latestAnalysis.ats_score}%</Badge>
+                    )}
                     {resume.latestTailored && <Badge variant="secondary">Tailored ready</Badge>}
                   </div>
                   <div className="grid gap-2 text-sm text-muted-foreground md:grid-cols-4">
-                    <Info label="Filename" value={resume.latestVersion?.file_name ?? "Not uploaded"} />
-                    <Info label="Upload date" value={resume.latestVersion ? new Date(resume.latestVersion.created_at).toLocaleString() : "Not uploaded"} />
+                    <Info
+                      label="Filename"
+                      value={resume.latestVersion?.file_name ?? "Not uploaded"}
+                    />
+                    <Info
+                      label="Upload date"
+                      value={
+                        resume.latestVersion
+                          ? new Date(resume.latestVersion.created_at).toLocaleString()
+                          : "Not uploaded"
+                      }
+                    />
                     <Info label="Processing" value={resume.processing_state} />
-                    <Info label="ATS score" value={resume.latestAnalysis ? `${resume.latestAnalysis.ats_score}%` : "Not analyzed"} />
+                    <Info
+                      label="ATS score"
+                      value={
+                        resume.latestAnalysis
+                          ? `${resume.latestAnalysis.ats_score}%`
+                          : "Not analyzed"
+                      }
+                    />
                   </div>
                   {resume.parse && (
                     <div className="text-sm text-muted-foreground">
                       Parsed profile: {resume.parse.full_name ?? "Name unavailable"}
-                      {resume.parse.skills.length ? ` • ${resume.parse.skills.slice(0, 8).join(", ")}` : ""}
+                      {resume.parse.skills.length
+                        ? ` • ${resume.parse.skills.slice(0, 8).join(", ")}`
+                        : ""}
                     </div>
                   )}
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  <Button variant="outline" disabled={!resume.latestVersion || parseMutation.isPending} onClick={() => parseMutation.mutate(resume)}>
+                  <Button
+                    variant="outline"
+                    disabled={!resume.latestVersion || parseMutation.isPending}
+                    onClick={() => parseMutation.mutate(resume)}
+                  >
                     Parse
                   </Button>
-                  <Button variant="outline" disabled={!resume.latestVersion} onClick={() => {
-                    openGenerationDialog(resume, "analyze");
-                  }}>
+                  <Button
+                    variant="outline"
+                    disabled={!resume.latestVersion}
+                    onClick={() => {
+                      openGenerationDialog(resume, "analyze");
+                    }}
+                  >
                     ATS Analyze
                   </Button>
-                  <Button variant="outline" disabled={!resume.latestVersion} onClick={() => {
-                    openGenerationDialog(resume, "tailor");
-                  }}>
+                  <Button
+                    variant="outline"
+                    disabled={!resume.latestVersion}
+                    onClick={() => {
+                      openGenerationDialog(resume, "tailor");
+                    }}
+                  >
                     <Wand2 className="mr-2 h-4 w-4" />
                     Tailor
                   </Button>
-                  <Button variant="outline" disabled={!resume.latestVersion && !resume.latestTailored} onClick={() => downloadResume(resume)}>
+                  <Button
+                    variant="outline"
+                    disabled={!resume.latestVersion && !resume.latestTailored}
+                    onClick={() => downloadResume(resume)}
+                  >
                     <Download className="mr-2 h-4 w-4" />
                     Download
                   </Button>
-                  <Button variant="outline" disabled={resume.is_primary || primaryMutation.isPending} onClick={() => primaryMutation.mutate(resume.id)}>
+                  <Button
+                    variant="outline"
+                    disabled={resume.is_primary || primaryMutation.isPending}
+                    onClick={() => primaryMutation.mutate(resume.id)}
+                  >
                     Mark Primary
                   </Button>
-                  <Button variant="destructive" disabled={deleteMutation.isPending} onClick={() => confirm("Delete this resume and all derived outputs?") && deleteMutation.mutate(resume.id)}>
+                  <Button
+                    variant="destructive"
+                    disabled={deleteMutation.isPending}
+                    onClick={() =>
+                      confirm("Delete this resume and all derived outputs?") &&
+                      deleteMutation.mutate(resume.id)
+                    }
+                  >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Delete
                   </Button>
@@ -333,30 +428,65 @@ function ResumesPage() {
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <div className="text-sm font-semibold">ATS Breakdown</div>
-                          <div className="text-xs text-muted-foreground">Visible immediately after analysis, with the latest job description context.</div>
+                          <div className="text-xs text-muted-foreground">
+                            Visible immediately after analysis, with the latest job description
+                            context.
+                          </div>
                         </div>
                         <Badge variant={resume.latestAnalysis ? "secondary" : "outline"}>
-                          {resume.latestAnalysis ? `${resume.latestAnalysis.ats_score}%` : "Run analysis"}
+                          {resume.latestAnalysis
+                            ? `${resume.latestAnalysis.ats_score}%`
+                            : "Run analysis"}
                         </Badge>
                       </div>
                       {resume.latestAnalysis && analysisInsights ? (
                         <div className="space-y-4">
                           <div className="grid gap-3 sm:grid-cols-3">
-                            <MiniMetric label="Keyword coverage" value={`${analysisInsights.coverage}%`} />
-                            <MiniMetric label="Matched skills" value={analysisInsights.matchedSkills.length} />
-                            <MiniMetric label="Missing skills" value={resume.latestAnalysis.missing_keywords.length} />
+                            <MiniMetric
+                              label="Keyword coverage"
+                              value={`${analysisInsights.coverage}%`}
+                            />
+                            <MiniMetric
+                              label="Matched skills"
+                              value={analysisInsights.matchedSkills.length}
+                            />
+                            <MiniMetric
+                              label="Missing skills"
+                              value={resume.latestAnalysis.missing_keywords.length}
+                            />
                           </div>
                           <Progress value={resume.latestAnalysis.ats_score} className="h-2" />
                           <div className="grid gap-3 md:grid-cols-2">
-                            <TagBlock title="Matched skills" items={analysisInsights.matchedSkills} empty="No explicit overlap captured yet." />
-                            <TagBlock title="Missing skills" items={resume.latestAnalysis.missing_keywords} empty="No missing keywords recorded." destructive />
+                            <TagBlock
+                              title="Matched skills"
+                              items={analysisInsights.matchedSkills}
+                              empty="No explicit overlap captured yet."
+                            />
+                            <TagBlock
+                              title="Missing skills"
+                              items={resume.latestAnalysis.missing_keywords}
+                              empty="No missing keywords recorded."
+                              destructive
+                            />
                             <ListBlock title="Strengths" items={resume.latestAnalysis.strengths} />
-                            <ListBlock title="Weaknesses" items={resume.latestAnalysis.weaknesses} />
+                            <ListBlock
+                              title="Weaknesses"
+                              items={resume.latestAnalysis.weaknesses}
+                            />
                           </div>
-                          <ListBlock title="Recommendations" items={resume.latestAnalysis.improvement_suggestions} />
+                          <ListBlock
+                            title="Recommendations"
+                            items={resume.latestAnalysis.improvement_suggestions}
+                          />
                           <div className="space-y-2">
-                            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Job description used</div>
-                            <Textarea rows={6} readOnly value={resume.latestAnalysis.job_description} />
+                            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              Job description used
+                            </div>
+                            <Textarea
+                              rows={6}
+                              readOnly
+                              value={resume.latestAnalysis.job_description}
+                            />
                           </div>
                         </div>
                       ) : (
@@ -368,7 +498,10 @@ function ResumesPage() {
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <div className="text-sm font-semibold">Tailored Resume Output</div>
-                          <div className="text-xs text-muted-foreground">Preview, compare, and download the latest tailored version without leaving the page.</div>
+                          <div className="text-xs text-muted-foreground">
+                            Preview, compare, and download the latest tailored version without
+                            leaving the page.
+                          </div>
                         </div>
                         <Badge variant={resume.latestTailored ? "secondary" : "outline"}>
                           {resume.latestTailored ? "Visible now" : "Generate first"}
@@ -382,7 +515,11 @@ function ResumesPage() {
                             <TabsTrigger value="compare">Compare</TabsTrigger>
                           </TabsList>
                           <TabsContent value="preview" className="space-y-3">
-                            <TagBlock title="Missing skills addressed" items={resume.latestTailored.missing_skills} empty="No explicit missing-skill list returned." />
+                            <TagBlock
+                              title="Missing skills addressed"
+                              items={resume.latestTailored.missing_skills}
+                              empty="No explicit missing-skill list returned."
+                            />
                             <div className="space-y-2">
                               {resume.latestTailored.storage_path?.endsWith(".tex") ? (
                                 <div className="space-y-2">
@@ -392,48 +529,106 @@ function ResumesPage() {
                                         ✓ PDF Verified
                                       </Badge>
                                       <span className="text-muted-foreground">
-                                        Size: <strong className="text-foreground">{((resume.latestTailored.pdf_file_size ?? 0) / 1024).toFixed(1)} KB</strong>
+                                        Size:{" "}
+                                        <strong className="text-foreground">
+                                          {(
+                                            (resume.latestTailored.pdf_file_size ?? 0) / 1024
+                                          ).toFixed(1)}{" "}
+                                          KB
+                                        </strong>
                                       </span>
                                       <span className="text-muted-foreground">
-                                        Pages: <strong className="text-foreground">{resume.latestTailored.pdf_page_count ?? "N/A"}</strong>
+                                        Pages:{" "}
+                                        <strong className="text-foreground">
+                                          {resume.latestTailored.pdf_page_count ?? "N/A"}
+                                        </strong>
                                       </span>
                                     </div>
                                   )}
-                                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">PDF Preview</div>
-                                  <PdfPreview path={resume.latestTailored.storage_path.replace(".tex", ".pdf")} bucket="tailored-resumes" />
+                                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                    PDF Preview
+                                  </div>
+                                  <PdfPreview
+                                    path={resume.latestTailored.storage_path.replace(
+                                      ".tex",
+                                      ".pdf",
+                                    )}
+                                    bucket="tailored-resumes"
+                                  />
                                 </div>
                               ) : (
                                 <>
-                                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tailored resume version</div>
-                                  <Textarea rows={14} readOnly value={resume.latestTailored.optimized_resume} />
+                                  <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                    Tailored resume version
+                                  </div>
+                                  <Textarea
+                                    rows={14}
+                                    readOnly
+                                    value={resume.latestTailored.optimized_resume}
+                                  />
                                 </>
                               )}
                             </div>
                           </TabsContent>
                           <TabsContent value="ats" className="space-y-3">
                             <div className="space-y-2">
-                              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">ATS-friendly preview</div>
-                              <Textarea rows={14} readOnly value={resume.latestTailored.ats_friendly_resume} />
+                              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                ATS-friendly preview
+                              </div>
+                              <Textarea
+                                rows={14}
+                                readOnly
+                                value={resume.latestTailored.ats_friendly_resume}
+                              />
                             </div>
                             <div className="space-y-2">
-                              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Job description used</div>
-                              <Textarea rows={6} readOnly value={resume.latestTailored.job_description} />
+                              <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                Job description used
+                              </div>
+                              <Textarea
+                                rows={6}
+                                readOnly
+                                value={resume.latestTailored.job_description}
+                              />
                             </div>
                           </TabsContent>
                           <TabsContent value="compare" className="space-y-3">
                             <div className="grid gap-3 md:grid-cols-2">
                               <div className="space-y-2">
-                                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Original parsed text</div>
-                                <Textarea rows={12} readOnly value={resume.latestVersion?.parsed_text ?? "Original parsed text unavailable."} />
+                                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                  Original parsed text
+                                </div>
+                                <Textarea
+                                  rows={12}
+                                  readOnly
+                                  value={
+                                    resume.latestVersion?.parsed_text ??
+                                    "Original parsed text unavailable."
+                                  }
+                                />
                               </div>
                               <div className="space-y-2">
-                                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Tailored ATS version</div>
-                                <Textarea rows={12} readOnly value={resume.latestTailored.ats_friendly_resume} />
+                                <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                  Tailored ATS version
+                                </div>
+                                <Textarea
+                                  rows={12}
+                                  readOnly
+                                  value={resume.latestTailored.ats_friendly_resume}
+                                />
                               </div>
                             </div>
                             <div className="grid gap-3 md:grid-cols-2">
-                              <ListBlock title="Added emphasis" items={tailoredDiff?.added ?? []} empty="No added lines captured." />
-                              <ListBlock title="Removed or de-emphasized" items={tailoredDiff?.removed ?? []} empty="No removed lines captured." />
+                              <ListBlock
+                                title="Added emphasis"
+                                items={tailoredDiff?.added ?? []}
+                                empty="No added lines captured."
+                              />
+                              <ListBlock
+                                title="Removed or de-emphasized"
+                                items={tailoredDiff?.removed ?? []}
+                                empty="No removed lines captured."
+                              />
                             </div>
                           </TabsContent>
                         </Tabs>
@@ -457,19 +652,31 @@ function ResumesPage() {
         <Dialog open onOpenChange={(open) => !open && setGenerationDialog(null)}>
           <DialogContent className="max-w-3xl">
             <DialogHeader>
-              <DialogTitle>{generationDialog.mode === "analyze" ? "ATS Analyze" : "Generate Tailored Resume"}</DialogTitle>
+              <DialogTitle>
+                {generationDialog.mode === "analyze" ? "ATS Analyze" : "Generate Tailored Resume"}
+              </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">
               <div className="text-sm text-muted-foreground">
-                {generationDialog.resume.title} • {generationDialog.resume.latestVersion?.file_name ?? "No file"}
+                {generationDialog.resume.title} •{" "}
+                {generationDialog.resume.latestVersion?.file_name ?? "No file"}
               </div>
-              <Textarea aria-label="Job description" rows={12} value={jobDescription} onChange={(event) => setJobDescription(event.target.value)} placeholder="Paste the full job description here." />
+              <Textarea
+                aria-label="Job description"
+                rows={12}
+                value={jobDescription}
+                onChange={(event) => setJobDescription(event.target.value)}
+                placeholder="Paste the full job description here."
+              />
             </div>
             <DialogFooter>
               <Button variant="ghost" onClick={() => setGenerationDialog(null)}>
                 Cancel
               </Button>
-              <Button disabled={generationMutation.isPending || !jobDescription.trim()} onClick={() => generationMutation.mutate(generationDialog)}>
+              <Button
+                disabled={generationMutation.isPending || !jobDescription.trim()}
+                onClick={() => generationMutation.mutate(generationDialog)}
+              >
                 <Sparkles className="mr-2 h-4 w-4" />
                 {generationMutation.isPending
                   ? generationDialog.mode === "analyze"
@@ -517,11 +724,15 @@ function Info({ label, value }: { label: string; value: string }) {
 function ListBlock({ title, items, empty }: { title: string; items: string[]; empty?: string }) {
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
+      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </div>
       {items.length ? (
         <ul className="space-y-1 text-sm text-foreground">
           {items.map((item) => (
-            <li key={item} className="leading-6">• {item}</li>
+            <li key={item} className="leading-6">
+              • {item}
+            </li>
           ))}
         </ul>
       ) : (
@@ -531,10 +742,22 @@ function ListBlock({ title, items, empty }: { title: string; items: string[]; em
   );
 }
 
-function TagBlock({ title, items, empty, destructive }: { title: string; items: string[]; empty?: string; destructive?: boolean }) {
+function TagBlock({
+  title,
+  items,
+  empty,
+  destructive,
+}: {
+  title: string;
+  items: string[];
+  empty?: string;
+  destructive?: boolean;
+}) {
   return (
     <div className="space-y-2 rounded-lg border border-border p-3">
-      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{title}</div>
+      <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+        {title}
+      </div>
       {items.length ? (
         <div className="flex flex-wrap gap-2">
           {items.map((item) => (
@@ -551,7 +774,11 @@ function TagBlock({ title, items, empty, destructive }: { title: string; items: 
 }
 
 function EmptyState({ text }: { text: string }) {
-  return <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">{text}</div>;
+  return (
+    <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
+      {text}
+    </div>
+  );
 }
 
 function normalizeKeyword(value: string) {
@@ -577,10 +804,19 @@ function deriveAnalysisInsights(
   if (!analysis) return null;
   const jobKeywords = extractKeywords(analysis.job_description);
   const missing = new Set(analysis.missing_keywords.map(normalizeKeyword));
-  const matchedKeywords = jobKeywords.filter((keyword) => !missing.has(normalizeKeyword(keyword))).slice(0, 12);
-  const matchedSkills = parsedSkills.filter((skill) => analysis.job_description.toLowerCase().includes(skill.toLowerCase())).slice(0, 10);
-  const coverageBase = Math.max(jobKeywords.length, matchedKeywords.length + analysis.missing_keywords.length);
-  const coverage = coverageBase ? Math.round((matchedKeywords.length / coverageBase) * 100) : analysis.ats_score;
+  const matchedKeywords = jobKeywords
+    .filter((keyword) => !missing.has(normalizeKeyword(keyword)))
+    .slice(0, 12);
+  const matchedSkills = parsedSkills
+    .filter((skill) => analysis.job_description.toLowerCase().includes(skill.toLowerCase()))
+    .slice(0, 10);
+  const coverageBase = Math.max(
+    jobKeywords.length,
+    matchedKeywords.length + analysis.missing_keywords.length,
+  );
+  const coverage = coverageBase
+    ? Math.round((matchedKeywords.length / coverageBase) * 100)
+    : analysis.ats_score;
   return {
     matchedKeywords,
     matchedSkills: matchedSkills.length ? matchedSkills : matchedKeywords,
@@ -589,7 +825,10 @@ function deriveAnalysisInsights(
 }
 
 async function downloadResume(resume: ResumeCenterRow) {
-  const path = resume.latestTailored?.storage_path; const isTex = path && path.endsWith(".tex"); const source = path ? { bucket: "tailored-resumes", path: isTex ? path.replace(".tex", ".pdf") : path }
+  const path = resume.latestTailored?.storage_path;
+  const isTex = path && path.endsWith(".tex");
+  const source = path
+    ? { bucket: "tailored-resumes", path: isTex ? path.replace(".tex", ".pdf") : path }
     : resume.latestVersion?.storage_path
       ? { bucket: "resumes", path: resume.latestVersion.storage_path }
       : null;
@@ -599,7 +838,9 @@ async function downloadResume(resume: ResumeCenterRow) {
     return;
   }
 
-  const { data, error } = await supabase.storage.from(source.bucket).createSignedUrl(source.path, 60 * 10);
+  const { data, error } = await supabase.storage
+    .from(source.bucket)
+    .createSignedUrl(source.path, 60 * 10);
   if (error || !data?.signedUrl) {
     toast.error(error?.message ?? "Failed to create download URL.");
     return;
@@ -611,10 +852,18 @@ async function downloadResume(resume: ResumeCenterRow) {
 function PdfPreview({ path, bucket }: { path: string; bucket: string }) {
   const [url, setUrl] = useState<string | null>(null);
   useEffect(() => {
-    supabase.storage.from(bucket).createSignedUrl(path, 60 * 10).then(({ data }) => {
-      if (data?.signedUrl) setUrl(data.signedUrl);
-    });
+    supabase.storage
+      .from(bucket)
+      .createSignedUrl(path, 60 * 10)
+      .then(({ data }) => {
+        if (data?.signedUrl) setUrl(data.signedUrl);
+      });
   }, [path, bucket]);
-  if (!url) return <div className="p-4 text-center text-sm text-muted-foreground border rounded-lg">Loading preview...</div>;
+  if (!url)
+    return (
+      <div className="p-4 text-center text-sm text-muted-foreground border rounded-lg">
+        Loading preview...
+      </div>
+    );
   return <iframe src={url} className="w-full h-[600px] border rounded-lg" title="PDF Preview" />;
 }

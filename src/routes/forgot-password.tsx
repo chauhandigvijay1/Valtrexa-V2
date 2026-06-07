@@ -34,11 +34,21 @@ function ForgotPage() {
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
+            <Input
+              id="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              required
+            />
           </div>
-          <Button disabled={busy} className="w-full">{busy ? "Sending…" : "Send reset link"}</Button>
+          <Button disabled={busy} className="w-full">
+            {busy ? "Sending…" : "Send reset link"}
+          </Button>
         </form>
-        <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground">Back to sign in</Link>
+        <Link to="/login" className="text-sm text-muted-foreground hover:text-foreground">
+          Back to sign in
+        </Link>
       </Card>
     </div>
   );

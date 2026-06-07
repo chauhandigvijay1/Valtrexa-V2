@@ -17,7 +17,10 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq);
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "");
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "");
     if (!process.env[key]) process.env[key] = value;
   }
 }

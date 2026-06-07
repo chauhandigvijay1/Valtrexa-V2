@@ -13,7 +13,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
     if (!process.env[key]) process.env[key] = value;
   }
@@ -29,7 +33,10 @@ const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-async function invokeRoute(routePath: string, init: { method?: string; body?: unknown; token?: string }) {
+async function invokeRoute(
+  routePath: string,
+  init: { method?: string; body?: unknown; token?: string },
+) {
   const mod = await import(pathToFileURL(path.resolve(process.cwd(), "api/[...route].ts")).href);
   const headers = new Headers();
   if (init.token) headers.set("authorization", `Bearer ${init.token}`);
@@ -51,7 +58,7 @@ async function invokeRoute(routePath: string, init: { method?: string; body?: un
 async function main() {
   const email = `skills-check-${Date.now()}@example.com`;
   const password = "CareerCompass#123";
-  
+
   const createdUser = await admin.auth.admin.createUser({
     email,
     password,
@@ -73,10 +80,12 @@ async function main() {
   ].join("\n");
 
   const storagePath = `${userId}/verification/${Date.now()}-resume.tex`;
-  const upload = await authClient.storage.from("resumes").upload(storagePath, Buffer.from(sampleText), {
-    upsert: true,
-    contentType: "text/x-tex",
-  });
+  const upload = await authClient.storage
+    .from("resumes")
+    .upload(storagePath, Buffer.from(sampleText), {
+      upsert: true,
+      contentType: "text/x-tex",
+    });
   if (upload.error) throw upload.error;
 
   console.log("Processing resume...");

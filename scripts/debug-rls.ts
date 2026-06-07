@@ -12,7 +12,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
   }
   return env;
@@ -24,12 +28,15 @@ async function main() {
 
   console.log("--- policies ---");
   const { data: policies, error: polErr } = await supabase.rpc("get_policies"); // fallback if not exist
-  const { data: rawPol } = await supabase.from("pg_policies" as any).select("*").ilike("tablename", "workflow_events");
+  const { data: rawPol } = await supabase
+    .from("pg_policies" as any)
+    .select("*")
+    .ilike("tablename", "workflow_events");
   console.log(JSON.stringify(rawPol, null, 2));
 
   console.log("--- trigger owner and security definer ---");
   const { data: rawFunc } = await supabase.rpc("get_func" as any).catch(() => ({ data: null }));
-  
+
   // Let's run a raw query to check details of trigger functions
   const query = `
     SELECT proname, prosecuridef, prosrc 

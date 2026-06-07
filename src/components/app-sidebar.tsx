@@ -1,12 +1,34 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
-  LayoutDashboard, User, FolderGit2, Wrench, FileText, Radar,
-  Briefcase, Users, Send, Calendar, BarChart3, Settings as SettingsIcon, LogOut,
-  Target, Brain, AlertTriangle, Building2,
+  LayoutDashboard,
+  User,
+  FolderGit2,
+  Wrench,
+  FileText,
+  Radar,
+  Briefcase,
+  Users,
+  Send,
+  Calendar,
+  BarChart3,
+  Settings as SettingsIcon,
+  LogOut,
+  Target,
+  Brain,
+  AlertTriangle,
+  Building2,
 } from "lucide-react";
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
-  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarFooter,
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
+  SidebarMenu,
+  SidebarMenuButton,
+  SidebarMenuItem,
+  SidebarHeader,
+  SidebarFooter,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
@@ -37,7 +59,9 @@ export function AppSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="h-7 w-7 rounded-md bg-primary/20 grid place-items-center text-primary font-semibold">V</div>
+          <div className="h-7 w-7 rounded-md bg-primary/20 grid place-items-center text-primary font-semibold">
+            V
+          </div>
           <span className="font-semibold tracking-tight">Career Compass Pro</span>
         </div>
       </SidebarHeader>

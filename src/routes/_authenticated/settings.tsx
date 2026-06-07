@@ -33,9 +33,11 @@ const PROVIDERS: Provider[] = [
   {
     key: "openrouter",
     label: "OpenRouter",
-    description: "Primary AI provider for ATS, company research, pain points, outreach, and Loom generation.",
+    description:
+      "Primary AI provider for ATS, company research, pain points, outreach, and Loom generation.",
     workflow: "Resume intelligence and downstream generation modules",
-    backendUsage: "Consumed by server handlers in /api/resumes, /api/company-research, /api/painpoints, /api/outreach, and /api/loom",
+    backendUsage:
+      "Consumed by server handlers in /api/resumes, /api/company-research, /api/painpoints, /api/outreach, and /api/loom",
     fields: [{ name: "api_key", label: "API key", type: "password" }],
   },
   {
@@ -43,7 +45,8 @@ const PROVIDERS: Provider[] = [
     label: "Greenhouse",
     description: "Default board token for job ingestion.",
     workflow: "Opportunity Radar import flow",
-    backendUsage: "Merged into /api/jobs/import when a source-specific token is not supplied manually",
+    backendUsage:
+      "Merged into /api/jobs/import when a source-specific token is not supplied manually",
     fields: [{ name: "board_token", label: "Board token" }],
   },
   {
@@ -51,7 +54,8 @@ const PROVIDERS: Provider[] = [
     label: "Lever",
     description: "Default Lever site slug for job ingestion.",
     workflow: "Opportunity Radar import flow",
-    backendUsage: "Merged into /api/jobs/import when a source-specific site is not supplied manually",
+    backendUsage:
+      "Merged into /api/jobs/import when a source-specific site is not supplied manually",
     fields: [{ name: "site", label: "Site slug" }],
   },
   {
@@ -59,7 +63,8 @@ const PROVIDERS: Provider[] = [
     label: "Ashby",
     description: "Default Ashby board URL for job ingestion.",
     workflow: "Opportunity Radar import flow",
-    backendUsage: "Merged into /api/jobs/import when a source-specific URL is not supplied manually",
+    backendUsage:
+      "Merged into /api/jobs/import when a source-specific URL is not supplied manually",
     fields: [{ name: "board_url", label: "Board URL" }],
   },
   {
@@ -102,11 +107,15 @@ export const Route = createFileRoute("/_authenticated/settings")({ component: Se
 function SettingsPage() {
   return (
     <div className="space-y-6">
-      <PageHeader title="Settings" description="Only live integrations stay here. Each card saves to the database and is consumed by a real workflow." />
+      <PageHeader
+        title="Settings"
+        description="Only live integrations stay here. Each card saves to the database and is consumed by a real workflow."
+      />
       <Alert>
         <AlertTitle>Removed from the release surface</AlertTitle>
         <AlertDescription>
-          Telegram, Gmail, Groq, Indeed, and Instahyre were removed from settings because they were not wired into the current production workflow.
+          Telegram, Gmail, Groq, Indeed, and Instahyre were removed from settings because they were
+          not wired into the current production workflow.
         </AlertDescription>
       </Alert>
       <div className="grid gap-4 xl:grid-cols-2">
@@ -127,7 +136,11 @@ function IntegrationCard({ provider }: { provider: Provider }) {
     queryKey,
     enabled: !!user,
     queryFn: async () => {
-      const { data, error } = await supabase.from("integrations").select("*").eq("provider", provider.key).maybeSingle();
+      const { data, error } = await supabase
+        .from("integrations")
+        .select("*")
+        .eq("provider", provider.key)
+        .maybeSingle();
       if (error) throw error;
       return data;
     },
@@ -146,7 +159,10 @@ function IntegrationCard({ provider }: { provider: Provider }) {
     }
   }, [provider.key, q.data]);
 
-  const configured = useMemo(() => Object.values(config).some((value) => Boolean(value?.trim())), [config]);
+  const configured = useMemo(
+    () => Object.values(config).some((value) => Boolean(value?.trim())),
+    [config],
+  );
 
   const save = useMutation({
     mutationFn: async () => {

@@ -12,7 +12,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
   }
   return env;
@@ -42,16 +46,14 @@ const tables = [
   "resumes",
   "skills",
   "tailored_resumes",
-  "workflow_events"
+  "workflow_events",
 ];
 
 async function main() {
   console.log("=== DB INVENTORY ===");
   for (const table of tables) {
     try {
-      const { count, error } = await admin
-        .from(table)
-        .select("*", { count: "exact", head: true });
+      const { count, error } = await admin.from(table).select("*", { count: "exact", head: true });
       if (error) {
         console.log(`${table} .... error (${error.message})`);
       } else {

@@ -34,11 +34,16 @@ function AnalyticsPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="Analytics" description="Real conversion metrics from your live application data." />
+      <PageHeader
+        title="Analytics"
+        description="Real conversion metrics from your live application data."
+      />
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {metrics.map((metric) => (
           <Card key={metric.label} className="p-5">
-            <div className="text-xs uppercase tracking-wide text-muted-foreground">{metric.label}</div>
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">
+              {metric.label}
+            </div>
             <div className="text-3xl font-semibold mt-2 tabular-nums">{metric.value}</div>
           </Card>
         ))}

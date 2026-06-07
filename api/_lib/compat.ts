@@ -16,7 +16,9 @@ function isObject(value: unknown): value is Record<string, any> {
 
 export function isMissingSchemaError(error?: { message?: string } | null) {
   const message = error?.message ?? "";
-  return /schema cache|relation .* does not exist|column .* does not exist|Could not find the table|Could not find the '.*' column/i.test(message);
+  return /schema cache|relation .* does not exist|column .* does not exist|Could not find the table|Could not find the '.*' column/i.test(
+    message,
+  );
 }
 
 export function encodeMeta(meta: Record<string, unknown>) {
@@ -41,7 +43,8 @@ export function normalizeResumeVersion(version: any) {
     file_name: version?.file_name ?? meta.fileName ?? null,
     file_type: version?.file_type ?? meta.fileType ?? null,
     file_size_bytes: version?.file_size_bytes ?? meta.fileSizeBytes ?? null,
-    parse_status: version?.parse_status ?? meta.parseStatus ?? (version?.content ? "completed" : "pending"),
+    parse_status:
+      version?.parse_status ?? meta.parseStatus ?? (version?.content ? "completed" : "pending"),
     parsed_text: version?.parsed_text ?? version?.content ?? "",
   };
 }

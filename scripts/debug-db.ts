@@ -4,13 +4,18 @@ import postgres from "postgres";
 async function main() {
   const envText = await fs.readFile(".env", "utf-8");
   const env: Record<string, string> = {};
-  envText.split(/\r?\n/).forEach(line => {
+  envText.split(/\r?\n/).forEach((line) => {
     const eq = line.indexOf("=");
-    if (eq > 0) env[line.slice(0, eq).trim()] = line.slice(eq+1).trim().replace(/^"/, "").replace(/"$/, "");
+    if (eq > 0)
+      env[line.slice(0, eq).trim()] = line
+        .slice(eq + 1)
+        .trim()
+        .replace(/^"/, "")
+        .replace(/"$/, "");
   });
 
   const sql = postgres(env["SUPABASE_DB_URL"], { ssl: "require" });
-  
+
   console.log("--- Policies for workflow_events ---");
   const policies = await sql`
     SELECT schemaname, tablename, policyname, roles, cmd, qual, with_check 

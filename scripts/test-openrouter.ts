@@ -11,7 +11,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
   }
   return env;
@@ -26,8 +30,11 @@ async function testModel(model: string) {
     model,
     temperature: 0.1,
     messages: [
-      { role: "system", content: "Extract name and skills. Return JSON only: {\"name\": \"\", \"skills\": []}" },
-      { role: "user", content: "Jane Doe, TypeScript, React" }
+      {
+        role: "system",
+        content: 'Extract name and skills. Return JSON only: {"name": "", "skills": []}',
+      },
+      { role: "user", content: "Jane Doe, TypeScript, React" },
     ],
     response_format: {
       type: "json_schema",
@@ -39,12 +46,12 @@ async function testModel(model: string) {
           additionalProperties: false,
           properties: {
             name: { type: "string" },
-            skills: { type: "array", items: { type: "string" } }
+            skills: { type: "array", items: { type: "string" } },
           },
-          required: ["name", "skills"]
-        }
-      }
-    }
+          required: ["name", "skills"],
+        },
+      },
+    },
   };
 
   try {

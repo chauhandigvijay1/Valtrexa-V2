@@ -1,15 +1,29 @@
-import { ImportedJob, importGreenhouse, importLever, importAshby, importHtmlSource } from "./job-sources.js";
+import {
+  ImportedJob,
+  importGreenhouse,
+  importLever,
+  importAshby,
+  importHtmlSource,
+} from "./job-sources.js";
 
 export interface JobProvider {
   importJobs(config: any): Promise<{ status: string; jobs: ImportedJob[] }>;
 }
 
 export interface RecruiterProvider {
-  discoverRecruiters(companyName: string, roleTitle: string, config?: any): Promise<{ status: string; recruiters: any[] }>;
+  discoverRecruiters(
+    companyName: string,
+    roleTitle: string,
+    config?: any,
+  ): Promise<{ status: string; recruiters: any[] }>;
 }
 
 export interface ApplicationProvider {
-  submitApplication(applicationId: string, details: any, config?: any): Promise<{ status: string; success: boolean; externalId?: string }>;
+  submitApplication(
+    applicationId: string,
+    details: any,
+    config?: any,
+  ): Promise<{ status: string; success: boolean; externalId?: string }>;
 }
 
 export class GreenhouseProvider implements JobProvider, RecruiterProvider, ApplicationProvider {
@@ -21,11 +35,19 @@ export class GreenhouseProvider implements JobProvider, RecruiterProvider, Appli
     return { status: "SUCCESS", jobs };
   }
 
-  async discoverRecruiters(companyName: string, roleTitle: string, config?: any): Promise<{ status: string; recruiters: any[] }> {
+  async discoverRecruiters(
+    companyName: string,
+    roleTitle: string,
+    config?: any,
+  ): Promise<{ status: string; recruiters: any[] }> {
     return { status: "NOT_SUPPORTED", recruiters: [] };
   }
 
-  async submitApplication(applicationId: string, details: any, config?: any): Promise<{ status: string; success: boolean }> {
+  async submitApplication(
+    applicationId: string,
+    details: any,
+    config?: any,
+  ): Promise<{ status: string; success: boolean }> {
     return { status: "NOT_SUPPORTED", success: false };
   }
 }
@@ -39,11 +61,19 @@ export class LeverProvider implements JobProvider, RecruiterProvider, Applicatio
     return { status: "SUCCESS", jobs };
   }
 
-  async discoverRecruiters(companyName: string, roleTitle: string, config?: any): Promise<{ status: string; recruiters: any[] }> {
+  async discoverRecruiters(
+    companyName: string,
+    roleTitle: string,
+    config?: any,
+  ): Promise<{ status: string; recruiters: any[] }> {
     return { status: "NOT_SUPPORTED", recruiters: [] };
   }
 
-  async submitApplication(applicationId: string, details: any, config?: any): Promise<{ status: string; success: boolean }> {
+  async submitApplication(
+    applicationId: string,
+    details: any,
+    config?: any,
+  ): Promise<{ status: string; success: boolean }> {
     return { status: "NOT_SUPPORTED", success: false };
   }
 }
@@ -57,11 +87,19 @@ export class AshbyProvider implements JobProvider, RecruiterProvider, Applicatio
     return { status: "SUCCESS", jobs };
   }
 
-  async discoverRecruiters(companyName: string, roleTitle: string, config?: any): Promise<{ status: string; recruiters: any[] }> {
+  async discoverRecruiters(
+    companyName: string,
+    roleTitle: string,
+    config?: any,
+  ): Promise<{ status: string; recruiters: any[] }> {
     return { status: "NOT_SUPPORTED", recruiters: [] };
   }
 
-  async submitApplication(applicationId: string, details: any, config?: any): Promise<{ status: string; success: boolean }> {
+  async submitApplication(
+    applicationId: string,
+    details: any,
+    config?: any,
+  ): Promise<{ status: string; success: boolean }> {
     return { status: "NOT_SUPPORTED", success: false };
   }
 }
@@ -78,11 +116,19 @@ export class LinkedInProvider implements JobProvider, RecruiterProvider, Applica
     return { status: "SUCCESS", jobs };
   }
 
-  async discoverRecruiters(companyName: string, roleTitle: string, config?: any): Promise<{ status: string; recruiters: any[] }> {
+  async discoverRecruiters(
+    companyName: string,
+    roleTitle: string,
+    config?: any,
+  ): Promise<{ status: string; recruiters: any[] }> {
     return { status: "READY_FOR_CREDENTIALS", recruiters: [] };
   }
 
-  async submitApplication(applicationId: string, details: any, config?: any): Promise<{ status: string; success: boolean }> {
+  async submitApplication(
+    applicationId: string,
+    details: any,
+    config?: any,
+  ): Promise<{ status: string; success: boolean }> {
     return { status: "READY_FOR_CREDENTIALS", success: false };
   }
 }
@@ -99,11 +145,19 @@ export class NaukriProvider implements JobProvider, RecruiterProvider, Applicati
     return { status: "SUCCESS", jobs };
   }
 
-  async discoverRecruiters(companyName: string, roleTitle: string, config?: any): Promise<{ status: string; recruiters: any[] }> {
+  async discoverRecruiters(
+    companyName: string,
+    roleTitle: string,
+    config?: any,
+  ): Promise<{ status: string; recruiters: any[] }> {
     return { status: "READY_FOR_CREDENTIALS", recruiters: [] };
   }
 
-  async submitApplication(applicationId: string, details: any, config?: any): Promise<{ status: string; success: boolean }> {
+  async submitApplication(
+    applicationId: string,
+    details: any,
+    config?: any,
+  ): Promise<{ status: string; success: boolean }> {
     return { status: "READY_FOR_CREDENTIALS", success: false };
   }
 }
@@ -120,11 +174,19 @@ export class WellfoundProvider implements JobProvider, RecruiterProvider, Applic
     return { status: "SUCCESS", jobs };
   }
 
-  async discoverRecruiters(companyName: string, roleTitle: string, config?: any): Promise<{ status: string; recruiters: any[] }> {
+  async discoverRecruiters(
+    companyName: string,
+    roleTitle: string,
+    config?: any,
+  ): Promise<{ status: string; recruiters: any[] }> {
     return { status: "READY_FOR_CREDENTIALS", recruiters: [] };
   }
 
-  async submitApplication(applicationId: string, details: any, config?: any): Promise<{ status: string; success: boolean }> {
+  async submitApplication(
+    applicationId: string,
+    details: any,
+    config?: any,
+  ): Promise<{ status: string; success: boolean }> {
     return { status: "READY_FOR_CREDENTIALS", success: false };
   }
 }
@@ -141,11 +203,19 @@ export class IndeedProvider implements JobProvider, RecruiterProvider, Applicati
     return { status: "SUCCESS", jobs };
   }
 
-  async discoverRecruiters(companyName: string, roleTitle: string, config?: any): Promise<{ status: string; recruiters: any[] }> {
+  async discoverRecruiters(
+    companyName: string,
+    roleTitle: string,
+    config?: any,
+  ): Promise<{ status: string; recruiters: any[] }> {
     return { status: "READY_FOR_CREDENTIALS", recruiters: [] };
   }
 
-  async submitApplication(applicationId: string, details: any, config?: any): Promise<{ status: string; success: boolean }> {
+  async submitApplication(
+    applicationId: string,
+    details: any,
+    config?: any,
+  ): Promise<{ status: string; success: boolean }> {
     return { status: "READY_FOR_CREDENTIALS", success: false };
   }
 }
@@ -162,16 +232,26 @@ export class InstahyreProvider implements JobProvider, RecruiterProvider, Applic
     return { status: "SUCCESS", jobs };
   }
 
-  async discoverRecruiters(companyName: string, roleTitle: string, config?: any): Promise<{ status: string; recruiters: any[] }> {
+  async discoverRecruiters(
+    companyName: string,
+    roleTitle: string,
+    config?: any,
+  ): Promise<{ status: string; recruiters: any[] }> {
     return { status: "READY_FOR_CREDENTIALS", recruiters: [] };
   }
 
-  async submitApplication(applicationId: string, details: any, config?: any): Promise<{ status: string; success: boolean }> {
+  async submitApplication(
+    applicationId: string,
+    details: any,
+    config?: any,
+  ): Promise<{ status: string; success: boolean }> {
     return { status: "READY_FOR_CREDENTIALS", success: false };
   }
 }
 
-export function getProvider(sourceName: string): JobProvider & RecruiterProvider & ApplicationProvider {
+export function getProvider(
+  sourceName: string,
+): JobProvider & RecruiterProvider & ApplicationProvider {
   switch (sourceName.toLowerCase()) {
     case "greenhouse":
       return new GreenhouseProvider();

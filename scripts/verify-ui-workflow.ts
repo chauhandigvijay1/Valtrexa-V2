@@ -16,7 +16,10 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq);
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "");
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "");
     if (!process.env[key]) process.env[key] = value;
   }
 }
@@ -74,7 +77,9 @@ async function stopServerTree(server: ChildProcess) {
   if (!server.pid) return;
   if (process.platform === "win32") {
     await new Promise<void>((resolve) => {
-      const killer = spawn("taskkill", ["/PID", String(server.pid), "/T", "/F"], { stdio: "ignore" });
+      const killer = spawn("taskkill", ["/PID", String(server.pid), "/T", "/F"], {
+        stdio: "ignore",
+      });
       killer.on("exit", () => resolve());
       killer.on("error", () => resolve());
     });
@@ -190,23 +195,35 @@ async function main() {
     const companyName = await page.getByLabel("Company name *").inputValue();
     const website = await page.getByLabel("Website").inputValue();
     if (companyName.trim() !== "Supabase") {
-      throw new Error(`Expected company research handoff to prefill Supabase, received "${companyName}".`);
+      throw new Error(
+        `Expected company research handoff to prefill Supabase, received "${companyName}".`,
+      );
     }
     if (website.trim() !== "https://supabase.com") {
-      throw new Error(`Expected company research handoff to prefill https://supabase.com, received "${website}".`);
+      throw new Error(
+        `Expected company research handoff to prefill https://supabase.com, received "${website}".`,
+      );
     }
-    await page.getByRole("button", { name: /^Generate$/ }).last().click();
+    await page
+      .getByRole("button", { name: /^Generate$/ })
+      .last()
+      .click();
     await page.getByText("Suggested Outreach Angles").waitFor({ timeout: 120000 });
     await page.getByText("Linked Pain Points").waitFor({ timeout: 120000 });
     await take(page, outputDir, "05-research-intelligence.png");
 
     console.log("STEP: pain points");
     await page.goto("http://127.0.0.1:4173/painpoints", { waitUntil: "networkidle" });
-    await page.getByText("Suggested solution:", { exact: true }).first().waitFor({ timeout: 30000 });
+    await page
+      .getByText("Suggested solution:", { exact: true })
+      .first()
+      .waitFor({ timeout: 30000 });
     await take(page, outputDir, "06-painpoints.png");
 
     console.log("STEP: outreach campaign");
-    await page.goto("http://127.0.0.1:4173/outreach?company=Supabase", { waitUntil: "networkidle" });
+    await page.goto("http://127.0.0.1:4173/outreach?company=Supabase", {
+      waitUntil: "networkidle",
+    });
     await page.getByRole("dialog").waitFor({ timeout: 30000 });
     const resumeSelect = page.locator('select[aria-label="Resume *"]');
     if ((await resumeSelect.inputValue()) === "") {

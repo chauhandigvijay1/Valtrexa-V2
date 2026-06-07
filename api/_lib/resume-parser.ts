@@ -24,8 +24,10 @@ export async function extractResumeText(fileName: string, fileBytes: ArrayBuffer
   const lower = fileName.toLowerCase();
   if (lower.endsWith(".pdf")) {
     const canvas = await import("@napi-rs/canvas");
-    if (!globalThis.DOMMatrix) globalThis.DOMMatrix = canvas.DOMMatrix as typeof globalThis.DOMMatrix;
-    if (!globalThis.ImageData) globalThis.ImageData = canvas.ImageData as typeof globalThis.ImageData;
+    if (!globalThis.DOMMatrix)
+      globalThis.DOMMatrix = canvas.DOMMatrix as typeof globalThis.DOMMatrix;
+    if (!globalThis.ImageData)
+      globalThis.ImageData = canvas.ImageData as typeof globalThis.ImageData;
     if (!globalThis.Path2D) globalThis.Path2D = canvas.Path2D as typeof globalThis.Path2D;
     if (!(globalThis as any).pdfjsWorker?.WorkerMessageHandler) {
       (globalThis as any).pdfjsWorker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
@@ -43,9 +45,9 @@ export async function extractResumeText(fileName: string, fileBytes: ArrayBuffer
         const text = await page.getTextContent();
         pages.push(
           text.items
-             .map((item) => ("str" in item ? item.str : ""))
-             .filter(Boolean)
-             .join(" "),
+            .map((item) => ("str" in item ? item.str : ""))
+            .filter(Boolean)
+            .join(" "),
         );
         page.cleanup();
       }
@@ -90,7 +92,16 @@ const resumeSchema = {
           description: { type: ["string", "null"] },
           summary: { type: ["string", "null"] },
         },
-        required: ["company", "title", "location", "start_date", "end_date", "is_current", "description", "summary"],
+        required: [
+          "company",
+          "title",
+          "location",
+          "start_date",
+          "end_date",
+          "is_current",
+          "description",
+          "summary",
+        ],
       },
     },
     projects: {
@@ -150,9 +161,22 @@ const resumeSchema = {
     communication_style: { type: ["string", "null"] },
   },
   required: [
-    "name", "email", "phone", "skills", "experience", "projects", "education", "certifications",
-    "github_url", "linkedin_url", "portfolio_url", "preferred_roles", "preferred_locations",
-    "salary_expectation", "career_goal", "communication_style"
+    "name",
+    "email",
+    "phone",
+    "skills",
+    "experience",
+    "projects",
+    "education",
+    "certifications",
+    "github_url",
+    "linkedin_url",
+    "portfolio_url",
+    "preferred_roles",
+    "preferred_locations",
+    "salary_expectation",
+    "career_goal",
+    "communication_style",
   ],
 } as const;
 
@@ -173,9 +197,11 @@ function heuristicResumeParse(rawText: string): ResumeStructuredData {
   const skills = skillLine
     ? uniqueStrings(skillLine.replace(/^skills?\s*:/i, "").split(/[;,|]/))
     : uniqueStrings(
-        Array.from(rawText.matchAll(/\b(TypeScript|JavaScript|React|Next\.js|Node\.js|Node|Supabase|PostgreSQL|Python|AWS|Docker|Kubernetes|GraphQL|Tailwind|Vite|Go|Java|C\+\+|SQL)\b/gi)).map(
-          (match) => match[0],
-        ),
+        Array.from(
+          rawText.matchAll(
+            /\b(TypeScript|JavaScript|React|Next\.js|Node\.js|Node|Supabase|PostgreSQL|Python|AWS|Docker|Kubernetes|GraphQL|Tailwind|Vite|Go|Java|C\+\+|SQL)\b/gi,
+          ),
+        ).map((match) => match[0]),
       );
 
   const captureSection = (label: string) =>
@@ -186,7 +212,8 @@ function heuristicResumeParse(rawText: string): ResumeStructuredData {
   // Simple regex parser for URLs
   const github = rawText.match(/github\.com\/[a-zA-Z0-9_-]+/i)?.[0] ?? null;
   const linkedin = rawText.match(/linkedin\.com\/in\/[a-zA-Z0-9_-]+/i)?.[0] ?? null;
-  const portfolio = rawText.match(/(?:portfolio|website|site)\s*:\s*(https?:\/\/[^\s]+)/i)?.[1] ?? null;
+  const portfolio =
+    rawText.match(/(?:portfolio|website|site)\s*:\s*(https?:\/\/[^\s]+)/i)?.[1] ?? null;
 
   return {
     name,
@@ -196,9 +223,18 @@ function heuristicResumeParse(rawText: string): ResumeStructuredData {
     experience: captureSection("experience").map((value) => ({ summary: value })),
     projects: captureSection("projects").map((value) => ({ summary: value })),
     education: captureSection("education").map((value) => ({ summary: value })),
-    certifications: captureSection("certifications").map((value) => ({ name: value, issuer: null, date: null, summary: null })),
+    certifications: captureSection("certifications").map((value) => ({
+      name: value,
+      issuer: null,
+      date: null,
+      summary: null,
+    })),
     github_url: github ? (github.startsWith("http") ? github : `https://${github}`) : null,
-    linkedin_url: linkedin ? (linkedin.startsWith("http") ? linkedin : `https://${linkedin}`) : null,
+    linkedin_url: linkedin
+      ? linkedin.startsWith("http")
+        ? linkedin
+        : `https://${linkedin}`
+      : null,
     portfolio_url: portfolio,
     preferred_roles: [],
     preferred_locations: [],
@@ -208,7 +244,15 @@ function heuristicResumeParse(rawText: string): ResumeStructuredData {
   };
 }
 
-export async function parseResumeText(rawText: string, userId?: string): Promise<{ data: ResumeStructuredData; model: string; usage: any; source: "env" | "integration" }> {
+export async function parseResumeText(
+  rawText: string,
+  userId?: string,
+): Promise<{
+  data: ResumeStructuredData;
+  model: string;
+  usage: any;
+  source: "env" | "integration";
+}> {
   try {
     return await callOpenRouterJson<ResumeStructuredData>(
       [

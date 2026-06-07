@@ -12,7 +12,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
   }
   return env;
@@ -31,12 +35,18 @@ async function main() {
 
   // 2. Recruiters
   console.log("\n--- Recruiters (Discovered & Manual) ---");
-  const recs = await admin.from("recruiters").select("name,company,role,profile_url,source,relevance_score").limit(2);
+  const recs = await admin
+    .from("recruiters")
+    .select("name,company,role,profile_url,source,relevance_score")
+    .limit(2);
   console.log("Rows:", JSON.stringify(recs.data, null, 2));
 
   // 3. Companies
   console.log("\n--- Companies ---");
-  const comps = await admin.from("companies").select("name,target_value,company_quality_score,strategic_value_score,founder_detected").limit(2);
+  const comps = await admin
+    .from("companies")
+    .select("name,target_value,company_quality_score,strategic_value_score,founder_detected")
+    .limit(2);
   console.log("Rows:", JSON.stringify(comps.data, null, 2));
 }
 

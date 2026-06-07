@@ -12,7 +12,10 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq);
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "");
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "");
     if (!process.env[key]) process.env[key] = value;
   }
 }
@@ -37,7 +40,8 @@ async function main() {
 
   const baseUrl = process.env.SUPABASE_URL;
   const apiKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!baseUrl || !apiKey) throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env");
+  if (!baseUrl || !apiKey)
+    throw new Error("Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY in .env");
 
   const targets = [
     "resume_parses",
@@ -96,4 +100,3 @@ main().catch((err) => {
   console.error(err);
   process.exitCode = 1;
 });
-

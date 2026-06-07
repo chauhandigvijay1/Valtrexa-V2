@@ -34,9 +34,18 @@ function ResetPage() {
         <form onSubmit={submit} className="space-y-3">
           <div className="space-y-1.5">
             <Label htmlFor="password">New password</Label>
-            <Input id="password" type="password" minLength={8} value={password} onChange={(event) => setPassword(event.target.value)} required />
+            <Input
+              id="password"
+              type="password"
+              minLength={8}
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+            />
           </div>
-          <Button disabled={busy} className="w-full">{busy ? "Saving…" : "Update password"}</Button>
+          <Button disabled={busy} className="w-full">
+            {busy ? "Saving…" : "Update password"}
+          </Button>
         </form>
       </Card>
     </div>

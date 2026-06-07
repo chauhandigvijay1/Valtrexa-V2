@@ -14,7 +14,10 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq);
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "");
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "");
     if (!process.env[key]) process.env[key] = value;
   }
 }
@@ -33,7 +36,10 @@ const admin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-async function invokeRoute(routePath: string, init: { method?: string; body?: unknown; token?: string }) {
+async function invokeRoute(
+  routePath: string,
+  init: { method?: string; body?: unknown; token?: string },
+) {
   const mod = await import(pathToFileURL(path.resolve(process.cwd(), "api/[...route].ts")).href);
   const headers = new Headers();
   if (init.token) headers.set("authorization", `Bearer ${init.token}`);
@@ -75,12 +81,14 @@ async function main() {
       password,
       email_confirm: true,
     });
-    if (createdUser.error || !createdUser.data.user) throw new Error(createdUser.error?.message ?? "Failed to create temp user.");
+    if (createdUser.error || !createdUser.data.user)
+      throw new Error(createdUser.error?.message ?? "Failed to create temp user.");
     userId = createdUser.data.user.id;
 
     const authClient = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
     const signedIn = await authClient.auth.signInWithPassword({ email, password });
-    if (signedIn.error || !signedIn.data.session) throw new Error(signedIn.error?.message ?? "Failed to sign in.");
+    if (signedIn.error || !signedIn.data.session)
+      throw new Error(signedIn.error?.message ?? "Failed to sign in.");
     const token = signedIn.data.session.access_token;
 
     storagePath = `${userId}/verification/${Date.now()}-resume.tex`;
@@ -112,10 +120,13 @@ async function main() {
       token,
       body: {
         resumeId,
-        jobDescription: "Build TypeScript, React, Supabase, PostgreSQL, automation, and developer tooling systems.",
+        jobDescription:
+          "Build TypeScript, React, Supabase, PostgreSQL, automation, and developer tooling systems.",
       },
     });
-    console.log(`ATS ${analyze.status} ${analyze.ok ? `OK score=${analyze.data.ats_score}` : analyze.raw}`);
+    console.log(
+      `ATS ${analyze.status} ${analyze.ok ? `OK score=${analyze.data.ats_score}` : analyze.raw}`,
+    );
 
     const loom = await invokeRoute("/api/loom/script", {
       method: "POST",
@@ -130,7 +141,10 @@ async function main() {
     if (!analyze.ok || !loom.ok) process.exitCode = 1;
   } finally {
     if (storagePath) {
-      await admin.storage.from("resumes").remove([storagePath]).catch(() => undefined);
+      await admin.storage
+        .from("resumes")
+        .remove([storagePath])
+        .catch(() => undefined);
     }
     if (userId) {
       await admin.auth.admin.deleteUser(userId).catch(() => undefined);

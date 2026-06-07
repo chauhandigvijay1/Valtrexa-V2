@@ -12,7 +12,11 @@ function loadDotEnv() {
     const eq = trimmed.indexOf("=");
     if (eq < 0) continue;
     const key = trimmed.slice(0, eq).trim();
-    const value = trimmed.slice(eq + 1).replace(/^"/, "").replace(/"$/, "").trim();
+    const value = trimmed
+      .slice(eq + 1)
+      .replace(/^"/, "")
+      .replace(/"$/, "")
+      .trim();
     env[key] = value;
   }
   return env;
@@ -31,7 +35,11 @@ async function checkTable(tableName: string) {
 }
 
 async function checkTailoredResumes() {
-  const { data, error } = await admin.from("tailored_resumes").select("id, pdf_storage_path, pdf_file_size, pdf_page_count, pdf_verified, storage_path").order("created_at", { ascending: false }).limit(2);
+  const { data, error } = await admin
+    .from("tailored_resumes")
+    .select("id, pdf_storage_path, pdf_file_size, pdf_page_count, pdf_verified, storage_path")
+    .order("created_at", { ascending: false })
+    .limit(2);
   if (error) {
     console.log("tailored_resumes error:", error.message);
   } else {
