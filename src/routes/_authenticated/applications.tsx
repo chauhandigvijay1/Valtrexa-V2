@@ -133,12 +133,16 @@ function ApplicationsPage() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("resume_versions")
-        .select("id, version, notes, resumes:resume_id(title)")
+        .select("id, version, notes, resumes:resume_id(title,is_primary)")
         .order("created_at", { ascending: false });
       if (error) throw error;
       return data ?? [];
     },
   });
+  const primaryResumeVersionId =
+    (resumes.data ?? []).find((item: any) => item.resumes?.is_primary)?.id ??
+    (resumes.data ?? [])[0]?.id ??
+    null;
 
   const followupsQuery = useQuery({
     queryKey: ["followups-for-apps"],
@@ -230,7 +234,13 @@ function ApplicationsPage() {
           setPage(1);
           setSearch(v);
         }}
-        onNew={() => setEditing({ status: "applied", applied_at: new Date().toISOString() })}
+        onNew={() =>
+          setEditing({
+            status: "applied",
+            applied_at: new Date().toISOString(),
+            resume_version_id: primaryResumeVersionId,
+          })
+        }
         newLabel="New application"
         filters={
           <Select
@@ -458,9 +468,10 @@ function ApplicationsPage() {
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {(resumes.data ?? []).map((v: any) => (
-                        <SelectItem key={v.id} value={v.id}>
+                      <SelectItem key={v.id} value={v.id}>
                           {v.resumes?.title ?? "Resume"} · v{v.version}
-                        </SelectItem>
+                          {v.resumes?.is_primary ? " (Primary)" : ""}
+                      </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -499,12 +510,12 @@ function ApplicationsPage() {
                   />
                 </div>
                 <div className="space-y-1.5 flex items-center justify-between border rounded-md p-3 col-span-2 bg-muted/20">
-                  <div>
-                    <Label className="font-semibold text-sm">Package Generated</Label>
-                    <div className="text-xs text-muted-foreground">
-                      Indicates if tailored resume & QA package are ready
+                    <div>
+                      <Label className="font-semibold text-sm">Package Generated</Label>
+                      <div className="text-xs text-muted-foreground">
+                        Indicates if resume context and application Q&A are ready
+                      </div>
                     </div>
-                  </div>
                   <input
                     type="checkbox"
                     className="h-4 w-4 rounded border-gray-300 accent-primary"

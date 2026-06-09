@@ -28,6 +28,10 @@ import { Badge } from "@/components/ui/badge";
 import { Github, ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
+function isMissingColumnError(message?: string) {
+  return /column .* does not exist|Could not find the '.*' column/i.test(message ?? "");
+}
+
 type Project = {
   id: string;
   name: string;
@@ -35,6 +39,7 @@ type Project = {
   github_url: string | null;
   live_url: string | null;
   tech_stack: string[] | null;
+  features: string[] | null;
   impact: string | null;
 };
 
@@ -73,14 +78,27 @@ function ProjectsPage() {
         github_url: p.github_url ?? null,
         live_url: p.live_url ?? null,
         tech_stack: p.tech_stack ?? [],
+        features: p.features ?? [],
         impact: p.impact ?? null,
       };
       if (p.id) {
-        const { error } = await supabase.from("projects").update(payload).eq("id", p.id);
-        if (error) throw error;
+        const update = await supabase.from("projects").update(payload).eq("id", p.id);
+        if (update.error) {
+          if (!isMissingColumnError(update.error.message)) throw update.error;
+          const { features: _features, ...fallbackPayload } = payload;
+          const fallback = await supabase.from("projects").update(fallbackPayload).eq("id", p.id);
+          if (fallback.error) throw fallback.error;
+        }
       } else {
-        const { error } = await supabase.from("projects").insert({ ...payload, user_id: user.id });
-        if (error) throw error;
+        const insert = await supabase.from("projects").insert({ ...payload, user_id: user.id });
+        if (insert.error) {
+          if (!isMissingColumnError(insert.error.message)) throw insert.error;
+          const { features: _features, ...fallbackPayload } = payload;
+          const fallback = await supabase
+            .from("projects")
+            .insert({ ...fallbackPayload, user_id: user.id });
+          if (fallback.error) throw fallback.error;
+        }
       }
     },
     onSuccess: () => {
@@ -143,6 +161,7 @@ function ProjectsPage() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead>Tech</TableHead>
+              <TableHead>Features</TableHead>
               <TableHead>Links</TableHead>
               <TableHead>Impact</TableHead>
               <TableHead className="w-24" />
@@ -164,6 +183,15 @@ function ProjectsPage() {
                     {(r.tech_stack ?? []).slice(0, 4).map((t) => (
                       <Badge key={t} variant="secondary">
                         {t}
+                      </Badge>
+                    ))}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap gap-1 max-w-[240px]">
+                    {(r.features ?? []).slice(0, 3).map((feature) => (
+                      <Badge key={feature} variant="outline">
+                        {feature}
                       </Badge>
                     ))}
                   </div>
@@ -287,6 +315,21 @@ function ProjectDialog({
               onChange={(e) =>
                 set(
                   "tech_stack",
+                  e.target.value
+                    .split(",")
+                    .map((s) => s.trim())
+                    .filter(Boolean),
+                )
+              }
+            />
+          </div>
+          <div className="space-y-1.5">
+            <Label>Features (comma separated)</Label>
+            <Input
+              value={(draft.features ?? []).join(", ")}
+              onChange={(e) =>
+                set(
+                  "features",
                   e.target.value
                     .split(",")
                     .map((s) => s.trim())

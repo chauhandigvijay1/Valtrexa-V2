@@ -231,7 +231,7 @@ function ResumesPage() {
     <div className="space-y-6">
       <PageHeader
         title="Resume Intelligence Center"
-        description="Upload once, parse into structure, review ATS breakdowns, preview tailored output, and reuse the same resume everywhere else."
+        description="Upload once, auto-sync your candidate data, mark a primary resume, and reuse it across matching and applications. Tailoring is optional."
       />
 
       <div className="grid gap-4 md:grid-cols-4">
@@ -254,8 +254,8 @@ function ResumesPage() {
           <div className="space-y-1">
             <div className="text-lg font-semibold">Upload Resume</div>
             <div className="text-sm text-muted-foreground">
-              Supported formats: PDF, DOCX, TEX. Uploading triggers storage, parsing, and immediate
-              downstream readiness.
+              Supported formats: PDF, DOCX, TEX. Uploading triggers storage, resume parsing, and
+              automatic sync into Candidate Brain, Skills, Projects, Experience, and Education.
             </div>
           </div>
           <div className="flex gap-2">
@@ -500,7 +500,7 @@ function ResumesPage() {
                           <div className="text-sm font-semibold">Tailored Resume Output</div>
                           <div className="text-xs text-muted-foreground">
                             Preview, compare, and download the latest tailored version without
-                            leaving the page.
+                            blocking the primary application flow.
                           </div>
                         </div>
                         <Badge variant={resume.latestTailored ? "secondary" : "outline"}>
@@ -549,10 +549,10 @@ function ResumesPage() {
                                     PDF Preview
                                   </div>
                                   <PdfPreview
-                                    path={resume.latestTailored.storage_path.replace(
-                                      ".tex",
-                                      ".pdf",
-                                    )}
+                                    path={
+                                      resume.latestTailored.pdf_storage_path ??
+                                      resume.latestTailored.storage_path.replace(".tex", ".pdf")
+                                    }
                                     bucket="tailored-resumes"
                                   />
                                 </div>
@@ -825,16 +825,19 @@ function deriveAnalysisInsights(
 }
 
 async function downloadResume(resume: ResumeCenterRow) {
-  const path = resume.latestTailored?.storage_path;
-  const isTex = path && path.endsWith(".tex");
-  const source = path
-    ? { bucket: "tailored-resumes", path: isTex ? path.replace(".tex", ".pdf") : path }
+  const tailoredPath =
+    resume.latestTailored?.pdf_storage_path ??
+    (resume.latestTailored?.storage_path?.endsWith(".pdf")
+      ? resume.latestTailored.storage_path
+      : null);
+  const source = tailoredPath
+    ? { bucket: "tailored-resumes", path: tailoredPath }
     : resume.latestVersion?.storage_path
       ? { bucket: "resumes", path: resume.latestVersion.storage_path }
       : null;
 
   if (!source) {
-    toast.error("No stored file is available for download.");
+    toast.error("No PDF or primary resume file is available for download.");
     return;
   }
 
@@ -846,7 +849,11 @@ async function downloadResume(resume: ResumeCenterRow) {
     return;
   }
 
-  window.open(data.signedUrl, "_blank", "noopener,noreferrer");
+  const anchor = document.createElement("a");
+  anchor.href = data.signedUrl;
+  anchor.target = "_blank";
+  anchor.rel = "noopener noreferrer";
+  anchor.click();
 }
 
 function PdfPreview({ path, bucket }: { path: string; bucket: string }) {

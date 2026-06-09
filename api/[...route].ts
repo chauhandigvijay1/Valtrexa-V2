@@ -35,134 +35,279 @@ import {
   parseResumeText,
   type ResumeStructuredData,
 } from "./_lib/resume-parser.js";
+import { dedupeRoles, expandRoleVariants } from "./_lib/role-taxonomy.js";
 import { supabaseAdmin } from "./_lib/supabase.js";
 import { emitWorkflowEvent } from "./_lib/workflow-events.js";
 
-async function syncCandidateBrain(userId: string, parsed: Record<string, any>, rawText?: string) {
+const SKILL_CATEGORY_LOOKUP: Record<string, string> = {
+  typescript: "Languages",
+  javascript: "Languages",
+  python: "Languages",
+  java: "Languages",
+  go: "Languages",
+  "c++": "Languages",
+  react: "Frameworks",
+  "next.js": "Frameworks",
+  "node.js": "Frameworks",
+  express: "Frameworks",
+  nestjs: "Frameworks",
+  postgres: "Databases",
+  postgresql: "Databases",
+  mysql: "Databases",
+  mongodb: "Databases",
+  supabase: "Databases",
+  redis: "Databases",
+  aws: "Cloud",
+  azure: "Cloud",
+  gcp: "Cloud",
+  docker: "DevOps",
+  kubernetes: "DevOps",
+  terraform: "DevOps",
+  linux: "DevOps",
+  git: "Tools",
+  postman: "Tools",
+  figma: "Tools",
+  playwright: "Tools",
+  vite: "Tools",
+  "tailwind css": "Libraries",
+  graphql: "Libraries",
+};
+
+function normalizeResumeWhitespace(value: string | null | undefined) {
+  return value?.replace(/\s+/g, " ").trim() ?? "";
+}
+
+function chooseText(...values: Array<string | null | undefined>) {
+  for (const value of values) {
+    const normalized = normalizeResumeWhitespace(value);
+    if (normalized) return normalized;
+  }
+  return null;
+}
+
+function uniqueResumeStrings(values: Array<string | null | undefined>) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const value of values) {
+    const normalized = normalizeResumeWhitespace(value);
+    if (!normalized) continue;
+    const key = normalized.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push(normalized);
+  }
+  return result;
+}
+
+function deriveYearsExperience(parsed: ResumeStructuredData, existingYears?: number | null) {
+  if (!parsed.experience.length) return existingYears ?? null;
+  return Math.max(existingYears ?? 0, parsed.experience.length);
+}
+
+function inferRemotePreference(parsed: ResumeStructuredData, existingPreference?: string | null) {
+  const locationText = parsed.preferred_locations.join(" ").toLowerCase();
+  if (locationText.includes("remote")) return "remote";
+  if (locationText.includes("hybrid")) return "hybrid";
+  if (locationText.includes("onsite") || locationText.includes("on-site")) return "onsite";
+  return existingPreference ?? "hybrid";
+}
+
+function categorizeSkill(name: string) {
+  return SKILL_CATEGORY_LOOKUP[name.toLowerCase()] ?? "Tools";
+}
+
+function inferSkillLevel(name: string, parsed: ResumeStructuredData, rawText = "") {
+  const normalized = name.toLowerCase();
+  const hits =
+    parsed.projects.filter((project) =>
+      (project.tech_stack ?? []).some((item) => item.toLowerCase() === normalized),
+    ).length +
+    parsed.experience.filter((experience) =>
+      `${experience.title ?? ""} ${experience.description ?? ""} ${experience.summary ?? ""}`
+        .toLowerCase()
+        .includes(normalized),
+    ).length +
+    (rawText.toLowerCase().match(new RegExp(normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))?.length ?? 0);
+
+  if (hits >= 6) return "expert";
+  if (hits >= 4) return "advanced";
+  if (hits >= 2) return "intermediate";
+  return "beginner";
+}
+
+function buildSkillRows(parsed: ResumeStructuredData, rawText = "") {
+  const collected = uniqueResumeStrings([
+    ...parsed.skills,
+    ...parsed.projects.flatMap((project) => project.tech_stack ?? []),
+  ]);
+
+  return collected.map((name) => ({
+    name,
+    category: categorizeSkill(name),
+    level: inferSkillLevel(name, parsed, rawText),
+  }));
+}
+
+function buildProjectRows(parsed: ResumeStructuredData, existingProjects: Array<Record<string, any>>) {
+  const existingByName = new Map(
+    existingProjects
+      .filter((project) => typeof project.name === "string")
+      .map((project) => [String(project.name).toLowerCase(), project]),
+  );
+
+  return parsed.projects
+    .map((project) => {
+      const fallback = project.name ? existingByName.get(project.name.toLowerCase()) : null;
+      const features = uniqueResumeStrings([...(project.features ?? []), ...(fallback?.features ?? [])]);
+      return {
+        name: chooseText(project.name, fallback?.name, "Project"),
+        description: chooseText(project.description, project.summary, fallback?.description),
+        github_url: chooseText(project.github_url, fallback?.github_url),
+        live_url: chooseText(project.live_url, fallback?.live_url),
+        tech_stack: uniqueResumeStrings([...(project.tech_stack ?? []), ...(fallback?.tech_stack ?? [])]),
+        features,
+        impact: chooseText(features.join("; "), fallback?.impact),
+      };
+    })
+    .filter((project) => !!project.name);
+}
+
+async function replaceUserRows(table: string, userId: string, rows: Record<string, unknown>[]) {
+  if (!rows.length) return;
+  await supabaseAdmin.from(table).delete().eq("user_id", userId);
+  for (const row of rows) {
+    const payload = { ...row, user_id: userId } as any;
+    const insert = await supabaseAdmin.from(table).insert(payload);
+    if (insert.error && isMissingSchemaError(insert.error) && "features" in payload) {
+      const { features: _features, ...fallbackPayload } = payload;
+      await supabaseAdmin.from(table).insert(fallbackPayload as any);
+    }
+  }
+}
+
+async function syncCandidateBrain(userId: string, parsed: ResumeStructuredData, rawText?: string) {
+  const [existingProfile, existingBaseProfile, existingProjects] = await Promise.all([
+    supabaseAdmin.from("candidate_profiles").select("*").eq("user_id", userId).maybeSingle(),
+    supabaseAdmin.from("profiles").select("*").eq("id", userId).maybeSingle(),
+    supabaseAdmin.from("projects").select("*").eq("user_id", userId),
+  ]);
+
+  const mergedRoles = dedupeRoles([
+    ...(parsed.preferred_roles ?? []),
+    ...((existingProfile.data?.preferred_roles as string[] | null) ?? []),
+  ]);
+  const expandedRoles = dedupeRoles(mergedRoles.flatMap((role) => expandRoleVariants(role)));
+
   const profilePayload = {
     user_id: userId,
-    github_url: parsed.github_url || parsed.github || null,
-    linkedin_url: parsed.linkedin_url || parsed.linkedin || null,
-    portfolio_url: parsed.portfolio_url || parsed.portfolio || null,
-    career_goal: parsed.career_goal || parsed.career_goals || null,
-    remote_preference: parsed.remote_preference || null,
-    summary: parsed.summary || parsed.bio || null,
-    communication_style: parsed.communication_style || null,
-    preferred_roles: parsed.preferred_roles || parsed.preferredRoles || null,
-    preferred_locations: parsed.preferred_locations || parsed.preferredLocations || null,
-    salary_expectation: parsed.salary_expectation || parsed.salaryExpectation || null,
-    resume_raw_text: rawText || null,
-    parsed_resume: parsed,
+    current_title: chooseText(parsed.experience[0]?.title, existingProfile.data?.current_title),
+    current_company: chooseText(parsed.experience[0]?.company, existingProfile.data?.current_company),
+    years_experience: deriveYearsExperience(parsed, existingProfile.data?.years_experience),
+    github_url: chooseText(parsed.github_url, existingProfile.data?.github_url),
+    linkedin_url: chooseText(parsed.linkedin_url, existingProfile.data?.linkedin_url),
+    portfolio_url: chooseText(parsed.portfolio_url, existingProfile.data?.portfolio_url),
+    career_goal: chooseText(parsed.career_goal, existingProfile.data?.career_goal),
+    remote_preference: inferRemotePreference(parsed, existingProfile.data?.remote_preference),
+    summary: chooseText(parsed.summary, existingProfile.data?.summary),
+    communication_style: chooseText(parsed.communication_style, existingProfile.data?.communication_style),
+    preferred_roles: mergedRoles.length ? mergedRoles : expandedRoles,
+    preferred_locations: uniqueResumeStrings([
+      ...(parsed.preferred_locations ?? []),
+      parsed.location,
+      ...((existingProfile.data?.preferred_locations as string[] | null) ?? []),
+    ]),
+    salary_expectation: parsed.salary_expectation ?? existingProfile.data?.salary_expectation ?? null,
+    resume_raw_text: rawText ?? existingProfile.data?.resume_raw_text ?? null,
+    parsed_resume: {
+      ...parsed,
+      preferred_roles_expanded: expandedRoles,
+    },
   };
 
-  const existingProfile = await supabaseAdmin
-    .from("candidate_profiles")
-    .select("id")
-    .eq("user_id", userId)
-    .maybeSingle();
   if (existingProfile.data?.id) {
-    await supabaseAdmin
-      .from("candidate_profiles")
-      .update(profilePayload)
-      .eq("id", existingProfile.data.id);
+    await supabaseAdmin.from("candidate_profiles").update(profilePayload).eq("id", existingProfile.data.id);
   } else {
-    await supabaseAdmin.from("candidate_profiles").insert({ ...profilePayload, user_id: userId });
+    await supabaseAdmin.from("candidate_profiles").insert(profilePayload as any);
   }
 
   const baseProfilePayload = {
-    name: parsed.name || null,
-    email: parsed.email || null,
-    location: parsed.location || null,
+    name: chooseText(parsed.name, existingBaseProfile.data?.name),
+    email: chooseText(parsed.email, existingBaseProfile.data?.email),
+    phone: chooseText(parsed.phone, existingBaseProfile.data?.phone),
+    location: chooseText(parsed.location, existingBaseProfile.data?.location),
   };
-  await supabaseAdmin.from("profiles").update(baseProfilePayload).eq("id", userId);
-
-  // Sync skills
-  if (Array.isArray(parsed.skills)) {
-    await supabaseAdmin.from("skills").delete().eq("user_id", userId);
-    for (const skillName of parsed.skills) {
-      if (typeof skillName === "string" && skillName.trim()) {
-        await supabaseAdmin.from("skills").insert({
-          user_id: userId,
-          name: skillName.trim(),
-          level: "intermediate",
-        });
-      }
-    }
+  const profileUpdate = await supabaseAdmin
+    .from("profiles")
+    .update(baseProfilePayload as any)
+    .eq("id", userId);
+  if (profileUpdate.error && isMissingSchemaError(profileUpdate.error)) {
+    const { phone: _phone, ...fallbackBaseProfilePayload } = baseProfilePayload;
+    await supabaseAdmin.from("profiles").update(fallbackBaseProfilePayload as any).eq("id", userId);
   }
 
-  // Sync education
-  if (Array.isArray(parsed.education)) {
-    await supabaseAdmin.from("education").delete().eq("user_id", userId);
-    for (const edu of parsed.education) {
-      if (edu && typeof edu === "object") {
-        await supabaseAdmin.from("education").insert({
-          user_id: userId,
-          school: edu.school || edu.institution || "Unknown School",
-          degree: edu.degree || null,
-          field: edu.field || edu.major || null,
-          start_date: edu.start_date || edu.startDate || null,
-          end_date: edu.end_date || edu.endDate || edu.year || null,
-          description: edu.description || null,
-        });
-      }
-    }
-  }
+  await replaceUserRows(
+    "skills",
+    userId,
+    buildSkillRows(parsed, rawText).map((skill) => ({
+      name: skill.name,
+      category: skill.category,
+      level: skill.level,
+    })),
+  );
 
-  // Sync experiences
-  if (Array.isArray(parsed.experience)) {
-    await supabaseAdmin.from("experiences").delete().eq("user_id", userId);
-    for (const exp of parsed.experience) {
-      if (exp && typeof exp === "object") {
-        await supabaseAdmin.from("experiences").insert({
-          user_id: userId,
-          company: exp.company || exp.employer || "Unknown Company",
-          title: exp.title || exp.role || "Title",
-          location: exp.location || null,
-          start_date: exp.start_date || exp.startDate || null,
-          end_date: exp.end_date || exp.endDate || null,
-          is_current: exp.is_current || exp.isCurrent || false,
-          description: exp.description || exp.summary || null,
-        });
-      }
-    }
-  }
+  await replaceUserRows(
+    "education",
+    userId,
+    parsed.education.map((edu) => ({
+      school: chooseText(edu.school, "Unknown School"),
+      degree: chooseText(edu.degree),
+      field: chooseText(edu.field),
+      start_date: chooseText(edu.start_date),
+      end_date: chooseText(edu.end_date),
+      description: chooseText(edu.description, edu.summary),
+    })),
+  );
 
-  // Sync projects
-  if (Array.isArray(parsed.projects)) {
-    await supabaseAdmin.from("projects").delete().eq("user_id", userId);
-    for (const proj of parsed.projects) {
-      if (proj && typeof proj === "object") {
-        await supabaseAdmin.from("projects").insert({
-          user_id: userId,
-          name: proj.name || proj.title || "Project",
-          description: proj.description || null,
-          github_url: proj.github_url || proj.github || null,
-          live_url: proj.live_url || proj.url || null,
-          tech_stack: Array.isArray(proj.tech_stack)
-            ? proj.tech_stack
-            : Array.isArray(proj.technologies)
-              ? proj.technologies
-              : null,
-        });
-      }
-    }
-  }
+  await replaceUserRows(
+    "experiences",
+    userId,
+    parsed.experience.map((exp) => ({
+      company: chooseText(exp.company, "Unknown Company"),
+      title: chooseText(exp.title, "Title"),
+      location: chooseText(exp.location),
+      start_date: chooseText(exp.start_date),
+      end_date: chooseText(exp.end_date),
+      is_current: exp.is_current ?? false,
+      description: chooseText(exp.description, exp.summary),
+    })),
+  );
 
-  // Sync certifications
-  if (Array.isArray(parsed.certifications)) {
-    await supabaseAdmin.from("certifications").delete().eq("user_id", userId);
-    for (const cert of parsed.certifications) {
-      if (cert && typeof cert === "object") {
-        await supabaseAdmin.from("certifications").insert({
-          user_id: userId,
-          name: cert.name || "Certification",
-          issuer: cert.issuer || null,
-          date: cert.date || cert.year || null,
-          summary: cert.summary || cert.description || null,
-        });
-      }
-    }
-  }
+  await replaceUserRows(
+    "projects",
+    userId,
+    buildProjectRows(parsed, (existingProjects.data as Array<Record<string, any>>) ?? []).map((project) => ({
+      name: project.name,
+      description: project.description,
+      github_url: project.github_url,
+      live_url: project.live_url,
+      tech_stack: project.tech_stack,
+      features: project.features,
+      impact: project.impact,
+    })),
+  );
+
+  await replaceUserRows(
+    "certifications",
+    userId,
+    parsed.certifications
+      .filter((cert) => !!chooseText(cert.name))
+      .map((cert) => ({
+        name: chooseText(cert.name, "Certification"),
+        issuer: chooseText(cert.issuer),
+        date: chooseText(cert.date),
+        summary: chooseText(cert.summary),
+      })),
+  );
 }
 
 type SourceRequest =
@@ -1041,7 +1186,7 @@ async function handleResumeProcess(request: Request) {
     return json({ error: parseInsert.error.message }, { status: 400 });
   }
 
-  await syncCandidateBrain(user.id, parsed.data as Record<string, any>, rawText);
+  await syncCandidateBrain(user.id, parsed.data, rawText);
 
   await emitWorkflowEvent({
     userId: user.id,
@@ -1534,7 +1679,7 @@ async function handleResumeParse(request: Request) {
     return json({ error: parseInsert.error.message }, { status: 400 });
   }
 
-  await syncCandidateBrain(user.id, parsed.data as Record<string, any>, rawText);
+  await syncCandidateBrain(user.id, parsed.data, rawText);
 
   await supabaseAdmin
     .from("resume_versions")
@@ -1624,6 +1769,69 @@ async function handleResumeDelete(request: Request) {
   return json({ deleted: true, resumeId: body.resumeId });
 }
 
+function inferWorkMode(location: string | null, description: string) {
+  const text = `${location ?? ""} ${description}`.toLowerCase();
+  if (text.includes("hybrid")) return "hybrid";
+  if (text.includes("remote")) return "remote";
+  if (text.includes("onsite") || text.includes("on-site")) return "onsite";
+  return null;
+}
+
+function inferExperienceLevel(title: string, description: string) {
+  const text = `${title} ${description}`.toLowerCase();
+  if (/intern|fresher|entry.level|entry-level|graduate|new grad/.test(text)) return "Fresher";
+  if (/0.?1 year|0-1 year|0 to 1 year/.test(text)) return "0-1 Years";
+  if (/1.?2 year|1-2 year|1 to 2 year/.test(text)) return "1-2 Years";
+  if (/2.?3 year|2-3 year|2 to 3 year/.test(text)) return "2-3 Years";
+  if (/3.?5 year|3-5 year|3 to 5 year|mid level/.test(text)) return "3-5 Years";
+  if (/5\+ year|senior|staff|principal|lead/.test(text)) return "5+ Years";
+  return null;
+}
+
+function inferSalaryBounds(text: string) {
+  const match = text.match(/(?:\$|usd\s*)?(\d{2,3})(?:k)?\s*(?:-|to)\s*(?:\$|usd\s*)?(\d{2,3})(?:k)?/i);
+  if (!match) return { salaryMin: null, salaryMax: null };
+  const min = Number(match[1]);
+  const max = Number(match[2]);
+  const normalize = (value: number) => (value < 1000 ? value * 1000 : value);
+  return { salaryMin: normalize(min), salaryMax: normalize(max) };
+}
+
+function inferCompanySize(description: string) {
+  const text = description.toLowerCase();
+  if (/startup|seed|series a|series b|small team/.test(text)) return "startup";
+  if (/mid.?size|growing team|scale-up/.test(text)) return "mid";
+  if (/enterprise|fortune 500|global company|large team/.test(text)) return "enterprise";
+  return null;
+}
+
+function inferFreshnessBucket(postedAt: string | null) {
+  if (!postedAt) return null;
+  const posted = new Date(postedAt).getTime();
+  if (!Number.isFinite(posted)) return null;
+  const days = Math.floor((Date.now() - posted) / 86400000);
+  if (days <= 1) return "24h";
+  if (days <= 3) return "3d";
+  if (days <= 7) return "7d";
+  if (days <= 30) return "30d";
+  return "older";
+}
+
+function buildJobMetadata(job: ImportedJob) {
+  const description = chooseText(job.description, "") ?? "";
+  return {
+    normalized_roles: dedupeRoles(expandRoleVariants(job.title)),
+    experience_level: inferExperienceLevel(job.title, description),
+    work_mode: inferWorkMode(job.location, description),
+    company_size: inferCompanySize(description),
+    easy_apply:
+      /easy apply|quick apply|one click/i.test(description) ||
+      ["linkedin", "wellfound", "naukri"].includes(job.source),
+    freshness_bucket: inferFreshnessBucket(job.postedAt),
+    ...inferSalaryBounds(`${job.title}\n${description}`),
+  };
+}
+
 async function handleJobsImport(request: Request) {
   if (request.method !== "POST") return methodNotAllowed(["POST"]);
   const user = await requireApiUser(request);
@@ -1666,6 +1874,7 @@ async function handleJobsImport(request: Request) {
 
     const jobs = await resolveSourceJobs(hydratedSource as SourceRequest);
     for (const job of jobs) {
+      const metadata = buildJobMetadata(job);
       const upsert = await supabaseAdmin
         .from("jobs")
         .upsert(
@@ -1681,6 +1890,14 @@ async function handleJobsImport(request: Request) {
             posted_at: job.postedAt,
             external_id: job.externalId,
             raw_payload: job.rawPayload,
+            normalized_roles: metadata.normalized_roles,
+            experience_level: metadata.experience_level,
+            work_mode: metadata.work_mode,
+            salary_min: metadata.salaryMin,
+            salary_max: metadata.salaryMax,
+            company_size: metadata.company_size,
+            freshness_bucket: metadata.freshness_bucket,
+            easy_apply: metadata.easy_apply,
             status: "open",
             priority: "medium",
           } as any,
@@ -1699,6 +1916,14 @@ async function handleJobsImport(request: Request) {
             url: job.url,
             source: job.source,
             description: job.description,
+            normalized_roles: metadata.normalized_roles,
+            experience_level: metadata.experience_level,
+            work_mode: metadata.work_mode,
+            salary_min: metadata.salaryMin,
+            salary_max: metadata.salaryMax,
+            company_size: metadata.company_size,
+            freshness_bucket: metadata.freshness_bucket,
+            easy_apply: metadata.easy_apply,
             status: "open",
             priority: "medium",
           } as any)
@@ -2648,13 +2873,16 @@ async function handleCandidateBrain(request: Request) {
 
     // 1. Update candidate_profiles
     if (body.profile) {
+      const mergedRoles = dedupeRoles(
+        Array.isArray(body.profile.preferred_roles) ? body.profile.preferred_roles : [],
+      );
       const profilePayload = {
         current_company: body.profile.current_company ?? null,
         current_title: body.profile.current_title ?? null,
         years_experience: body.profile.years_experience ?? null,
         open_to_work: body.profile.open_to_work ?? null,
         summary: body.profile.summary ?? null,
-        preferred_roles: body.profile.preferred_roles ?? null,
+        preferred_roles: mergedRoles.length ? mergedRoles : null,
         preferred_locations: body.profile.preferred_locations ?? null,
         remote_preference: body.profile.remote_preference ?? null,
         salary_expectation: body.profile.salary_expectation ?? null,
@@ -2687,9 +2915,20 @@ async function handleCandidateBrain(request: Request) {
       const baseProfilePayload = {
         name: body.baseProfile.name ?? null,
         email: body.baseProfile.email ?? null,
+        phone: body.baseProfile.phone ?? null,
         location: body.baseProfile.location ?? null,
       };
-      await supabaseAdmin.from("profiles").update(baseProfilePayload).eq("id", user.id);
+      const update = await supabaseAdmin
+        .from("profiles")
+        .update(baseProfilePayload as any)
+        .eq("id", user.id);
+      if (update.error && isMissingSchemaError(update.error)) {
+        const { phone: _phone, ...fallbackBaseProfilePayload } = baseProfilePayload;
+        await supabaseAdmin
+          .from("profiles")
+          .update(fallbackBaseProfilePayload as any)
+          .eq("id", user.id);
+      }
     }
 
     // 3. Update skills

@@ -6,10 +6,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
+import {
+  clearAuthCallbackParams,
+  getAuthCallbackError,
+  hasAuthCallbackParams,
+} from "@/lib/auth-callback";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Sign In — Career Compass Pro" }] }),
+  head: () => ({ meta: [{ title: "Sign In - Career Compass Pro" }] }),
   component: LoginPage,
 });
 
@@ -19,12 +24,73 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [oauthBusy, setOauthBusy] = useState(() => hasAuthCallbackParams());
 
   useEffect(() => {
     if (!loading && user) {
       nav({ to: "/dashboard", replace: true });
     }
   }, [loading, user, nav]);
+
+  useEffect(() => {
+    if (!hasAuthCallbackParams()) return;
+
+    let cancelled = false;
+
+    const finishOAuth = async () => {
+      const callbackError = getAuthCallbackError();
+      if (callbackError) {
+        clearAuthCallbackParams();
+        setOauthBusy(false);
+        toast.error(callbackError);
+        return;
+      }
+
+      const url = new URL(window.location.href);
+      const code = url.searchParams.get("code");
+      if (code) {
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          clearAuthCallbackParams();
+          setOauthBusy(false);
+          toast.error(error.message);
+          return;
+        }
+      }
+
+      for (let attempt = 0; attempt < 20; attempt += 1) {
+        if (cancelled) return;
+
+        const { data, error } = await supabase.auth.getSession();
+        if (error) {
+          clearAuthCallbackParams();
+          setOauthBusy(false);
+          toast.error(error.message);
+          return;
+        }
+
+        if (data.session?.user) {
+          clearAuthCallbackParams();
+          nav({ to: "/dashboard", replace: true });
+          return;
+        }
+
+        await new Promise((resolve) => window.setTimeout(resolve, 250));
+      }
+
+      if (!cancelled) {
+        clearAuthCallbackParams();
+        setOauthBusy(false);
+        toast.error("Google sign-in completed, but the session did not persist. Please try again.");
+      }
+    };
+
+    void finishOAuth();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [nav]);
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -39,13 +105,17 @@ function LoginPage() {
   };
 
   const google = async () => {
+    setOauthBusy(true);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/dashboard`,
+        redirectTo: `${window.location.origin}/login`,
       },
     });
-    if (error) toast.error(error.message);
+    if (error) {
+      setOauthBusy(false);
+      toast.error(error.message);
+    }
   };
 
   return (
@@ -58,9 +128,15 @@ function LoginPage() {
           </p>
         </div>
 
-        <Button onClick={google} variant="outline" className="w-full">
-          Continue with Google
-        </Button>
+        {oauthBusy ? (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-4 text-sm text-muted-foreground">
+            Completing Google sign-in and restoring your session...
+          </div>
+        ) : (
+          <Button onClick={google} variant="outline" className="w-full" disabled={busy}>
+            Continue with Google
+          </Button>
+        )}
 
         <div className="relative text-center text-xs text-muted-foreground">
           <span className="bg-card px-2 relative z-10">or</span>
@@ -88,8 +164,8 @@ function LoginPage() {
               required
             />
           </div>
-          <Button type="submit" disabled={busy} className="w-full">
-            {busy ? "Signing in…" : "Sign in"}
+          <Button type="submit" disabled={busy || oauthBusy} className="w-full">
+            {busy ? "Signing in..." : "Sign in"}
           </Button>
         </form>
 

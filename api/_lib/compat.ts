@@ -109,7 +109,7 @@ export async function insertResumeParseCompat(input: {
   model?: string | null;
   usage?: any;
 }) {
-  const richInsert = await supabaseAdmin.from("resume_parses").insert({
+  const richPayload = {
     user_id: input.userId,
     resume_id: input.resumeId,
     resume_version_id: input.resumeVersionId,
@@ -117,15 +117,24 @@ export async function insertResumeParseCompat(input: {
     full_name: input.parsed.name ?? null,
     email: input.parsed.email ?? null,
     phone: input.parsed.phone ?? null,
+    confidence_score: input.parsed.confidence_score ?? null,
     skills: input.parsed.skills ?? [],
     experience: input.parsed.experience ?? [],
     projects: input.parsed.projects ?? [],
     education: input.parsed.education ?? [],
     certifications: input.parsed.certifications ?? [],
+    parser_version: input.model ?? "unknown",
     parsed_data: input.parsed,
-  } as any);
+  } as any;
 
-  return { error: richInsert.error, persistedTable: !richInsert.error };
+  const richInsert = await supabaseAdmin.from("resume_parses").insert(richPayload);
+  if (!richInsert.error || !isMissingSchemaError(richInsert.error)) {
+    return { error: richInsert.error, persistedTable: !richInsert.error };
+  }
+
+  const { confidence_score: _confidenceScore, ...fallbackPayload } = richPayload;
+  const fallbackInsert = await supabaseAdmin.from("resume_parses").insert(fallbackPayload);
+  return { error: fallbackInsert.error, persistedTable: !fallbackInsert.error };
 }
 
 export async function getLatestResumeParseCompat(userId: string, resumeId: string) {

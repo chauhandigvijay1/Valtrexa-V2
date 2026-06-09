@@ -41,6 +41,35 @@ const WORKFLOW_EVENT_BY_TABLE: Partial<Record<TableName, string>> = {
   assessments: "assessment_added",
 };
 
+function isMissingColumnError(error: { message?: string } | null | undefined) {
+  const message = error?.message ?? "";
+  return /column .* does not exist|Could not find the '.*' column/i.test(message);
+}
+
+function stripUnsupportedColumns(table: TableName, payload: Record<string, unknown>) {
+  if (table === "jobs") {
+    const {
+      normalized_roles: _normalizedRoles,
+      experience_level: _experienceLevel,
+      work_mode: _workMode,
+      salary_min: _salaryMin,
+      salary_max: _salaryMax,
+      company_size: _companySize,
+      freshness_bucket: _freshnessBucket,
+      easy_apply: _easyApply,
+      ...fallback
+    } = payload;
+    return fallback;
+  }
+
+  if (table === "projects") {
+    const { features: _features, ...fallback } = payload;
+    return fallback;
+  }
+
+  return payload;
+}
+
 export function useCrudList<T extends { id: string }>(opts: {
   table: TableName;
   searchColumn: string;
@@ -80,20 +109,32 @@ export function useCrudSave<T extends { id?: string }>(table: TableName, queryKe
       if (!user) throw new Error("Not signed in");
       const { id, ...rest } = payload as any;
       if (id) {
-        const { error } = await supabase
-          .from(table as any)
-          .update(rest)
-          .eq("id", id);
-        if (error) throw error;
+        const initial = await supabase.from(table as any).update(rest).eq("id", id);
+        if (initial.error) {
+          if (!isMissingColumnError(initial.error)) throw initial.error;
+          const fallbackPayload = stripUnsupportedColumns(table, rest);
+          const fallback = await supabase.from(table as any).update(fallbackPayload).eq("id", id);
+          if (fallback.error) throw fallback.error;
+        }
         return null;
       } else {
-        const { data, error } = await supabase
+        const initial = await supabase
           .from(table as any)
           .insert({ ...rest, user_id: user.id })
           .select("*")
           .single();
-        if (error) throw error;
-        return data;
+        if (initial.error) {
+          if (!isMissingColumnError(initial.error)) throw initial.error;
+          const fallbackPayload = stripUnsupportedColumns(table, rest);
+          const fallback = await supabase
+            .from(table as any)
+            .insert({ ...fallbackPayload, user_id: user.id })
+            .select("*")
+            .single();
+          if (fallback.error) throw fallback.error;
+          return fallback.data;
+        }
+        return initial.data;
       }
     },
     onSuccess: async (row) => {

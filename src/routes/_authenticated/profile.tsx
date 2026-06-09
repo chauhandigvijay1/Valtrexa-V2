@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useAuth } from "@/hooks/use-auth";
 import { apiGet, apiPost } from "@/lib/api-client";
 import { PageHeader } from "@/components/page-header";
+import { RoleMultiSelect } from "@/components/role-multi-select";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -26,6 +27,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
+import { expandRoleVariants, normalizeRoles } from "@/lib/role-taxonomy";
 import { toast } from "sonner";
 import {
   Brain,
@@ -90,7 +92,7 @@ function ProfilePage() {
 
   // Local state for profile inputs
   const [profileForm, setProfileForm] = useState<ProfileData>({});
-  const [baseForm, setBaseForm] = useState({ name: "", email: "", location: "" });
+  const [baseForm, setBaseForm] = useState({ name: "", email: "", phone: "", location: "" });
 
   useEffect(() => {
     if (brainQuery.data) {
@@ -98,6 +100,7 @@ function ProfilePage() {
       setBaseForm({
         name: brainQuery.data.baseProfile?.name ?? "",
         email: brainQuery.data.baseProfile?.email ?? "",
+        phone: brainQuery.data.baseProfile?.phone ?? "",
         location: brainQuery.data.baseProfile?.location ?? "",
       });
     }
@@ -108,8 +111,15 @@ function ProfilePage() {
     mutationFn: async () => {
       if (!user) throw new Error("Not authenticated");
       const { id, created_at, updated_at, user_id, ...cleanPayload } = profileForm as any;
+      const normalizedRoles = normalizeRoles(cleanPayload.preferred_roles ?? []);
+      if (normalizedRoles.length < 5) {
+        throw new Error("Select at least 5 preferred roles to improve matching coverage.");
+      }
       await apiPost("/api/candidate-brain", {
-        profile: cleanPayload,
+        profile: {
+          ...cleanPayload,
+          preferred_roles: normalizedRoles,
+        },
         baseProfile: baseForm,
       });
     },
@@ -402,6 +412,13 @@ function ProfilePage() {
                     />
                   </div>
                   <div className="space-y-1.5">
+                    <Label>Phone</Label>
+                    <Input
+                      value={baseForm.phone}
+                      onChange={(e) => setBaseForm({ ...baseForm, phone: e.target.value })}
+                    />
+                  </div>
+                  <div className="space-y-1.5">
                     <Label>Remote Preference</Label>
                     <Select
                       value={profileForm.remote_preference ?? "hybrid"}
@@ -518,23 +535,11 @@ function ProfilePage() {
                   />
                 </div>
 
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-1.5">
-                    <Label>Preferred Roles (Comma-separated)</Label>
-                    <Input
-                      value={(profileForm.preferred_roles ?? []).join(", ")}
-                      onChange={(e) =>
-                        setProfileForm({
-                          ...profileForm,
-                          preferred_roles: e.target.value
-                            .split(",")
-                            .map((s) => s.trim())
-                            .filter(Boolean),
-                        })
-                      }
-                      placeholder="e.g. Senior Frontend Engineer, Full Stack Engineer"
-                    />
-                  </div>
+                <div className="grid gap-4">
+                  <RoleMultiSelect
+                    value={profileForm.preferred_roles ?? []}
+                    onChange={(preferred_roles) => setProfileForm({ ...profileForm, preferred_roles })}
+                  />
                   <div className="space-y-1.5">
                     <Label>Preferred Locations (Comma-separated)</Label>
                     <Input
@@ -550,6 +555,12 @@ function ProfilePage() {
                       }
                       placeholder="e.g. San Francisco, CA, New York, NY"
                     />
+                  </div>
+                  <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground">
+                    Selected roles: {(profileForm.preferred_roles ?? []).length}. Expanded search coverage:{" "}
+                    {normalizeRoles(
+                      (profileForm.preferred_roles ?? []).flatMap((role) => expandRoleVariants(role)),
+                    ).join(", ") || "Choose roles to preview expansion."}
                   </div>
                 </div>
               </CardContent>

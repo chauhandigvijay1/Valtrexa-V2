@@ -4,6 +4,7 @@ import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
+import { hasAuthCallbackParams } from "@/lib/auth-callback";
 
 export const Route = createFileRoute("/_authenticated")({
   component: AuthedLayout,
@@ -12,12 +13,13 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthedLayout() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+  const waitingForCallback = hasAuthCallbackParams();
 
   useEffect(() => {
-    if (!loading && !user) {
+    if (!loading && !user && !waitingForCallback) {
       nav({ to: "/login", replace: true });
     }
-  }, [loading, user, nav]);
+  }, [loading, user, nav, waitingForCallback]);
 
   if (loading || !user) {
     return (

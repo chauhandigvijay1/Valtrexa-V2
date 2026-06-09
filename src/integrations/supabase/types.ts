@@ -956,58 +956,94 @@ export type Database = {
       };
       jobs: {
         Row: {
+          company_size: string | null;
           company_id: string | null;
           company_name: string | null;
           created_at: string;
           description: string | null;
+          easy_apply: boolean | null;
+          experience_level: string | null;
+          external_id: string | null;
+          freshness_bucket: string | null;
           id: string;
           location: string | null;
           match_score: number | null;
+          normalized_roles: string[] | null;
+          posted_at: string | null;
           priority: Database["public"]["Enums"]["job_priority"];
+          raw_payload: Json;
           salary_range: string | null;
+          salary_max: number | null;
+          salary_min: number | null;
           saved: boolean | null;
           source: string | null;
+          source_type: string | null;
           status: Database["public"]["Enums"]["job_status"];
           title: string;
           updated_at: string;
           url: string | null;
           user_id: string;
+          work_mode: string | null;
         };
         Insert: {
+          company_size?: string | null;
           company_id?: string | null;
           company_name?: string | null;
           created_at?: string;
           description?: string | null;
+          easy_apply?: boolean | null;
+          experience_level?: string | null;
+          external_id?: string | null;
+          freshness_bucket?: string | null;
           id?: string;
           location?: string | null;
           match_score?: number | null;
+          normalized_roles?: string[] | null;
+          posted_at?: string | null;
           priority?: Database["public"]["Enums"]["job_priority"];
+          raw_payload?: Json;
           salary_range?: string | null;
+          salary_max?: number | null;
+          salary_min?: number | null;
           saved?: boolean | null;
           source?: string | null;
+          source_type?: string | null;
           status?: Database["public"]["Enums"]["job_status"];
           title: string;
           updated_at?: string;
           url?: string | null;
           user_id: string;
+          work_mode?: string | null;
         };
         Update: {
+          company_size?: string | null;
           company_id?: string | null;
           company_name?: string | null;
           created_at?: string;
           description?: string | null;
+          easy_apply?: boolean | null;
+          experience_level?: string | null;
+          external_id?: string | null;
+          freshness_bucket?: string | null;
           id?: string;
           location?: string | null;
           match_score?: number | null;
+          normalized_roles?: string[] | null;
+          posted_at?: string | null;
           priority?: Database["public"]["Enums"]["job_priority"];
+          raw_payload?: Json;
           salary_range?: string | null;
+          salary_max?: number | null;
+          salary_min?: number | null;
           saved?: boolean | null;
           source?: string | null;
+          source_type?: string | null;
           status?: Database["public"]["Enums"]["job_status"];
           title?: string;
           updated_at?: string;
           url?: string | null;
           user_id?: string;
+          work_mode?: string | null;
         };
         Relationships: [
           {
@@ -1252,6 +1288,7 @@ export type Database = {
           linkedin_url: string | null;
           location: string | null;
           name: string | null;
+          phone: string | null;
           portfolio_url: string | null;
           updated_at: string;
           website_url: string | null;
@@ -1267,6 +1304,7 @@ export type Database = {
           linkedin_url?: string | null;
           location?: string | null;
           name?: string | null;
+          phone?: string | null;
           portfolio_url?: string | null;
           updated_at?: string;
           website_url?: string | null;
@@ -1282,6 +1320,7 @@ export type Database = {
           linkedin_url?: string | null;
           location?: string | null;
           name?: string | null;
+          phone?: string | null;
           portfolio_url?: string | null;
           updated_at?: string;
           website_url?: string | null;
@@ -1292,6 +1331,7 @@ export type Database = {
         Row: {
           created_at: string;
           description: string | null;
+          features: string[] | null;
           github_url: string | null;
           id: string;
           impact: string | null;
@@ -1304,6 +1344,7 @@ export type Database = {
         Insert: {
           created_at?: string;
           description?: string | null;
+          features?: string[] | null;
           github_url?: string | null;
           id?: string;
           impact?: string | null;
@@ -1316,6 +1357,7 @@ export type Database = {
         Update: {
           created_at?: string;
           description?: string | null;
+          features?: string[] | null;
           github_url?: string | null;
           id?: string;
           impact?: string | null;
