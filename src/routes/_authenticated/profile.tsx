@@ -493,7 +493,7 @@ function ProfilePage() {
                     </div>
                     <input
                       type="checkbox"
-                      className="h-4 w-4 rounded border-gray-300 accent-primary"
+                      className="h-4 w-4 rounded border-input accent-primary"
                       checked={profileForm.open_to_work ?? false}
                       onChange={(e) =>
                         setProfileForm({ ...profileForm, open_to_work: e.target.checked })
@@ -538,7 +538,9 @@ function ProfilePage() {
                 <div className="grid gap-4">
                   <RoleMultiSelect
                     value={profileForm.preferred_roles ?? []}
-                    onChange={(preferred_roles) => setProfileForm({ ...profileForm, preferred_roles })}
+                    onChange={(preferred_roles) =>
+                      setProfileForm({ ...profileForm, preferred_roles })
+                    }
                   />
                   <div className="space-y-1.5">
                     <Label>Preferred Locations (Comma-separated)</Label>
@@ -557,9 +559,12 @@ function ProfilePage() {
                     />
                   </div>
                   <div className="rounded-lg border border-border p-3 text-sm text-muted-foreground">
-                    Selected roles: {(profileForm.preferred_roles ?? []).length}. Expanded search coverage:{" "}
+                    Selected roles: {(profileForm.preferred_roles ?? []).length}. Expanded search
+                    coverage:{" "}
                     {normalizeRoles(
-                      (profileForm.preferred_roles ?? []).flatMap((role) => expandRoleVariants(role)),
+                      (profileForm.preferred_roles ?? []).flatMap((role) =>
+                        expandRoleVariants(role),
+                      ),
                     ).join(", ") || "Choose roles to preview expansion."}
                   </div>
                 </div>
@@ -939,7 +944,7 @@ function ProfilePage() {
                 <CardHeader className="flex flex-row justify-between items-start pb-2">
                   <div>
                     <CardTitle className="text-base flex items-center gap-1.5">
-                      <Lightbulb className="h-4 w-4 text-amber-500" />
+                      <Lightbulb className="h-4 w-4 text-accent-purple" />
                       {mem.topic}
                     </CardTitle>
                     <CardDescription>Importance: {mem.importance}/10</CardDescription>

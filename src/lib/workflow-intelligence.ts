@@ -41,7 +41,7 @@ const CODE_NOISE_PATTERNS = [
   /window\.matchMedia/i,
   /data-theme/i,
   /function\s+[a-zA-Z_$][\w$]*\s*\(/i,
-  /\=\>/,
+  /=>/,
 ];
 
 function unique(values: Array<string | null | undefined>) {

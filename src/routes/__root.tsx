@@ -11,6 +11,7 @@ import { useEffect } from "react";
 import appCss from "../styles.css?url";
 import { supabase } from "@/integrations/supabase/client";
 import { AuthProvider } from "@/hooks/use-auth";
+import { ThemeProvider, useTheme } from "@/hooks/use-theme";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -75,13 +76,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Career Compass Pro — AI Career Operating System" },
+      { title: "VALTREXA-V2 — AI Career Operating System" },
       {
         name: "description",
         content:
           "Manage resumes, jobs, research, outreach, and interview operations in one AI-native career workspace.",
       },
-      { property: "og:title", content: "Career Compass Pro — AI Career Operating System" },
+      { property: "og:title", content: "VALTREXA-V2 — AI Career Operating System" },
       {
         property: "og:description",
         content:
@@ -100,8 +101,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem("valtrexa-theme");if(t==="light"){document.documentElement.classList.remove("dark")}else if(t==="dark"||!t||window.matchMedia("(prefers-color-scheme:dark)").matches){document.documentElement.classList.add("dark")}else{document.documentElement.classList.remove("dark")}}catch(e){}})()`,
+          }}
+        />
         <HeadContent />
       </head>
       <body>
@@ -127,9 +133,16 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Outlet />
-        <Toaster richColors theme="dark" />
+        <ThemeProvider>
+          <Outlet />
+          <ThemeAwareToaster />
+        </ThemeProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
+}
+
+function ThemeAwareToaster() {
+  const { resolved } = useTheme();
+  return <Toaster richColors theme={resolved} />;
 }

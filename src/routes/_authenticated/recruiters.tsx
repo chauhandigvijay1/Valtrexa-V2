@@ -128,7 +128,7 @@ function RecruitersPage() {
             onClick={() => setDiscoveryOpen(true)}
             className="gap-1.5"
           >
-            <Wand2 className="h-4 w-4 text-purple-500" /> Discover Recruiters
+            <Wand2 className="h-4 w-4 text-accent-purple" /> Discover Recruiters
           </Button>
         }
       >
@@ -283,7 +283,7 @@ function RecruitersPage() {
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle className="flex items-center gap-2">
-                <Wand2 className="h-5 w-5 text-purple-500" /> AI Recruiter Discovery
+                <Wand2 className="h-5 w-5 text-accent-purple" /> AI Recruiter Discovery
               </DialogTitle>
             </DialogHeader>
             <div className="space-y-3">

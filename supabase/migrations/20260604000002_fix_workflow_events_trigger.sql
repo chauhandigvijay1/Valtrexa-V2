@@ -31,18 +31,18 @@ BEGIN
           event_kind := entity_kind || ''_deleted'';
         END IF;
 
-        INSERT INTO workflow_events (kind, entity_id, entity_type, user_id, payload)
-        VALUES (
-          event_kind,
-          COALESCE(NEW.id, OLD.id)::TEXT,
-          entity_kind,
-          COALESCE(NEW.user_id, OLD.user_id),
-          jsonb_build_object(
-            ''operation'', TG_OP,
-            ''table'', TG_TABLE_NAME,
-            ''timestamp'', now()
-          )
-        );
+         INSERT INTO workflow_events (event_type, entity_id, entity_type, user_id, payload)
+         VALUES (
+           event_kind,
+           COALESCE(NEW.id, OLD.id)::TEXT,
+           entity_kind,
+           COALESCE(NEW.user_id, OLD.user_id),
+           jsonb_build_object(
+             ''operation'', TG_OP,
+             ''table'', TG_TABLE_NAME,
+             ''timestamp'', now()
+           )
+         );
 
         RETURN COALESCE(NEW, OLD);
       END;

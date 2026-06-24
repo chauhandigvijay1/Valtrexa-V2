@@ -52,7 +52,14 @@ type WorkMode = "remote" | "hybrid" | "onsite";
 
 const STATUSES: JobStatus[] = ["open", "saved", "closed", "archived"];
 const PRIORITIES: JobPriority[] = ["low", "medium", "high"];
-const EXPERIENCE_OPTIONS = ["Fresher", "0-1 Years", "1-2 Years", "2-3 Years", "3-5 Years", "5+ Years"] as const;
+const EXPERIENCE_OPTIONS = [
+  "Fresher",
+  "0-1 Years",
+  "1-2 Years",
+  "2-3 Years",
+  "3-5 Years",
+  "5+ Years",
+] as const;
 const WORK_MODES: WorkMode[] = ["remote", "hybrid", "onsite"];
 const FRESHNESS_OPTIONS = ["24h", "3d", "7d", "30d", "older"] as const;
 const COMPANY_SIZES = ["startup", "mid", "enterprise"] as const;
@@ -499,7 +506,9 @@ function OpportunitiesPage() {
                         {job.work_mode}
                       </Badge>
                     )}
-                    {job.experience_level && <Badge variant="outline">{job.experience_level}</Badge>}
+                    {job.experience_level && (
+                      <Badge variant="outline">{job.experience_level}</Badge>
+                    )}
                     {job.easy_apply && <Badge variant="secondary">Easy Apply</Badge>}
                   </div>
                 </TableCell>
@@ -588,7 +597,10 @@ function OpportunitiesPage() {
             <div className="space-y-3">
               <div className="space-y-1.5">
                 <Label>Source</Label>
-                <Select value={sourceType} onValueChange={(value) => setSourceType(value as SourceType)}>
+                <Select
+                  value={sourceType}
+                  onValueChange={(value) => setSourceType(value as SourceType)}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -603,7 +615,15 @@ function OpportunitiesPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>{sourceType === "greenhouse" ? "Board token" : sourceType === "lever" ? "Site" : sourceType === "ashby" ? "Board URL" : "Search URL"}</Label>
+                <Label>
+                  {sourceType === "greenhouse"
+                    ? "Board token"
+                    : sourceType === "lever"
+                      ? "Site"
+                      : sourceType === "ashby"
+                        ? "Board URL"
+                        : "Search URL"}
+                </Label>
                 <Input
                   value={sourceValue}
                   onChange={(event) => setSourceValue(event.target.value)}
@@ -615,8 +635,8 @@ function OpportunitiesPage() {
                 />
               </div>
               <div className="text-sm text-muted-foreground">
-                Imported jobs are automatically classified for role coverage, experience band,
-                work mode, freshness, and easy-apply signals.
+                Imported jobs are automatically classified for role coverage, experience band, work
+                mode, freshness, and easy-apply signals.
               </div>
             </div>
             <DialogFooter>
@@ -661,7 +681,9 @@ function OpportunitiesPage() {
                   <Label>Work mode</Label>
                   <Select
                     value={editing.work_mode ?? "remote"}
-                    onValueChange={(value) => setEditing({ ...editing, work_mode: value as WorkMode })}
+                    onValueChange={(value) =>
+                      setEditing({ ...editing, work_mode: value as WorkMode })
+                    }
                   >
                     <SelectTrigger>
                       <SelectValue />
@@ -849,7 +871,7 @@ function OpportunitiesPage() {
                   </div>
                   <input
                     type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 accent-primary"
+                    className="h-4 w-4 rounded border-input accent-primary"
                     checked={editing.easy_apply ?? false}
                     onChange={(event) =>
                       setEditing({ ...editing, easy_apply: event.target.checked })

@@ -109,11 +109,17 @@ export function useCrudSave<T extends { id?: string }>(table: TableName, queryKe
       if (!user) throw new Error("Not signed in");
       const { id, ...rest } = payload as any;
       if (id) {
-        const initial = await supabase.from(table as any).update(rest).eq("id", id);
+        const initial = await supabase
+          .from(table as any)
+          .update(rest)
+          .eq("id", id);
         if (initial.error) {
           if (!isMissingColumnError(initial.error)) throw initial.error;
           const fallbackPayload = stripUnsupportedColumns(table, rest);
-          const fallback = await supabase.from(table as any).update(fallbackPayload).eq("id", id);
+          const fallback = await supabase
+            .from(table as any)
+            .update(fallbackPayload)
+            .eq("id", id);
           if (fallback.error) throw fallback.error;
         }
         return null;

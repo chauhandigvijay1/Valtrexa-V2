@@ -14,7 +14,7 @@ import {
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Sign In - Career Compass Pro" }] }),
+  head: () => ({ meta: [{ title: "Sign In - VALTREXA-V2" }] }),
   component: LoginPage,
 });
 
@@ -122,7 +122,7 @@ function LoginPage() {
     <div className="min-h-screen grid place-items-center bg-background px-4">
       <Card className="w-full max-w-sm p-6 space-y-5">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">Sign in to Career Compass Pro</h1>
+          <h1 className="text-xl font-semibold tracking-tight">Sign in to VALTREXA-V2</h1>
           <p className="text-sm text-muted-foreground">
             Resume intelligence, job discovery, research, and outreach in one workspace.
           </p>

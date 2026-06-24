@@ -38,6 +38,12 @@ import {
 import { dedupeRoles, expandRoleVariants } from "./_lib/role-taxonomy.js";
 import { supabaseAdmin } from "./_lib/supabase.js";
 import { emitWorkflowEvent } from "./_lib/workflow-events.js";
+import { processTelegramUpdate } from "./_lib/telegram.js";
+import { logger } from "./_lib/logger.js";
+import { checkRateLimit, rateLimitKey } from "./_lib/rate-limiter.js";
+import { initSentry } from "./_lib/sentry.js";
+import { initTelegramBot } from "./_lib/telegram-init.js";
+import { runAutoMigration } from "./_lib/auto-migrate.js";
 
 const SKILL_CATEGORY_LOOKUP: Record<string, string> = {
   typescript: "Languages",
@@ -127,7 +133,8 @@ function inferSkillLevel(name: string, parsed: ResumeStructuredData, rawText = "
         .toLowerCase()
         .includes(normalized),
     ).length +
-    (rawText.toLowerCase().match(new RegExp(normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))?.length ?? 0);
+    (rawText.toLowerCase().match(new RegExp(normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))
+      ?.length ?? 0);
 
   if (hits >= 6) return "expert";
   if (hits >= 4) return "advanced";
@@ -148,7 +155,10 @@ function buildSkillRows(parsed: ResumeStructuredData, rawText = "") {
   }));
 }
 
-function buildProjectRows(parsed: ResumeStructuredData, existingProjects: Array<Record<string, any>>) {
+function buildProjectRows(
+  parsed: ResumeStructuredData,
+  existingProjects: Array<Record<string, any>>,
+) {
   const existingByName = new Map(
     existingProjects
       .filter((project) => typeof project.name === "string")
@@ -158,13 +168,19 @@ function buildProjectRows(parsed: ResumeStructuredData, existingProjects: Array<
   return parsed.projects
     .map((project) => {
       const fallback = project.name ? existingByName.get(project.name.toLowerCase()) : null;
-      const features = uniqueResumeStrings([...(project.features ?? []), ...(fallback?.features ?? [])]);
+      const features = uniqueResumeStrings([
+        ...(project.features ?? []),
+        ...(fallback?.features ?? []),
+      ]);
       return {
         name: chooseText(project.name, fallback?.name, "Project"),
         description: chooseText(project.description, project.summary, fallback?.description),
         github_url: chooseText(project.github_url, fallback?.github_url),
         live_url: chooseText(project.live_url, fallback?.live_url),
-        tech_stack: uniqueResumeStrings([...(project.tech_stack ?? []), ...(fallback?.tech_stack ?? [])]),
+        tech_stack: uniqueResumeStrings([
+          ...(project.tech_stack ?? []),
+          ...(fallback?.tech_stack ?? []),
+        ]),
         features,
         impact: chooseText(features.join("; "), fallback?.impact),
       };
@@ -201,7 +217,10 @@ async function syncCandidateBrain(userId: string, parsed: ResumeStructuredData, 
   const profilePayload = {
     user_id: userId,
     current_title: chooseText(parsed.experience[0]?.title, existingProfile.data?.current_title),
-    current_company: chooseText(parsed.experience[0]?.company, existingProfile.data?.current_company),
+    current_company: chooseText(
+      parsed.experience[0]?.company,
+      existingProfile.data?.current_company,
+    ),
     years_experience: deriveYearsExperience(parsed, existingProfile.data?.years_experience),
     github_url: chooseText(parsed.github_url, existingProfile.data?.github_url),
     linkedin_url: chooseText(parsed.linkedin_url, existingProfile.data?.linkedin_url),
@@ -209,14 +228,18 @@ async function syncCandidateBrain(userId: string, parsed: ResumeStructuredData, 
     career_goal: chooseText(parsed.career_goal, existingProfile.data?.career_goal),
     remote_preference: inferRemotePreference(parsed, existingProfile.data?.remote_preference),
     summary: chooseText(parsed.summary, existingProfile.data?.summary),
-    communication_style: chooseText(parsed.communication_style, existingProfile.data?.communication_style),
+    communication_style: chooseText(
+      parsed.communication_style,
+      existingProfile.data?.communication_style,
+    ),
     preferred_roles: mergedRoles.length ? mergedRoles : expandedRoles,
     preferred_locations: uniqueResumeStrings([
       ...(parsed.preferred_locations ?? []),
       parsed.location,
       ...((existingProfile.data?.preferred_locations as string[] | null) ?? []),
     ]),
-    salary_expectation: parsed.salary_expectation ?? existingProfile.data?.salary_expectation ?? null,
+    salary_expectation:
+      parsed.salary_expectation ?? existingProfile.data?.salary_expectation ?? null,
     resume_raw_text: rawText ?? existingProfile.data?.resume_raw_text ?? null,
     parsed_resume: {
       ...parsed,
@@ -225,7 +248,10 @@ async function syncCandidateBrain(userId: string, parsed: ResumeStructuredData, 
   };
 
   if (existingProfile.data?.id) {
-    await supabaseAdmin.from("candidate_profiles").update(profilePayload).eq("id", existingProfile.data.id);
+    await supabaseAdmin
+      .from("candidate_profiles")
+      .update(profilePayload)
+      .eq("id", existingProfile.data.id);
   } else {
     await supabaseAdmin.from("candidate_profiles").insert(profilePayload as any);
   }
@@ -242,7 +268,10 @@ async function syncCandidateBrain(userId: string, parsed: ResumeStructuredData, 
     .eq("id", userId);
   if (profileUpdate.error && isMissingSchemaError(profileUpdate.error)) {
     const { phone: _phone, ...fallbackBaseProfilePayload } = baseProfilePayload;
-    await supabaseAdmin.from("profiles").update(fallbackBaseProfilePayload as any).eq("id", userId);
+    await supabaseAdmin
+      .from("profiles")
+      .update(fallbackBaseProfilePayload as any)
+      .eq("id", userId);
   }
 
   await replaceUserRows(
@@ -285,15 +314,17 @@ async function syncCandidateBrain(userId: string, parsed: ResumeStructuredData, 
   await replaceUserRows(
     "projects",
     userId,
-    buildProjectRows(parsed, (existingProjects.data as Array<Record<string, any>>) ?? []).map((project) => ({
-      name: project.name,
-      description: project.description,
-      github_url: project.github_url,
-      live_url: project.live_url,
-      tech_stack: project.tech_stack,
-      features: project.features,
-      impact: project.impact,
-    })),
+    buildProjectRows(parsed, (existingProjects.data as Array<Record<string, any>>) ?? []).map(
+      (project) => ({
+        name: project.name,
+        description: project.description,
+        github_url: project.github_url,
+        live_url: project.live_url,
+        tech_stack: project.tech_stack,
+        features: project.features,
+        impact: project.impact,
+      }),
+    ),
   );
 
   await replaceUserRows(
@@ -591,7 +622,7 @@ const CODE_NOISE_PATTERNS = [
   /window\.matchMedia/i,
   /data-theme/i,
   /function\s+[a-zA-Z_$][\w$]*\s*\(/i,
-  /\=\>/,
+  /=>/,
 ];
 
 function normalizeWhitespace(value: string) {
@@ -992,7 +1023,7 @@ async function fetchWebsiteSummary(website?: string) {
   let response: Response;
   try {
     response = await fetch(website, {
-      headers: { "user-agent": "CareerCompassPro/1.0" },
+      headers: { "user-agent": "VALTREXA-V2/1.0" },
       signal: AbortSignal.timeout(10000),
     });
   } catch {
@@ -1037,7 +1068,7 @@ async function fetchNews(companyName: string) {
   let response: Response;
   try {
     response = await fetch(url, {
-      headers: { "user-agent": "CareerCompassPro/1.0" },
+      headers: { "user-agent": "VALTREXA-V2/1.0" },
       signal: AbortSignal.timeout(10000),
     });
   } catch {
@@ -1283,7 +1314,7 @@ async function handleResumeAnalyze(request: Request) {
     source: "env" as const,
   }));
 
-  let insertResult = await supabaseAdmin
+  const insertResult = await supabaseAdmin
     .from("resume_analyses")
     .insert({
       user_id: user.id,
@@ -1789,7 +1820,9 @@ function inferExperienceLevel(title: string, description: string) {
 }
 
 function inferSalaryBounds(text: string) {
-  const match = text.match(/(?:\$|usd\s*)?(\d{2,3})(?:k)?\s*(?:-|to)\s*(?:\$|usd\s*)?(\d{2,3})(?:k)?/i);
+  const match = text.match(
+    /(?:\$|usd\s*)?(\d{2,3})(?:k)?\s*(?:-|to)\s*(?:\$|usd\s*)?(\d{2,3})(?:k)?/i,
+  );
   if (!match) return { salaryMin: null, salaryMax: null };
   const min = Number(match[1]);
   const max = Number(match[2]);
@@ -2326,7 +2359,7 @@ async function handleOutreach(request: Request) {
     source: "env" as const,
   }));
 
-  let insert = await supabaseAdmin
+  const insert = await supabaseAdmin
     .from("outreach_messages")
     .insert({
       user_id: user.id,
@@ -3970,6 +4003,45 @@ async function handleMigrate(request: Request) {
   return json({ success: true, message: "Migration called." });
 }
 
+async function resolveUserIdFromTelegramChat(chatId: number): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from("telegram_notifications")
+    .select("user_id")
+    .eq("chat_id", String(chatId))
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (data?.user_id) return data.user_id;
+  const { data: anyUser } = await supabaseAdmin
+    .from("alert_preferences")
+    .select("user_id")
+    .limit(1)
+    .maybeSingle();
+  if (anyUser?.user_id) return anyUser.user_id;
+  const { data: brainUser } = await supabaseAdmin
+    .from("candidate_brain")
+    .select("user_id")
+    .limit(1)
+    .maybeSingle();
+  return brainUser?.user_id ?? "";
+}
+
+async function handleTelegramWebhook(request: Request) {
+  if (request.method !== "POST") {
+    return json({ error: "Use POST" }, { status: 405 });
+  }
+  const body = await request.json();
+  const chatId = body.message?.chat?.id ?? body.callback_query?.message?.chat?.id;
+  let userId = "";
+  if (chatId) userId = await resolveUserIdFromTelegramChat(chatId);
+  if (!userId) userId = process.env.TELEGRAM_USER_ID ?? "";
+  const result = await processTelegramUpdate(body, userId);
+  return json({ handled: result.handled });
+}
+
+// Phase A + B route handlers — see api/phase-handlers.ts
+import * as phase from "./phase-handlers.js";
+
 export async function routeRequest(request: Request) {
   const url = new URL(request.url);
   const pathnameFromUrl = url.pathname.replace(/^\/api\//, "");
@@ -4037,23 +4109,218 @@ export async function routeRequest(request: Request) {
       return handleFollowUpAutoCreate(request);
     case "recruiters/discover":
       return handleRecruiterDiscovery(request);
+    // ── Phase A endpoints ──
+    case "providers/audit":
+      return phase.handleProviderAudit(request);
+    case "providers/import":
+      return phase.handleProviderImport(request);
+    case "match/score":
+      return phase.handleMatchScore(request);
+    case "companies/strategic-value":
+      return phase.handleStrategicValue(request);
+    case "recruiters/discover-v2":
+      return phase.handleRecruiterDiscoveryV2(request);
+    case "apply":
+      return phase.handleApply(request);
+    case "batch-apply/run":
+      return phase.handleBatchApply(request);
+    case "batch-apply/eligibility":
+      return phase.handleBatchEligibility(request);
+    case "outreach/v2":
+      return phase.handleOutreachV2(request);
+    case "followups/schedule":
+      return phase.handleFollowupSchedule(request);
+    case "followups/generate":
+      return phase.handleFollowupGenerate(request);
+    case "followups/due":
+      return phase.handleFollowupDue(request);
+    case "followups/mark-sent":
+      return phase.handleFollowupMarkSent(request);
+    case "inbox/sync":
+      return phase.handleInboxSync(request);
+    case "inbox/classify":
+      return phase.handleInboxClassify(request);
+    case "inbox/list":
+      return phase.handleInboxList(request);
+    // ── Phase B endpoints ──
+    case "browser/profiles":
+      return phase.handleBrowserProfiles(request);
+    case "browser/session":
+      return phase.handleBrowserSession(request);
+    case "browser/storage-state":
+      return phase.handleBrowserStorageState(request);
+    case "browser/capture":
+      return phase.handleBrowserCapture(request);
+    case "queue/enqueue":
+      return phase.handleQueueEnqueue(request);
+    case "queue/stats":
+      return phase.handleQueueStats(request);
+    case "event-bus/consumers":
+      return phase.handleEventBusConsumers(request);
+    case "event-bus/replay":
+      return phase.handleEventBusReplay(request);
+    case "event-bus/history":
+      return phase.handleEventBusHistory(request);
     case "admin/migrate":
       return handleMigrate(request);
+    case "telegram/webhook":
+      return handleTelegramWebhook(request);
+    // ── Phase P endpoints ──
+    case "recruiters/discover-v3":
+      return phase.handleRecruiterDiscoveryV3(request);
+    case "email/discover":
+      return phase.handleEmailDiscovery(request);
+    case "companies/strategic-value-v3":
+      return phase.handleHighValueV3(request);
+    case "applications/evidence":
+      return phase.handlePlaywrightEvidence(request);
+    case "approvals/status":
+      return phase.handleApprovalStatus(request);
+    case "skills/gap":
+      return handleSkillGap(request);
+    case "outreach/send":
+      return handleOutreachSend(request);
+    case "outreach/send-pending":
+      return handleOutreachSendPending(request);
+    case "health":
+    case "api/health":
+      return handleHealthCheck();
     default:
       return json({ error: `Unknown API route: /api/${pathname}` }, { status: 404 });
   }
 }
 
-export async function safeRouteRequest(request: Request) {
+async function handleHealthCheck() {
+  const start = Date.now();
+  let dbOk = false;
+  let dbError: string | null = null;
   try {
-    return await routeRequest(request);
+    const { count, error } = await supabaseAdmin
+      .from("workflow_events")
+      .select("*", { count: "exact", head: true })
+      .limit(1);
+    dbOk = !error;
+    dbError = error?.message ?? null;
+  } catch (e: any) {
+    dbError = e.message;
+  }
+
+  let redisOk = false;
+  let redisError: string | null = null;
+  try {
+    const { Redis } = await import("ioredis");
+    const redis = new Redis(process.env.REDIS_URL || "redis://localhost:6379", {
+      maxRetriesPerRequest: 1,
+      connectTimeout: 3000,
+      lazyConnect: true,
+    });
+    await redis.connect();
+    await redis.ping();
+    redisOk = true;
+    await redis.quit();
+  } catch (e: any) {
+    redisError = e.message;
+  }
+
+  return json({
+    status: dbOk ? "ok" : "degraded",
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    checks: {
+      database: { ok: dbOk, error: dbError, latencyMs: Date.now() - start },
+      redis: { ok: redisOk, error: redisError },
+      version: "1.0.0",
+    },
+  });
+}
+
+async function handleSkillGap(request: Request) {
+  const user = await requireApiUser(request);
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  const body = await readJson<{
+    candidateSkills: string[];
+    jobDescription: string;
+    useAi?: boolean;
+  }>(request);
+  if (!body.candidateSkills?.length || !body.jobDescription) {
+    return json({ error: "candidateSkills and jobDescription are required" }, { status: 400 });
+  }
+  const { analyzeSkillGap, analyzeSkillGapWithAi } = await import("./_lib/skill-gap.js");
+  const result = body.useAi
+    ? await analyzeSkillGapWithAi(body.candidateSkills, body.jobDescription, user.id)
+    : analyzeSkillGap(body.candidateSkills, body.jobDescription);
+  return json(result);
+}
+
+async function handleOutreachSend(request: Request) {
+  const user = await requireApiUser(request);
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  const body = await readJson<{ outreachId?: string }>(request);
+  const { sendOutreachMessage, sendPendingOutreaches } = await import("./_lib/outreach-sender.js");
+  if (body.outreachId) {
+    const ok = await sendOutreachMessage(body.outreachId);
+    return json({ sent: ok });
+  }
+  const result = await sendPendingOutreaches();
+  return json(result);
+}
+
+async function handleOutreachSendPending(request: Request) {
+  const user = await requireApiUser(request);
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  const { sendPendingOutreaches } = await import("./_lib/outreach-sender.js");
+  const result = await sendPendingOutreaches(50);
+  return json(result);
+}
+
+export async function safeRouteRequest(request: Request) {
+  const url = new URL(request.url);
+  const { allowed, remaining, resetAt } = checkRateLimit(rateLimitKey(request));
+
+  if (!allowed) {
+    logger.warn("Rate limit exceeded", {
+      path: url.pathname,
+      method: request.method,
+      remote: rateLimitKey(request),
+    });
+    return json(
+      { error: "Too many requests. Please slow down.", retryAfterMs: resetAt - Date.now() },
+      {
+        status: 429,
+        headers: {
+          "retry-after": String(Math.ceil((resetAt - Date.now()) / 1000)),
+          "x-ratelimit-remaining": "0",
+        },
+      },
+    );
+  }
+
+  try {
+    const response = await routeRequest(request);
+    if (response.status === 200) {
+      (response.headers as any).set?.("x-ratelimit-remaining", String(remaining));
+    }
+    return response;
   } catch (error) {
     if (error instanceof Response) return error;
-    console.error("API ROUTE ERROR:", error);
+    logger.error("API ROUTE ERROR", {
+      path: url.pathname,
+      method: request.method,
+      error: error instanceof Error ? error.message : String(error),
+    });
     const message = error instanceof Error ? error.message : "Unexpected API error.";
     return json({ error: message }, { status: 500 });
   }
 }
+
+// Initialize Sentry at module load time
+initSentry();
+
+// Run auto-migration if DATABASE_URL is available
+void runAutoMigration().catch(() => {});
+
+// Initialize Telegram bot (commands + webhook if PUBLIC_URL set)
+initTelegramBot();
 
 export default async function handler(request: Request) {
   return safeRouteRequest(request);
@@ -4061,3 +4328,10 @@ export default async function handler(request: Request) {
 (handler as any).fetch = safeRouteRequest;
 
 export { safeRouteRequest as fetch };
+
+// Re-export for downstream usage
+export { analyzeSkillGap, analyzeSkillGapWithAi } from "./_lib/skill-gap.js";
+export type { SkillGapResult, SkillRecommendation } from "./_lib/skill-gap.js";
+export { sendOutreachMessage, sendPendingOutreaches } from "./_lib/outreach-sender.js";
+export { withRetry } from "./_lib/retry.js";
+export type { RetryOptions } from "./_lib/retry.js";

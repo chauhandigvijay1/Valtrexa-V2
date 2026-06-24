@@ -22,8 +22,8 @@ async function requestOpenRouter(body: string, apiKey: string) {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://career-compass-pro.local",
-      "X-Title": "Career Compass Pro",
+      "HTTP-Referer": "https://valtrexa-v2.local",
+      "X-Title": "VALTREXA-V2",
     },
     body,
   });

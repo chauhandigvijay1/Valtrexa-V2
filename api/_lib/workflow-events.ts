@@ -56,7 +56,7 @@ export async function emitWorkflowEvent(input: {
         method: "POST",
         headers: {
           "content-type": "application/json",
-          ...(subscription.secret ? { "x-career-compass-secret": subscription.secret } : {}),
+          ...(subscription.secret ? { "x-valtrexa-v2-secret": subscription.secret } : {}),
         },
         body: JSON.stringify({
           eventType: input.eventType,

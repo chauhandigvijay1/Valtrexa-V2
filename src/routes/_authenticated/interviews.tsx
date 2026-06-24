@@ -52,10 +52,10 @@ type Interview = {
 };
 
 const color: Record<IvStatus, string> = {
-  scheduled: "bg-blue-500/15 text-blue-400",
-  completed: "bg-emerald-500/15 text-emerald-400",
+  scheduled: "bg-status-applied/15 text-status-applied",
+  completed: "bg-status-offer/15 text-status-offer",
   cancelled: "bg-destructive/15 text-destructive",
-  rescheduled: "bg-amber-500/15 text-amber-400",
+  rescheduled: "bg-status-screening/15 text-status-screening",
 };
 
 export const Route = createFileRoute("/_authenticated/interviews")({ component: InterviewsPage });
@@ -188,7 +188,7 @@ function InterviewsPage() {
                       {prepLoadingId === r.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
-                        <Wand2 className="h-4 w-4 text-purple-500" />
+                        <Wand2 className="h-4 w-4 text-accent-purple" />
                       )}
                     </Button>
                     <Button size="icon" variant="ghost" onClick={() => setEditing(r)}>

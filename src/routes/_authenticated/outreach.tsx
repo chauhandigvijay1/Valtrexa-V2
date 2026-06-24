@@ -425,14 +425,14 @@ function OutreachPage() {
       />
 
       {/* Follow-up Reminders Card */}
-      <Card className="p-6 space-y-4 border border-purple-500/10 bg-purple-500/5">
+      <Card className="p-6 space-y-4 border border-accent-purple/10 bg-accent-purple/5">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Calendar className="h-5 w-5 text-purple-400" />
+            <Calendar className="h-5 w-5 text-accent-purple" />
             <h2 className="text-lg font-semibold">Follow-up Reminders</h2>
             <Badge
               variant="secondary"
-              className="bg-purple-500/10 text-purple-300 border border-purple-500/20"
+              className="bg-accent-purple/10 text-accent-purple border border-accent-purple/20"
             >
               {(followupsQuery.data ?? []).filter((f) => !f.done).length} pending
             </Badge>
@@ -440,7 +440,7 @@ function OutreachPage() {
           <Button
             size="sm"
             variant="outline"
-            className="border-purple-500/20 hover:bg-purple-500/10 text-purple-300"
+            className="border-accent-purple/20 hover:bg-accent-purple/10 text-accent-purple"
             onClick={() => setAddFollowupOpen(true)}
           >
             <Plus className="mr-1 h-4 w-4" /> Schedule Follow-up
@@ -459,14 +459,14 @@ function OutreachPage() {
                   fu.done
                     ? "bg-muted/30 border-muted/50 opacity-70"
                     : isOverdue
-                      ? "bg-red-500/10 border-red-500/20 text-red-300"
+                      ? "bg-destructive/10 border-destructive/20 text-destructive"
                       : "bg-card border-border"
                 }`}
               >
                 <div className="flex items-start gap-3">
                   <input
                     type="checkbox"
-                    className="mt-1 h-4 w-4 rounded border-gray-300 accent-purple-500"
+                    className="mt-1 h-4 w-4 rounded border-input accent-accent-purple"
                     checked={fu.done}
                     onChange={(e) =>
                       toggleFollowupMutation.mutate({ id: fu.id, done: e.target.checked })
@@ -730,7 +730,7 @@ function OutreachPage() {
                 </select>
               </div>
               {!isSelectedCompanyHighTarget && (
-                <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-500 border border-amber-500/20">
+                <div className="flex items-center gap-2 rounded-lg bg-warning/10 p-3 text-sm text-warning border border-warning/20">
                   <ShieldAlert className="h-4 w-4 flex-shrink-0" />
                   <span>
                     Strategic campaigns are gated to High Value Targets. Mark this company as a High

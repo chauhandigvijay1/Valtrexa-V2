@@ -14,7 +14,7 @@ export type ImportedJob = {
 
 async function fetchJson(url: string) {
   const response = await fetch(url, {
-    headers: { "user-agent": "CareerCompassPro/1.0" },
+    headers: { "user-agent": "VALTREXA-V2/1.0" },
     signal: AbortSignal.timeout(15000),
   });
   if (!response.ok) {
@@ -26,7 +26,7 @@ async function fetchJson(url: string) {
 async function fetchHtml(url: string, headers?: Record<string, string>) {
   const response = await fetch(url, {
     headers: {
-      "user-agent": "Mozilla/5.0 CareerCompassPro/1.0",
+      "user-agent": "Mozilla/5.0 VALTREXA-V2/1.0",
       ...headers,
     },
     signal: AbortSignal.timeout(15000),

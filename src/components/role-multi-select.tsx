@@ -3,7 +3,12 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { expandRoleVariants, normalizeRoleLabel, normalizeRoles, ROLE_OPTIONS } from "@/lib/role-taxonomy";
+import {
+  expandRoleVariants,
+  normalizeRoleLabel,
+  normalizeRoles,
+  ROLE_OPTIONS,
+} from "@/lib/role-taxonomy";
 
 export function RoleMultiSelect({
   value,
@@ -62,7 +67,13 @@ export function RoleMultiSelect({
           </div>
           <div className="flex flex-wrap gap-2">
             {suggestions.map((role) => (
-              <Button key={role} type="button" size="sm" variant="outline" onClick={() => addRole(role)}>
+              <Button
+                key={role}
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => addRole(role)}
+              >
                 {role}
               </Button>
             ))}

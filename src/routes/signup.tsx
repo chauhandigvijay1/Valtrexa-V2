@@ -9,7 +9,7 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/signup")({
-  head: () => ({ meta: [{ title: "Create Account — Career Compass Pro" }] }),
+  head: () => ({ meta: [{ title: "Create Account — VALTREXA-V2" }] }),
   component: SignupPage,
 });
 
@@ -52,9 +52,7 @@ function SignupPage() {
     <div className="min-h-screen grid place-items-center bg-background px-4">
       <Card className="w-full max-w-sm p-6 space-y-5">
         <div>
-          <h1 className="text-xl font-semibold tracking-tight">
-            Create your Career Compass Pro account
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight">Create your VALTREXA-V2 account</h1>
           <p className="text-sm text-muted-foreground">
             Set up your workspace for resumes, jobs, and outreach.
           </p>

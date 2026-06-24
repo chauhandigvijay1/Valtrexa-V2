@@ -85,20 +85,20 @@ type Application = {
 
 const statusColor: Record<AppStatus, string> = {
   saved: "bg-muted text-foreground",
-  applied: "bg-blue-500/15 text-blue-400",
-  screening: "bg-amber-500/15 text-amber-400",
-  interview: "bg-purple-500/15 text-purple-400",
-  offer: "bg-emerald-500/15 text-emerald-400",
-  accepted: "bg-emerald-500/20 text-emerald-300",
+  applied: "bg-status-applied/15 text-status-applied",
+  screening: "bg-status-screening/15 text-status-screening",
+  interview: "bg-status-interview/15 text-status-interview",
+  offer: "bg-status-offer/15 text-status-offer",
+  accepted: "bg-status-accepted/20 text-status-accepted",
   rejected: "bg-destructive/15 text-destructive",
   withdrawn: "bg-muted text-muted-foreground",
 };
 
 const tierColor: Record<string, string> = {
-  A: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
-  B: "bg-blue-500/20 text-blue-300 border-blue-500/30",
-  C: "bg-amber-500/20 text-amber-300 border-amber-500/30",
-  D: "bg-red-500/20 text-red-300 border-red-500/30",
+  A: "bg-tier-a/20 text-tier-a border-tier-a/30",
+  B: "bg-tier-b/20 text-tier-b border-tier-b/30",
+  C: "bg-tier-c/20 text-tier-c border-tier-c/30",
+  D: "bg-tier-d/20 text-tier-d border-tier-d/30",
 };
 
 export const Route = createFileRoute("/_authenticated/applications")({
@@ -330,7 +330,7 @@ function ApplicationsPage() {
                           {generatingId === r.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Wand2 className="h-4 w-4 text-purple-500" />
+                            <Wand2 className="h-4 w-4 text-accent-purple" />
                           )}
                         </Button>
                         <Button
@@ -343,7 +343,7 @@ function ApplicationsPage() {
                           {discoveringId === r.id ? (
                             <Loader2 className="h-4 w-4 animate-spin" />
                           ) : (
-                            <Search className="h-4 w-4 text-blue-500" />
+                            <Search className="h-4 w-4 text-status-applied" />
                           )}
                         </Button>
                         <Button
@@ -352,7 +352,7 @@ function ApplicationsPage() {
                           title="Create follow-up"
                           onClick={() => createFollowUpMutation.mutate(r)}
                         >
-                          <CalendarPlus className="h-4 w-4 text-green-500" />
+                          <CalendarPlus className="h-4 w-4 text-success" />
                         </Button>
                         <Button
                           size="icon"
@@ -363,7 +363,7 @@ function ApplicationsPage() {
                           {expandedId === r.id ? (
                             <ChevronUp className="h-4 w-4" />
                           ) : (
-                            <MessageSquare className="h-4 w-4 text-amber-500" />
+                            <MessageSquare className="h-4 w-4 text-warning" />
                           )}
                         </Button>
                         <Button size="icon" variant="ghost" onClick={() => setEditing(r)}>
@@ -468,10 +468,10 @@ function ApplicationsPage() {
                     <SelectContent>
                       <SelectItem value="none">None</SelectItem>
                       {(resumes.data ?? []).map((v: any) => (
-                      <SelectItem key={v.id} value={v.id}>
+                        <SelectItem key={v.id} value={v.id}>
                           {v.resumes?.title ?? "Resume"} · v{v.version}
                           {v.resumes?.is_primary ? " (Primary)" : ""}
-                      </SelectItem>
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
@@ -510,15 +510,15 @@ function ApplicationsPage() {
                   />
                 </div>
                 <div className="space-y-1.5 flex items-center justify-between border rounded-md p-3 col-span-2 bg-muted/20">
-                    <div>
-                      <Label className="font-semibold text-sm">Package Generated</Label>
-                      <div className="text-xs text-muted-foreground">
-                        Indicates if resume context and application Q&A are ready
-                      </div>
+                  <div>
+                    <Label className="font-semibold text-sm">Package Generated</Label>
+                    <div className="text-xs text-muted-foreground">
+                      Indicates if resume context and application Q&A are ready
                     </div>
+                  </div>
                   <input
                     type="checkbox"
-                    className="h-4 w-4 rounded border-gray-300 accent-primary"
+                    className="h-4 w-4 rounded border-input accent-primary"
                     checked={editing.package_generated ?? false}
                     onChange={(e) =>
                       setEditing({ ...editing, package_generated: e.target.checked })
@@ -584,8 +584,8 @@ function ApplicationQAPanel({
   if (answers.length === 0) {
     return (
       <div className="p-4 text-sm text-muted-foreground bg-muted/30 border-t">
-        No Q&A generated yet. Click the <Wand2 className="inline h-3 w-3 text-purple-500" /> button
-        to generate an application package.
+        No Q&A generated yet. Click the <Wand2 className="inline h-3 w-3 text-accent-purple" />{" "}
+        button to generate an application package.
       </div>
     );
   }
@@ -593,7 +593,7 @@ function ApplicationQAPanel({
   return (
     <div className="p-4 bg-muted/30 border-t space-y-3">
       <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
-        <MessageSquare className="h-4 w-4 text-amber-500" />
+        <MessageSquare className="h-4 w-4 text-warning" />
         Generated Q&A for {companyName}
       </h4>
       <div className="grid gap-2">

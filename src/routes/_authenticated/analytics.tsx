@@ -50,13 +50,15 @@ function AnalyticsPage() {
       </div>
       <Card className="p-5">
         <div className="text-sm font-medium">Conversion Funnel</div>
-        <div className="mt-4 grid md:grid-cols-5 gap-3">
-          {Object.entries(funnel).map(([key, value]) => (
-            <div key={key} className="rounded-lg border border-border p-4">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">{key}</div>
-              <div className="mt-2 text-2xl font-semibold">{value}</div>
-            </div>
-          ))}
+        <div className="mt-4 overflow-x-auto">
+          <div className="flex md:grid md:grid-cols-5 gap-3 min-w-max md:min-w-0">
+            {Object.entries(funnel).map(([key, value]) => (
+              <div key={key} className="rounded-lg border border-border p-4">
+                <div className="text-xs uppercase tracking-wide text-muted-foreground">{key}</div>
+                <div className="mt-2 text-2xl font-semibold">{value}</div>
+              </div>
+            ))}
+          </div>
         </div>
       </Card>
     </div>

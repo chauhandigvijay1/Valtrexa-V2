@@ -127,26 +127,8 @@ const SKILL_CATALOG: Record<string, string[]> = {
     "Elasticsearch",
   ],
   Cloud: ["AWS", "Azure", "GCP", "Vercel", "Netlify", "Firebase", "Cloudflare"],
-  DevOps: [
-    "Docker",
-    "Kubernetes",
-    "Terraform",
-    "GitHub Actions",
-    "CI/CD",
-    "Jenkins",
-    "Linux",
-  ],
-  Tools: [
-    "Git",
-    "Figma",
-    "Postman",
-    "Jira",
-    "Notion",
-    "Playwright",
-    "Vitest",
-    "Webpack",
-    "Vite",
-  ],
+  DevOps: ["Docker", "Kubernetes", "Terraform", "GitHub Actions", "CI/CD", "Jenkins", "Linux"],
+  Tools: ["Git", "Figma", "Postman", "Jira", "Notion", "Playwright", "Vitest", "Webpack", "Vite"],
 };
 
 const ROLE_RULES: Array<{ roles: string[]; requiredSkills: string[] }> = [
@@ -180,7 +162,12 @@ const PROJECT_SECTION_LABELS = [
   "personal projects",
   "selected projects",
 ];
-const EXPERIENCE_SECTION_LABELS = ["experience", "work experience", "employment", "professional experience"];
+const EXPERIENCE_SECTION_LABELS = [
+  "experience",
+  "work experience",
+  "employment",
+  "professional experience",
+];
 const EDUCATION_SECTION_LABELS = ["education", "academics", "academic background"];
 const SUMMARY_SECTION_LABELS = ["summary", "professional summary", "profile", "about"];
 
@@ -188,8 +175,10 @@ export async function extractResumeText(fileName: string, fileBytes: ArrayBuffer
   const lower = fileName.toLowerCase();
   if (lower.endsWith(".pdf")) {
     const canvas = await import("@napi-rs/canvas");
-    if (!globalThis.DOMMatrix) globalThis.DOMMatrix = canvas.DOMMatrix as typeof globalThis.DOMMatrix;
-    if (!globalThis.ImageData) globalThis.ImageData = canvas.ImageData as typeof globalThis.ImageData;
+    if (!globalThis.DOMMatrix)
+      globalThis.DOMMatrix = canvas.DOMMatrix as typeof globalThis.DOMMatrix;
+    if (!globalThis.ImageData)
+      globalThis.ImageData = canvas.ImageData as typeof globalThis.ImageData;
     if (!globalThis.Path2D) globalThis.Path2D = canvas.Path2D as typeof globalThis.Path2D;
     if (!(globalThis as any).pdfjsWorker?.WorkerMessageHandler) {
       (globalThis as any).pdfjsWorker = await import("pdfjs-dist/legacy/build/pdf.worker.mjs");
@@ -358,7 +347,10 @@ const resumeSchema = {
 } as const;
 
 function normalizeWhitespace(value: string) {
-  return value.replace(/\u00a0/g, " ").replace(/[ \t]+/g, " ").trim();
+  return value
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .trim();
 }
 
 function normalizeMultiline(value: string) {
@@ -409,7 +401,9 @@ function extractEmail(rawText: string) {
 }
 
 function extractPhone(rawText: string) {
-  return rawText.match(/(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?(?:\d[\s-]?){8,14}\d/)?.[0] ?? null;
+  return (
+    rawText.match(/(?:\+\d{1,3}[\s-]?)?(?:\(?\d{2,4}\)?[\s-]?)?(?:\d[\s-]?){8,14}\d/)?.[0] ?? null
+  );
 }
 
 function extractLinks(rawText: string) {
@@ -460,7 +454,8 @@ function isLikelyLocationLine(line: string, name: string | null) {
   }
   if (/\b(remote|hybrid|onsite|on-site|relocate|relocation)\b/i.test(normalized)) return true;
   if (/[A-Za-z]+,\s*[A-Za-z]{2,}/.test(normalized)) return true;
-  if (/\b(?:india|usa|uk|canada|singapore|australia|germany|france)\b/i.test(normalized)) return true;
+  if (/\b(?:india|usa|uk|canada|singapore|australia|germany|france)\b/i.test(normalized))
+    return true;
   return false;
 }
 
@@ -471,7 +466,9 @@ function extractLocation(rawText: string, name: string | null) {
 
 function getSection(rawText: string, labels: string[]) {
   const normalized = rawText.replace(/\r/g, "");
-  const labelPattern = labels.map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+  const labelPattern = labels
+    .map((label) => label.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+    .join("|");
   const regex = new RegExp(
     `(?:^|\\n)\\s*(?:${labelPattern})\\s*:?\\s*\\n([\\s\\S]*?)(?=\\n\\s*[A-Z][A-Za-z/& ]{2,}:?\\s*\\n|\\n\\s*(?:${labelPattern})\\s*:?\\s*\\n|$)`,
     "i",
@@ -522,7 +519,8 @@ function inferPreferredRoles(skills: string[], experience: ResumeExperience[], r
     const title = item.title?.toLowerCase() ?? "";
     if (title.includes("frontend")) inferred.add("Frontend Developer");
     if (title.includes("backend")) inferred.add("Backend Developer");
-    if (title.includes("full stack") || title.includes("full-stack")) inferred.add("Full Stack Developer");
+    if (title.includes("full stack") || title.includes("full-stack"))
+      inferred.add("Full Stack Developer");
     if (title.includes("software engineer")) inferred.add("Software Engineer");
   }
 
@@ -537,7 +535,9 @@ function inferPreferredRoles(skills: string[], experience: ResumeExperience[], r
 
 function inferProjectTech(projectText: string, knownSkills: string[]) {
   return uniqueStrings(
-    knownSkills.filter((skill) => new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(projectText)),
+    knownSkills.filter((skill) =>
+      new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(projectText),
+    ),
   );
 }
 
@@ -601,15 +601,17 @@ function inferExperiences(rawText: string) {
 function inferEducation(rawText: string) {
   const section = getSection(rawText, EDUCATION_SECTION_LABELS);
   if (!section) return [];
-  return splitBullets(section).slice(0, 6).map((line) => ({
-    school: line,
-    degree: null,
-    field: null,
-    start_date: null,
-    end_date: null,
-    description: null,
-    summary: line,
-  }));
+  return splitBullets(section)
+    .slice(0, 6)
+    .map((line) => ({
+      school: line,
+      degree: null,
+      field: null,
+      start_date: null,
+      end_date: null,
+      description: null,
+      summary: line,
+    }));
 }
 
 function inferSummary(rawText: string) {
@@ -635,12 +637,14 @@ function heuristicResumeParse(rawText: string): ResumeStructuredData {
   const experience = inferExperiences(rawText);
   const projects = inferProjects(rawText, skills);
   const education = inferEducation(rawText);
-  const certifications = splitBullets(getSection(rawText, ["certifications", "licenses"])).map((item) => ({
-    name: item,
-    issuer: null,
-    date: null,
-    summary: item,
-  }));
+  const certifications = splitBullets(getSection(rawText, ["certifications", "licenses"])).map(
+    (item) => ({
+      name: item,
+      issuer: null,
+      date: null,
+      summary: item,
+    }),
+  );
   const links = extractLinks(rawText);
   const preferred_roles = inferPreferredRoles(skills, experience, rawText);
   const preferred_locations = uniqueStrings([location]);
@@ -691,11 +695,19 @@ function normalizeProjects(projects: unknown[], heuristics: ResumeStructuredData
       const item = project as Record<string, unknown>;
       const name = firstNonEmpty(item.name as string, item.title as string);
       const fallback = name ? heuristicByName.get(name.toLowerCase()) : null;
-      const description = firstNonEmpty(item.description as string, item.summary as string, fallback?.description);
+      const description = firstNonEmpty(
+        item.description as string,
+        item.summary as string,
+        fallback?.description,
+      );
       return {
         name: name ?? fallback?.name ?? "Project",
         description,
-        github_url: firstNonEmpty(item.github_url as string, item.github as string, fallback?.github_url),
+        github_url: firstNonEmpty(
+          item.github_url as string,
+          item.github as string,
+          fallback?.github_url,
+        ),
         live_url: firstNonEmpty(item.live_url as string, item.url as string, fallback?.live_url),
         tech_stack: uniqueStrings([
           ...(Array.isArray(item.tech_stack) ? (item.tech_stack as string[]) : []),
@@ -712,33 +724,32 @@ function normalizeProjects(projects: unknown[], heuristics: ResumeStructuredData
     .filter((project) => !!project.name);
 }
 
-function sanitizeParsedResume(parsed: Partial<ResumeStructuredData>, rawText: string): ResumeStructuredData {
+function sanitizeParsedResume(
+  parsed: Partial<ResumeStructuredData>,
+  rawText: string,
+): ResumeStructuredData {
   const heuristics = heuristicResumeParse(rawText);
   const skills = uniqueStrings([...(parsed.skills ?? []), ...heuristics.skills]);
-  const experience = (parsed.experience ?? heuristics.experience)
-    .filter(Boolean)
-    .map((item) => ({
-      company: firstNonEmpty(item.company, (item as any).employer),
-      title: firstNonEmpty(item.title, (item as any).role),
-      location: firstNonEmpty(item.location),
-      start_date: firstNonEmpty(item.start_date),
-      end_date: firstNonEmpty(item.end_date),
-      is_current: typeof item.is_current === "boolean" ? item.is_current : item.is_current ?? null,
-      description: firstNonEmpty(item.description, item.summary),
-      summary: firstNonEmpty(item.summary, item.description),
-    }));
+  const experience = (parsed.experience ?? heuristics.experience).filter(Boolean).map((item) => ({
+    company: firstNonEmpty(item.company, (item as any).employer),
+    title: firstNonEmpty(item.title, (item as any).role),
+    location: firstNonEmpty(item.location),
+    start_date: firstNonEmpty(item.start_date),
+    end_date: firstNonEmpty(item.end_date),
+    is_current: typeof item.is_current === "boolean" ? item.is_current : (item.is_current ?? null),
+    description: firstNonEmpty(item.description, item.summary),
+    summary: firstNonEmpty(item.summary, item.description),
+  }));
   const projects = normalizeProjects(parsed.projects ?? heuristics.projects, heuristics);
-  const education = (parsed.education ?? heuristics.education)
-    .filter(Boolean)
-    .map((item) => ({
-      school: firstNonEmpty(item.school, (item as any).institution),
-      degree: firstNonEmpty(item.degree),
-      field: firstNonEmpty(item.field, (item as any).major),
-      start_date: firstNonEmpty(item.start_date),
-      end_date: firstNonEmpty(item.end_date, (item as any).year),
-      description: firstNonEmpty(item.description, item.summary),
-      summary: firstNonEmpty(item.summary, item.description),
-    }));
+  const education = (parsed.education ?? heuristics.education).filter(Boolean).map((item) => ({
+    school: firstNonEmpty(item.school, (item as any).institution),
+    degree: firstNonEmpty(item.degree),
+    field: firstNonEmpty(item.field, (item as any).major),
+    start_date: firstNonEmpty(item.start_date),
+    end_date: firstNonEmpty(item.end_date, (item as any).year),
+    description: firstNonEmpty(item.description, item.summary),
+    summary: firstNonEmpty(item.summary, item.description),
+  }));
   const certifications = (parsed.certifications ?? heuristics.certifications)
     .filter(Boolean)
     .map((item) => ({
@@ -793,7 +804,9 @@ function sanitizeParsedResume(parsed: Partial<ResumeStructuredData>, rawText: st
     preferred_roles,
     preferred_locations,
     salary_expectation:
-      typeof parsed.salary_expectation === "number" ? parsed.salary_expectation : heuristics.salary_expectation,
+      typeof parsed.salary_expectation === "number"
+        ? parsed.salary_expectation
+        : heuristics.salary_expectation,
     career_goal: firstNonEmpty(parsed.career_goal, heuristics.career_goal),
     communication_style: firstNonEmpty(parsed.communication_style, heuristics.communication_style),
     confidence_score:

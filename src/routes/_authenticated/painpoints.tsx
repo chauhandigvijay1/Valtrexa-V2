@@ -159,7 +159,7 @@ function PainPointsPage() {
                       <div className="text-lg font-semibold">{group.company}</div>
                       <Badge variant="secondary">{group.items.length} records</Badge>
                       {isHigh ? (
-                        <Badge className="bg-red-500/10 text-red-400 border border-red-500/20">
+                        <Badge className="bg-destructive/10 text-destructive border border-destructive/20">
                           High Value Target
                         </Badge>
                       ) : (
@@ -173,7 +173,7 @@ function PainPointsPage() {
                     </div>
                   </div>
                   {!isHigh && (
-                    <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-500 border border-amber-500/20 w-full lg:w-auto">
+                    <div className="flex items-center gap-2 rounded-lg bg-warning/10 p-3 text-sm text-warning border border-warning/20 w-full lg:w-auto">
                       <ShieldAlert className="h-4 w-4 flex-shrink-0" />
                       <span>Strategic features locked for Normal Targets.</span>
                     </div>
@@ -304,7 +304,7 @@ function PainPointsPage() {
                   const isHigh = comp?.target_value === "high";
                   if (!isHigh) {
                     return (
-                      <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-500 border border-amber-500/20">
+                      <div className="flex items-center gap-2 rounded-lg bg-warning/10 p-3 text-sm text-warning border border-warning/20">
                         <ShieldAlert className="h-4 w-4 flex-shrink-0" />
                         <span>
                           Pain points are gated to High Value Targets. Mark this company as a High

@@ -29,8 +29,8 @@ import {
   SidebarMenuItem,
   SidebarHeader,
   SidebarFooter,
+  useSidebar,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/use-auth";
 
 const items = [
@@ -55,14 +55,16 @@ const items = [
 export function AppSidebar() {
   const path = useRouterState({ select: (s) => s.location.pathname });
   const { signOut } = useAuth();
+  const { state } = useSidebar();
+  const collapsed = state === "collapsed";
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="h-7 w-7 rounded-md bg-primary/20 grid place-items-center text-primary font-semibold">
-            V
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-xs font-bold tracking-tight text-primary-foreground">
+            VX
           </div>
-          <span className="font-semibold tracking-tight">Career Compass Pro</span>
+          {!collapsed && <span className="truncate font-semibold tracking-tight">VALTREXA-V2</span>}
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -72,9 +74,9 @@ export function AppSidebar() {
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.url}>
-                  <SidebarMenuButton asChild isActive={path === item.url}>
+                  <SidebarMenuButton asChild isActive={path === item.url} tooltip={item.title}>
                     <Link to={item.url} className="flex items-center gap-2">
-                      <item.icon className="h-4 w-4" />
+                      <item.icon className="h-4 w-4 shrink-0" />
                       <span>{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
@@ -85,9 +87,16 @@ export function AppSidebar() {
         </SidebarGroup>
       </SidebarContent>
       <SidebarFooter>
-        <Button variant="ghost" size="sm" className="justify-start gap-2" onClick={() => signOut()}>
-          <LogOut className="h-4 w-4" /> Sign out
-        </Button>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Sign out" onClick={() => signOut()}>
+              <button className="flex items-center gap-2">
+                <LogOut className="h-4 w-4 shrink-0" />
+                <span>Sign out</span>
+              </button>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarFooter>
     </Sidebar>
   );

@@ -270,7 +270,7 @@ function CompanyResearchPage() {
                         <Badge variant="outline">{intelligence.products.length} products</Badge>
                       )}
                       {isHigh ? (
-                        <Badge className="flex items-center gap-1 bg-red-500/10 text-red-400 border border-red-500/20">
+                        <Badge className="flex items-center gap-1 bg-tier-d/10 text-tier-d border border-tier-d/20">
                           <Target className="h-3.5 w-3.5" /> High Value Target
                         </Badge>
                       ) : (
@@ -304,7 +304,7 @@ function CompanyResearchPage() {
                     </div>
                   </div>
                   {!isHigh && (
-                    <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-500 border border-amber-500/20 w-full lg:w-auto">
+                    <div className="flex items-center gap-2 rounded-lg bg-warning/10 p-3 text-sm text-warning border border-warning/20 w-full lg:w-auto">
                       <ShieldAlert className="h-4 w-4 flex-shrink-0" />
                       <span>Strategic features locked for Normal Targets.</span>
                     </div>
@@ -354,7 +354,7 @@ function CompanyResearchPage() {
                         });
                       }}
                     >
-                      <Target className="mr-2 h-4 w-4 text-amber-500" />
+                      <Target className="mr-2 h-4 w-4 text-warning" />
                       Configure Target
                     </Button>
                     <Button
@@ -555,7 +555,7 @@ function CompanyResearchPage() {
                 </Select>
               </div>
               {generateTargetValue === "normal" && (
-                <div className="flex items-center gap-2 rounded-lg bg-amber-500/10 p-3 text-sm text-amber-500 border border-amber-500/20">
+                <div className="flex items-center gap-2 rounded-lg bg-warning/10 p-3 text-sm text-warning border border-warning/20">
                   <ShieldAlert className="h-4 w-4 flex-shrink-0" />
                   <span>
                     Strategic research cannot be run for normal targets. Saving this company will

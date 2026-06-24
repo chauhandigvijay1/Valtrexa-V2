@@ -524,8 +524,8 @@ function ResumesPage() {
                               {resume.latestTailored.storage_path?.endsWith(".tex") ? (
                                 <div className="space-y-2">
                                   {resume.latestTailored.pdf_verified && (
-                                    <div className="flex flex-wrap items-center gap-3 p-3 border border-emerald-500/20 bg-emerald-500/5 rounded-lg text-xs">
-                                      <Badge className="bg-emerald-500/20 text-emerald-400 border-emerald-500/30 flex items-center gap-1 font-bold">
+                                    <div className="flex flex-wrap items-center gap-3 p-3 border border-success/20 bg-success/5 rounded-lg text-xs">
+                                      <Badge className="bg-success/20 text-success border-success/30 flex items-center gap-1 font-bold">
                                         ✓ PDF Verified
                                       </Badge>
                                       <span className="text-muted-foreground">

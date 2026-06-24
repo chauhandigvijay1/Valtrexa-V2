@@ -8,7 +8,7 @@ import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/forgot-password")({
-  head: () => ({ meta: [{ title: "Reset Password — Career Compass Pro" }] }),
+  head: () => ({ meta: [{ title: "Reset Password — VALTREXA-V2" }] }),
   component: ForgotPage,
 });
 

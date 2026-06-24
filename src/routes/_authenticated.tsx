@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { hasAuthCallbackParams } from "@/lib/auth-callback";
@@ -36,8 +37,11 @@ function AuthedLayout() {
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-12 flex items-center border-b border-border px-3 gap-2">
             <SidebarTrigger />
+            <div className="ml-auto">
+              <ThemeToggle />
+            </div>
           </header>
-          <main className="flex-1 p-6 overflow-auto">
+          <main id="main-content" className="flex-1 p-6 overflow-auto">
             <Outlet />
           </main>
         </div>
