@@ -49,14 +49,7 @@ import { apiPost, apiGet } from "@/lib/api-client";
 import { toast } from "sonner";
 
 type AppStatus =
-  | "saved"
-  | "applied"
-  | "screening"
-  | "interview"
-  | "offer"
-  | "rejected"
-  | "withdrawn"
-  | "accepted";
+  "saved" | "applied" | "screening" | "interview" | "offer" | "rejected" | "withdrawn" | "accepted";
 const STATUSES: AppStatus[] = [
   "saved",
   "applied",

@@ -11,10 +11,7 @@ import { callOpenRouterJson } from "./openrouter.js";
 import { emitWorkflowEvent } from "./workflow-events.js";
 import { getLatestResumeParseCompat } from "./compat.js";
 export type OutreachKind =
-  | "cold_email"
-  | "linkedin_message"
-  | "hiring_manager_outreach"
-  | "founder_outreach";
+  "cold_email" | "linkedin_message" | "hiring_manager_outreach" | "founder_outreach";
 
 const outreachSchema = {
   type: "object",

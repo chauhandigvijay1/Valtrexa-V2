@@ -15,12 +15,7 @@ import { supabaseAdmin } from "./supabase.js";
 import { emitWorkflowEvent } from "./workflow-events.js";
 
 export type InboxClassification =
-  | "interview"
-  | "assessment"
-  | "offer"
-  | "rejection"
-  | "recruiter_reply"
-  | "other";
+  "interview" | "assessment" | "offer" | "rejection" | "recruiter_reply" | "other";
 
 export type ClassifiedMessage = {
   messageId: string;

@@ -23,11 +23,7 @@ type PlatformHandlerInput = {
 };
 
 export type ApplyFlowStatus =
-  | "APPLIED"
-  | "PARTIAL"
-  | "REQUIRES_APPROVAL"
-  | "FAILED"
-  | "MANUAL_APPLY_REQUIRED";
+  "APPLIED" | "PARTIAL" | "REQUIRES_APPROVAL" | "FAILED" | "MANUAL_APPLY_REQUIRED";
 
 export type ApplyFlowResult = {
   status: ApplyFlowStatus;
