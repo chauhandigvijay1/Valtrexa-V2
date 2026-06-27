@@ -7,12 +7,6 @@
       "includeFiles": "api/_dist/**"
     }
   },
-  "crons": [
-    {
-      "path": "/api/workflow/cycle",
-      "schedule": "*/30 * * * *"
-    }
-  ],
   "rewrites": [
     {
       "source": "/api/:path*",

@@ -11,6 +11,7 @@
 
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
+import { supabaseAdmin } from "./_lib/supabase.js";
 
 const isRailway = !!(
   process.env.RAILWAY_SERVICE_NAME ||
@@ -169,8 +170,61 @@ async function start(): Promise<void> {
 
   console.log(`[worker] All ${workers.length} queues active. Waiting for jobs...`);
 
+  let cycleTimer: ReturnType<typeof setInterval> | null = null;
+  let cycleRunning = false;
+
+  async function runScheduledCycle(): Promise<void> {
+    if (cycleRunning) {
+      console.log("[worker] Previous cycle still running — skipping");
+      return;
+    }
+    cycleRunning = true;
+    const startedAt = Date.now();
+    try {
+      const { data: activeUsers, error } = await supabaseAdmin
+        .from("workflow_state")
+        .select("user_id")
+        .not("user_id", "is", null)
+        .eq("status", "running");
+
+      if (error) {
+        console.error(`[worker] Failed to query active users: ${error.message}`);
+        return;
+      }
+
+      if (!activeUsers || activeUsers.length === 0) {
+        console.log("[worker] No active workflows found — skipping cycle");
+        return;
+      }
+
+      console.log(`[worker] Running cycle for ${activeUsers.length} active user(s)`);
+      const { runCycle } = await import("./_lib/workflow-runner.js");
+
+      for (const row of activeUsers) {
+        if (!row.user_id) continue;
+        try {
+          const result = await runCycle(row.user_id);
+          const elapsed = Date.now() - startedAt;
+          console.log(`[worker] User ${row.user_id} cycle: ${result.status} (${elapsed}ms)`);
+        } catch (err: any) {
+          console.error(`[worker] User ${row.user_id} cycle failed: ${err?.message}`);
+        }
+      }
+    } catch (err: any) {
+      console.error(`[worker] Scheduled cycle error: ${err?.message}`);
+    } finally {
+      cycleRunning = false;
+      console.log(`[worker] Cycle finished (${Date.now() - startedAt}ms)`);
+    }
+  }
+
+  setTimeout(() => runScheduledCycle(), 10_000);
+  cycleTimer = setInterval(() => runScheduledCycle(), 30 * 60 * 1000);
+  console.log("[worker] Scheduled workflow cycle every 30 minutes");
+
   const shutdown = async () => {
     console.log("[worker] Shutting down...");
+    if (cycleTimer) clearInterval(cycleTimer);
     await Promise.all(workers.map((w) => w.close()));
     await connection.quit();
     process.exit(0);
