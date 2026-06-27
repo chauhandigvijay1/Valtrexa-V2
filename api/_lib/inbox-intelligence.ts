@@ -158,7 +158,7 @@ function getGmailClient() {
   const oauth2 = new google.auth.OAuth2(
     clientId,
     clientSecret,
-    process.env.GMAIL_REDIRECT_URI ?? "http://localhost",
+    process.env.GMAIL_REDIRECT_URI ?? "http://localhost:4173/api/auth/gmail/callback",
   );
   oauth2.setCredentials({ refresh_token: refreshToken });
   return google.gmail({ version: "v1", auth: oauth2 });

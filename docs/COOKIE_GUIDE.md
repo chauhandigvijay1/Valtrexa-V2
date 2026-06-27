@@ -27,7 +27,6 @@ flowchart LR
 
 - **Algorithm:** AES-256-GCM (authenticated encryption)
 - **Key source:** `COOKIE_ENCRYPTION_KEY` env var (64 hex chars = 32 bytes)
-- **Fallback key:** `SUPABASE_SERVICE_ROLE_KEY` if `COOKIE_ENCRYPTION_KEY` is not set
 - **Per-value IV:** Each encryption generates a unique 16-byte initialization vector
 - **Auth tag:** GCM appends a 16-byte authentication tag to detect tampering
 

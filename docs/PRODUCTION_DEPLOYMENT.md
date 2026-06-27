@@ -52,7 +52,7 @@ All variables must be set in the Vercel project dashboard (Settings → Environm
 | `GMAIL_CLIENT_ID`     | Optional | Google OAuth 2.0 Client ID                   | Google Cloud Console → APIs & Services → Credentials                                         |
 | `GMAIL_CLIENT_SECRET` | Optional | Google OAuth 2.0 Client Secret               | Google Cloud Console                                                                         |
 | `GMAIL_REFRESH_TOKEN` | Optional | OAuth refresh token for offline Gmail access | Via OAuth playbook or `scripts/get-refresh-token.cjs`                                        |
-| `GMAIL_REDIRECT_URI`  | Optional | OAuth redirect URI                           | Must match Google Cloud Console (e.g. `https://your-app.vercel.app/api/auth/gmail/callback`) |
+| `GMAIL_REDIRECT_URI`  | Optional | OAuth redirect URI                           | Must match Google Cloud Console (e.g. `https://valtrexa-v2.vercel.app/api/auth/gmail/callback`) |
 
 #### Redis / Queue (2)
 
@@ -67,6 +67,7 @@ All variables must be set in the Vercel project dashboard (Settings → Environm
 | --------------------- | -------- | -------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `EDGE_PATH`           | Optional | Path to Microsoft Edge Stable executable           | `"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"` (Windows) or `/usr/bin/microsoft-edge` (Linux) |
 | `EDGE_USER_DATA_DIR`  | Optional | Directory for persistent Edge user profile         | `./edge-profile` or absolute path                                                                               |
+| `EDGE_PROFILE_DIRECTORY` | Optional | Path to Edge profile directory for persistent contexts | `./edge-profile` or absolute path |
 | `PLAYWRIGHT_HEADLESS` | Optional | Set to `"false"` to run headed browser (debugging) | —                                                                                                               |
 
 #### Job Boards & ATS — Cookies (5)
@@ -176,8 +177,6 @@ Migrations are in `supabase/migrations/`. Apply them sequentially:
 20260529133925_0b4348a5-51b0-491f-aacc-e1bdc9332ebd.sql
 20260529140546_ab2d62c2-a2f5-4c7f-a576-8b41adec3af7.sql
 20260529152000_ai_career_os.sql
-20260530001000_pre_n8n_readiness.sql
-20260531030000_pre_n8n_release_final.sql
 20260603000000_candidate_brain.sql
 20260603000001_application_tier.sql
 20260603000002_company_target_value.sql
@@ -195,6 +194,9 @@ Migrations are in `supabase/migrations/`. Apply them sequentially:
 20260625000004_production_gaps.sql
 20260625000006_production_fix.sql
 20260625000007_schema_consolidation.sql
+20260626000001_production_stabilization.sql
+20260626000002_provider_cookies.sql
+20260627000000_resume_version_parse_columns.sql
 ```
 
 Via Supabase CLI:
@@ -219,10 +221,10 @@ Or via Supabase Dashboard → SQL Editor — paste and run each file in order.
 In Supabase Dashboard → Authentication → URL Configuration:
 
 ```
-Site URL: https://your-app.vercel.app
+Site URL: https://valtrexa-v2.vercel.app
 Redirect URLs:
-  https://your-app.vercel.app/api/auth/callback
-  https://your-app.vercel.app/auth/callback
+  https://valtrexa-v2.vercel.app/api/auth/callback
+  https://valtrexa-v2.vercel.app/auth/callback
   http://localhost:4173/api/auth/callback  (for local dev)
 ```
 
@@ -310,7 +312,7 @@ The workflow cycle endpoint runs the full automation pipeline (job import → ma
 ```
 Name: workflow-cycle
 Schedule: */30 * * * *
-URL: https://your-app.vercel.app/api/workflow/cycle
+URL: https://valtrexa-v2.vercel.app/api/workflow/cycle
 Method: POST
 ```
 
@@ -364,10 +366,10 @@ For production environments where you have a long-running server (e.g. Railway, 
 
 ```bash
 # Start all workers
-node workers/worker.ts
+npm run worker
 
 # Start specific queues only
-node workers/worker.ts job-import apply recruiter
+npm run worker -- job-import apply recruiter
 
 # Start with tsx for development
 npx tsx workers/worker.ts
@@ -397,7 +399,7 @@ The bot auto-registers its webhook on startup (via `api/_lib/telegram-init.ts`) 
 curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
   -H "Content-Type: application/json" \
   -d '{
-    "url": "https://your-app.vercel.app/api/telegram/webhook",
+    "url": "https://valtrexa-v2.vercel.app/api/telegram/webhook",
     "secret_token": "<TELEGRAM_WEBHOOK_SECRET>"
   }'
 ```
@@ -408,7 +410,7 @@ Verify:
 curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"
 ```
 
-Expected response includes `"url": "https://your-app.vercel.app/api/telegram/webhook"` and `"has_custom_certificate": false`.
+Expected response includes `"url": "https://valtrexa-v2.vercel.app/api/telegram/webhook"` and `"has_custom_certificate": false`.
 
 ### 5.3 Secret Token for Webhook Validation
 
@@ -466,13 +468,16 @@ Set `EDGE_PATH` to the absolute path of the Edge executable:
 | macOS   | `/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge` |
 | Linux   | `/usr/bin/microsoft-edge`                                        |
 
-### 7.3 EDGE_USER_DATA_DIR
+### 7.3 EDGE_USER_DATA_DIR / EDGE_PROFILE_DIRECTORY
 
 Directory for persistent Edge user profiles. This stores login sessions so cookies persist across runs.
 
 ```
 EDGE_USER_DATA_DIR="./edge-profile"
+EDGE_PROFILE_DIRECTORY="./edge-profile"
 ```
+
+`EDGE_PROFILE_DIRECTORY` is used by the Playwright platform to locate the persistent profile directory. If not set, defaults to `edge-profile` in the project root.
 
 ### 7.4 Headless Mode
 
@@ -528,7 +533,7 @@ Or follow the OAuth flow manually to obtain a refresh token.
 GMAIL_CLIENT_ID="your-client-id.apps.googleusercontent.com"
 GMAIL_CLIENT_SECRET="your-client-secret"
 GMAIL_REFRESH_TOKEN="your-refresh-token"
-GMAIL_REDIRECT_URI="https://your-app.vercel.app/api/auth/gmail/callback"
+GMAIL_REDIRECT_URI="https://valtrexa-v2.vercel.app/api/auth/gmail/callback"
 ```
 
 The redirect URI must match exactly what's configured in Google Cloud Console.
@@ -551,7 +556,7 @@ Configure in Vercel Dashboard → Settings → Cron Jobs:
 Cron Job 1:
   Name: workflow-cycle
   Schedule: */30 * * * *
-  URL: https://your-app.vercel.app/api/workflow/cycle
+  URL: https://valtrexa-v2.vercel.app/api/workflow/cycle
   Method: POST
 ```
 
@@ -562,7 +567,7 @@ Free alternative for hobby projects:
 1. Go to [cron-job.org](https://cron-job.org)
 2. Create account
 3. Create job:
-   - URL: `https://your-app.vercel.app/api/workflow/cycle`
+   - URL: `https://valtrexa-v2.vercel.app/api/workflow/cycle`
    - Method: `POST`
    - Interval: Every 30 minutes
    - Headers: (optional, for auth)
@@ -757,9 +762,9 @@ Server-side env vars like `SUPABASE_SERVICE_ROLE_KEY`, `SESSION_SECRET`, API key
 - [ ] **Import repository** to Vercel (Framework: Other)
 - [ ] **Set `NITRO_PRESET=vercel`** in Vercel environment variables
 - [ ] **Set all required env vars** (see Section 1.3) in Vercel Dashboard
-- [ ] **Deploy** — verify build succeeds and app loads at `https://your-app.vercel.app`
+- [ ] **Deploy** — verify build succeeds and app loads at `https://valtrexa-v2.vercel.app`
 - [ ] **Visit `/api/health`** — confirm `"status": "ok"`
-- [ ] **Update `PUBLIC_URL`** in Vercel env vars to `https://your-app.vercel.app`
+- [ ] **Update `PUBLIC_URL`** in Vercel env vars to `https://valtrexa-v2.vercel.app`
 - [ ] **Re-deploy** so Telegram webhook auto-registers
 
 ### Telegram Bot

@@ -126,7 +126,7 @@ For BullMQ background queues, set up Upstash Redis:
 2. Add env vars:
 
 ```env
-REDIS_URL=redis://:password@host:port
+REDIS_URL=rediss://default:password@host:port
 # or
 REDIS_TOKEN=xxxxxxxx
 ```
@@ -165,9 +165,9 @@ flowchart LR
 
 | Endpoint | Expected |
 |---|---|
-| `https://your-domain.vercel.app/` | 200 (dashboard) |
-| `https://your-domain.vercel.app/api/health` | 200 (health) |
-| `https://your-domain.vercel.app/api/telegram/webhook` | Accepts POST from Telegram |
+| `https://valtrexa-v2.vercel.app/` | 200 (dashboard) |
+| `https://valtrexa-v2.vercel.app/api/health` | 200 (health) |
+| `https://valtrexa-v2.vercel.app/api/telegram/webhook` | Accepts POST from Telegram |
 
 ### Verify
 

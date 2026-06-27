@@ -87,7 +87,6 @@
 | Table                       | Purpose                                                                        |
 | --------------------------- | ------------------------------------------------------------------------------ |
 | `workflow_events`           | Internal event bus for async workflows (event_type, payload, processed status) |
-| `n8n_webhook_subscriptions` | _(removed — n8n integration removed)_                                          |
 | `notification_queue`        | Queued notifications (categorized, scheduled, multi-channel)                   |
 | `inbox_messages`            | Inbound messages (email, LinkedIn, etc.)                                       |
 | `activity_logs`             | Audit trail of user actions                                                    |
@@ -156,7 +155,6 @@ Storage RLS policies on `storage.objects` restrict file access to the owning use
 | `idx_notification_queue_user_status` | `notification_queue`        | `(user_id, status, scheduled_for)`        |
 | `idx_inbox_messages_user_received`   | `inbox_messages`            | `(user_id, received_at DESC)`             |
 | `idx_workflow_events_user`           | `workflow_events`           | `user_id`                                 |
-| `idx_n8n_webhook_subscriptions_user` | `n8n_webhook_subscriptions` | `user_id` _(deprecated)_                  |
 | `idx_candidate_brain_user`           | `candidate_brain`           | `user_id`                                 |
 | `idx_phl_provider_event`             | `provider_health_log`       | `(provider, event_type, created_at DESC)` |
 

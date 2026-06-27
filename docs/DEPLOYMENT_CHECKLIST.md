@@ -11,7 +11,7 @@
 ### Environment Variables
 - [ ] Copy `.env.example` to Vercel environment
 - [ ] Set all **Required** variables
-- [ ] Verify `COOKIE_ENCRYPTION_KEY` is set (if not, SUPABASE_SERVICE_ROLE_KEY is used)
+- [ ] Verify `COOKIE_ENCRYPTION_KEY` is set (required for cookie encryption)
 - [ ] Verify `PUBLIC_URL` matches the Vercel deployment URL
 - [ ] Verify `FRONTEND_URL` matches the frontend domain
 - [ ] Set `TELEGRAM_WEBHOOK_SECRET` (random 32-char string)
@@ -39,19 +39,19 @@ SELECT conname FROM pg_constraint WHERE conrelid = 'applications'::regclass AND 
 ### Telegram
 - [ ] Deploy first, then register webhook:
 ```bash
-curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=https://your-domain.com/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>"
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=https://valtrexa-v2.vercel.app/api/telegram/webhook&secret_token=<TELEGRAM_WEBHOOK_SECRET>"
 ```
 - [ ] Verify webhook: `curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getWebhookInfo"`
 - [ ] Send `/start` to bot, verify response
 
 ### Google OAuth
-- [ ] Add `https://your-domain.com/api/auth/gmail/callback` to Google Cloud Console redirect URIs
+- [ ] Add `https://valtrexa-v2.vercel.app/api/auth/gmail/callback` to Google Cloud Console redirect URIs
 - [ ] Verify `GMAIL_REDIRECT_URI` is set correctly
 - [ ] Test OAuth flow end-to-end
 
 ### OpenRouter
 - [ ] Verify API key has sufficient credits
-- [ ] Test AI provider chain: `curl -X POST https://your-domain.com/api/health`
+- [ ] Test AI provider chain: `curl -X POST https://valtrexa-v2.vercel.app/api/health`
 
 ### Cron Job (Required for Automation)
 - [ ] Add Vercel Cron Job in `vercel.json`:
@@ -63,7 +63,7 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=ht
   }]
 }
 ```
-- [ ] OR configure external cron (cron-job.org, GitHub Actions) hitting `POST https://your-domain.com/api/workflow/cycle`
+- [ ] OR configure external cron (cron-job.org, GitHub Actions) hitting `POST https://valtrexa-v2.vercel.app/api/workflow/cycle`
 
 ### Redis (Optional)
 - [ ] Set up Upstash Redis (free tier sufficient)
@@ -73,7 +73,7 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=ht
 
 ### Health Check
 ```bash
-curl https://your-domain.com/api/health
+curl https://valtrexa-v2.vercel.app/api/health
 # Expected: {"status":"ok","checks":{"database":{"ok":true},"redis":{"ok":true}}}
 ```
 
@@ -95,7 +95,7 @@ curl https://your-domain.com/api/health
 
 ### Workflow Precheck
 ```bash
-curl -H "Authorization: Bearer <valid-jwt>" https://your-domain.com/api/precheck/workflow
+curl -H "Authorization: Bearer <valid-jwt>" https://valtrexa-v2.vercel.app/api/precheck/workflow
 # Expected: {"passed":true/false,"checks":[...]}
 ```
 

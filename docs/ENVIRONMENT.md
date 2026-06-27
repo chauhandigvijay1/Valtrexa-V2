@@ -8,7 +8,7 @@
 |---|---|---|
 | `SUPABASE_URL` | ✅ | Supabase project URL (e.g., `https://xxx.supabase.co`) |
 | `SUPABASE_ANON_KEY` | ✅ | Public anon key for client-side auth |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Service role key for admin/bot operations. Also used as fallback for `COOKIE_ENCRYPTION_KEY` |
+| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Service role key for admin/bot operations (server-only) |
 | `SUPABASE_JWT_SECRET` | ❌ | JWT secret for verifying auth tokens (admin operations) |
 
 ## Application
@@ -32,7 +32,7 @@
 
 | Variable | Required | Description |
 |---|---|---|
-| `COOKIE_ENCRYPTION_KEY` | ❌ | 64-character hex string (32 bytes) for AES-256-GCM. Falls back to `SUPABASE_SERVICE_ROLE_KEY` |
+| `COOKIE_ENCRYPTION_KEY` | ❌ | 64-character hex string (32 bytes) for AES-256-GCM. Must be set explicitly if cookie encryption is needed |
 
 ## AI / LLM
 
@@ -60,11 +60,13 @@
 | `MAX_APPLICATIONS_PER_CYCLE` | ❌ | Max applications per pipeline run (default: `10`) |
 | `APPROVAL_MODE` | ❌ | Require approval before applying (`true`/`false`, default: `true`) |
 
+To run the dedicated background worker (e.g. on Railway): `npm run worker`
+
 ## Redis / Queue
 
 | Variable | Required | Description |
 |---|---|---|
-| `REDIS_URL` | ❌ | Redis connection string (e.g., `redis://:password@host:port`). Required for BullMQ; inline fallback if not set |
+| `REDIS_URL` | ❌ | Redis connection string (e.g., `rediss://default:password@host:port`). Required for BullMQ; inline fallback if not set |
 | `REDIS_TOKEN` | ❌ | Upstash Redis token (alternative to `REDIS_URL`) |
 
 ## Monitoring
@@ -83,6 +85,13 @@
 | `INDEED_COOKIE` | ❌ | Indeed session cookie value (dev/test fallback) |
 | `NAUKRI_COOKIE` | ❌ | Naukri session cookie value (dev/test fallback) |
 | `WELLFOUND_COOKIE` | ❌ | Wellfound session cookie value (dev/test fallback) |
+
+## Browser Automation
+
+| Variable | Required | Description |
+|---|---|---|
+| `EDGE_PROFILE_DIRECTORY` | ❌ | Path to Edge profile directory for persistent browser contexts (default: `edge-profile`) |
+| `EDGE_PATH` | ❌ | Path to Microsoft Edge executable (auto-detected if not set) |
 
 ## Vercel (Auto-Provided)
 

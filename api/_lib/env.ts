@@ -19,3 +19,8 @@ export function getEdgePath(): string | undefined {
 export function getEdgeUserDataDir(): string | undefined {
   return process.env.EDGE_USER_DATA_DIR;
 }
+
+/** Edge profile directory name (set via EDGE_PROFILE_DIRECTORY), defaults to "Default". */
+export function getEdgeProfileDirectory(): string {
+  return process.env.EDGE_PROFILE_DIRECTORY || "Default";
+}

@@ -11,7 +11,8 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "test": "npx.cmd vitest run",
-    "test:watch": "npx.cmd vitest"
+    "test:watch": "npx.cmd vitest",
+    "worker": "npx.cmd tsx api/worker.ts"
   },
   "dependencies": {
     "@napi-rs/canvas": "^1.0.1",

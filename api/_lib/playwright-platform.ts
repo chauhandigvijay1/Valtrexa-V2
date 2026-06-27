@@ -3,6 +3,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { supabaseAdmin } from "./supabase.js";
 import { getCookie } from "./provider-cookies.js";
+import { getEdgeProfileDirectory } from "./env.js";
 
 export type BrowserProviderName = "linkedin" | "indeed" | "naukri" | "instahyre" | "wellfound";
 
@@ -292,7 +293,11 @@ export async function getBrowserForProvider(
       };
       const userDataDir = process.env.EDGE_USER_DATA_DIR;
       if (userDataDir) {
-        launchOptions.args = [`--user-data-dir=${userDataDir}`];
+        const profileDir = getEdgeProfileDirectory();
+        launchOptions.args = [
+          `--user-data-dir=${userDataDir}`,
+          `--profile-directory=${profileDir}`,
+        ];
       }
       const browser = await chromium.launch(launchOptions);
       return { browser, engine: "edge" };

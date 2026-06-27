@@ -187,7 +187,7 @@ Your AI Career Operating System is now connected.
 3. Configure provider cookies
 4. Press /workflow_start to begin automation
 
-Need help? Visit the web dashboard at <a href="${process.env.PUBLIC_URL ?? "https://valtrexa-v2.vercel.app"}">VALTREXA-V2</a>`;
+Need help? Visit the web dashboard${process.env.PUBLIC_URL ? ` at <a href="${process.env.PUBLIC_URL}">VALTREXA-V2</a>` : "."}`;
 
   await sendTelegramKeyboard(chatId, welcomeText, [
     [

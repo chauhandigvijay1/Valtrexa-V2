@@ -29,7 +29,7 @@ VALTREXA-V2 automates the end-to-end software engineering job search — from re
 
 ## Architecture
 
-The system is a **server-rendered React frontend** (TanStack Start + Vite) with a **Nitro-powered API layer** (file-based routing in `api/[...route].ts`), **Supabase PostgreSQL** for persistence (25+ migrations, RLS on every table), **BullMQ/Redis** for optional background job queues with inline fallback, and **Telegram** for notifications and interactive operations. Browser automation uses **Playwright** with persistent cookie-based sessions stored encrypted (AES-256-GCM) in the `provider_cookies` table. A **workflow runner** orchestrates Pipeline A (auto-apply for matched jobs) and Pipeline B (high-value company research, recruiter discovery, outreach approval) through a persistent state machine.
+The system is a **server-rendered React frontend** (TanStack Start + Vite) with a **Nitro-powered API layer** (file-based routing in `api/[...route].ts`), **Supabase PostgreSQL** for persistence (27 migrations, RLS on every table), **BullMQ/Redis** for optional background job queues with inline fallback, and **Telegram** for notifications and interactive operations. Browser automation uses **Playwright** with persistent cookie-based sessions stored encrypted (AES-256-GCM) in the `provider_cookies` table. A **workflow runner** orchestrates Pipeline A (auto-apply for matched jobs) and Pipeline B (high-value company research, recruiter discovery, outreach approval) through a persistent state machine.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full architecture.
 

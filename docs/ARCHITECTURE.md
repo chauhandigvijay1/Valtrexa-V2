@@ -40,7 +40,7 @@ flowchart TB
     end
 
     subgraph Storage["Persistence"]
-        PG[(Supabase PostgreSQL\n25+ tables, RLS)]
+        PG[(Supabase PostgreSQL\n27+ tables, RLS)]
         R[(Redis / BullMQ\nOptional background queues)]
     end
 
@@ -125,7 +125,7 @@ flowchart LR
 ## Cookie Architecture
 
 - **Storage:** `provider_cookies` table with columns `id, user_id, provider, cookie_name, cookie_value, domain, expires_at, is_active, last_validated_at`
-- **Encryption:** AES-256-GCM via `crypto-utils.ts`; key derived from `COOKIE_ENCRYPTION_KEY` env var (falls back to `SUPABASE_SERVICE_ROLE_KEY`)
+- **Encryption:** AES-256-GCM via `crypto-utils.ts`; key derived from `COOKIE_ENCRYPTION_KEY` env var
 - **Validation:** `validateCookie()` hits the real provider endpoint (e.g. `https://linkedin.com/feed`) to verify the session is alive
 - **Multi-User:** Every cookie row is scoped to a `user_id`; all API routes use `requireApiUser()` middleware
 - **Env Fallback:** Individual providers can fall back to hardcoded cookies from env vars (e.g. `LINKEDIN_COOKIE`)
@@ -221,7 +221,7 @@ api/                          # Nitro API layer
   [...route].ts               # Catch-all API handler
 
 supabase/
-  migrations/                 # SQL migration snapshots (25+)
+  migrations/                 # SQL migration snapshots (27)
   current_schema.sql          # Full current schema dump
 
 workers/                      # Background workers (BullMQ)

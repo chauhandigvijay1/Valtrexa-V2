@@ -33,11 +33,6 @@ Edit `.env` with your credentials:
 | `SESSION_SECRET`            | Generate: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`        |
 | `TELEGRAM_BOT_TOKEN`        | BotFather → `/newbot` → copy token                                                          |
 | `TELEGRAM_CHAT_ID`          | Send a message to your bot → `https://api.telegram.org/bot$TOKEN/getUpdates` → copy chat.id |
-| `LINKEDIN_COOKIE`           | Extract from Edge session via `scripts/refresh-cookies.ts`                                  |
-| `INDEED_COOKIE`             | Same as above                                                                               |
-| `NAUKRI_COOKIE`             | Same as above                                                                               |
-| `WELLFOUND_COOKIE`          | Same as above                                                                               |
-| `INSTAHYRE_COOKIE`          | Same as above                                                                               |
 | `GMAIL_CLIENT_ID`           | Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client ID                  |
 | `GMAIL_CLIENT_SECRET`       | Same as above                                                                               |
 | `GMAIL_REFRESH_TOKEN`       | Run Google OAuth playground with your client ID/secret                                      |
@@ -71,7 +66,7 @@ App runs at http://localhost:4173
 ## Step 7: Register Telegram Webhook
 
 ```bash
-curl -F "url=http://localhost:4173/api/telegram" \
+curl -F "url=http://localhost:4173/api/telegram/webhook" \
   https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook
 ```
 
@@ -86,7 +81,7 @@ All 5 providers should show as enabled.
 node node_modules\tsx\dist\cli.mjs scripts/refresh-cookies.ts
 ```
 
-This extracts cookies from Edge Profile 3 and updates your `.env`.
+This extracts cookies from Edge Profile 3. Cookies are managed through the Settings UI — do not edit .env directly for cookies.
 
 ## Troubleshooting
 
