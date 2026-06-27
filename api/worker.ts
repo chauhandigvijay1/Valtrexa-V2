@@ -6,7 +6,7 @@
  * - On Railway: execute work (Playwright, browser automation, all background jobs).
  * - Single queue, single execution path, no duplicated logic.
  *
- * Start: npx tsx api/worker.ts
+ * Start: tsx api/worker.ts
  */
 
 import { Worker } from "bullmq";
@@ -26,6 +26,7 @@ async function createRedisConnection(): Promise<IORedis> {
   const conn = new IORedis(REDIS_URL, {
     maxRetriesPerRequest: null,
     enableReadyCheck: true,
+    lazyConnect: true,
     connectTimeout: 5000,
     retryStrategy: (times) => Math.min(times * 100, 5000),
   });
