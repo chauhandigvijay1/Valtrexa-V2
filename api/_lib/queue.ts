@@ -98,24 +98,29 @@ export async function enqueue<T = unknown>(
       attempts: options?.attempts ?? 3,
       backoff: { type: "exponential", delay: 2000 },
     });
-    await updateQueueJobStatus(auditId, "queued", { jobId: job.id ?? undefined });
+    await updateQueueJobStatus(auditId, "queued", { jobId: job.id ?? undefined }, options?.userId);
     return { mode: "redis", jobId: job.id ?? null };
   }
 
   // Redis unavailable — run inline if a handler was supplied, else DB-only.
   if (options?.runInline) {
-    await updateQueueJobStatus(auditId, "active", {});
+    await updateQueueJobStatus(auditId, "active", {}, options?.userId);
     try {
       const result = await options.runInline(data);
-      await updateQueueJobStatus(auditId, "completed", { result });
+      await updateQueueJobStatus(auditId, "completed", { result }, options?.userId);
       return { mode: "inline", jobId: auditId, result };
     } catch (err: any) {
-      await updateQueueJobStatus(auditId, "failed", { error: err?.message ?? String(err) });
+      await updateQueueJobStatus(
+        auditId,
+        "failed",
+        { error: err?.message ?? String(err) },
+        options?.userId,
+      );
       throw err;
     }
   }
 
-  await updateQueueJobStatus(auditId, "queued", {});
+  await updateQueueJobStatus(auditId, "queued", {}, options?.userId);
   return { mode: "db-only", jobId: auditId };
 }
 
@@ -143,15 +148,18 @@ export async function updateQueueJobStatus(
   auditId: string,
   status: string,
   patch: { jobId?: string; result?: unknown; error?: string },
+  userId?: string,
 ) {
   const payload: Record<string, unknown> = { status };
   if (patch.jobId) payload.job_id = patch.jobId;
   if (patch.result !== undefined) payload.result = patch.result as any;
   if (patch.error) payload.error_message = patch.error;
-  await supabaseAdmin
+  let query = supabaseAdmin
     .from("queue_jobs")
     .update(payload as any)
     .eq("id", auditId);
+  if (userId) query = query.eq("user_id", userId);
+  await query;
 }
 
 /** Human-readable queue stats (counts by status) — for the UI dashboard. */

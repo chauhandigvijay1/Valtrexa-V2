@@ -41,7 +41,7 @@ npm run lint            # Run ESLint on all files
 npm run format          # Auto-format with Prettier
 npm run test            # Run unit tests (vitest)
 npm run test:watch      # Run tests in watch mode
-npm run verify:pre-n8n  # Pre-deployment n8n verification
+
 ```
 
 ---
@@ -59,37 +59,37 @@ The project uses **TanStack Start** with a file-based API route structure:
 
 All shared backend logic lives in `api/_lib/`:
 
-| Module | Purpose |
-|---|---|
-| `auth.ts` | Authentication middleware (`requireApiUser`) |
-| `supabase.ts` | Supabase admin client singleton |
-| `http.ts` | Response helpers (`json`, `methodNotAllowed`, `readJson`) |
-| `providers.ts` | Provider registry and type definitions |
-| `provider-controls.ts` | Provider enable/disable/pause lifecycle |
-| `match-engine.ts` | Resume-to-job matching algorithm |
-| `high-value-engine.ts` | Strategic value scoring |
-| `recruiter-discovery.ts` | Recruiter contact discovery |
-| `apply-engine.ts` | Application submission pipeline |
-| `batch-apply-engine.ts` | Batch application orchestration |
-| `outreach-engine.ts` | Outreach message generation |
-| `followup-engine.ts` | Follow-up scheduling and generation |
-| `inbox-intelligence.ts` | Gmail inbox sync and classification |
-| `playwright-platform.ts` | Browser profile and session management |
-| `playwright-apply.ts` | Playwright-based automated apply |
-| `queue.ts` | BullMQ job queue management |
-| `event-bus.ts` | Webhook/event delivery system |
-| `rate-limiter.ts` | In-memory rate limiting |
-| `telegram.ts` | Telegram bot operations |
-| `telegram-init.ts` | Telegram webhook and command registration |
-| `job-sources.ts` | Individual job source importers |
-| `job-resolver.ts` | Job source resolution |
-| `ai-provider.ts` | Multi-provider AI client abstraction |
-| `openrouter.ts` | OpenRouter API client |
-| `env.ts` | Environment variable loading |
-| `auto-migrate.ts` | Database schema migrations |
-| `compat.ts` | Backward compatibility layer |
-| `sentry.ts` | Sentry error reporting initialization |
-| `self-healing.ts` | Automated provider recovery |
+| Module                   | Purpose                                                   |
+| ------------------------ | --------------------------------------------------------- |
+| `auth.ts`                | Authentication middleware (`requireApiUser`)              |
+| `supabase.ts`            | Supabase admin client singleton                           |
+| `http.ts`                | Response helpers (`json`, `methodNotAllowed`, `readJson`) |
+| `providers.ts`           | Provider registry and type definitions                    |
+| `provider-controls.ts`   | Provider enable/disable/pause lifecycle                   |
+| `match-engine.ts`        | Resume-to-job matching algorithm                          |
+| `high-value-engine.ts`   | Strategic value scoring                                   |
+| `recruiter-discovery.ts` | Recruiter contact discovery                               |
+| `apply-engine.ts`        | Application submission pipeline                           |
+| `batch-apply-engine.ts`  | Batch application orchestration                           |
+| `outreach-engine.ts`     | Outreach message generation                               |
+| `followup-engine.ts`     | Follow-up scheduling and generation                       |
+| `inbox-intelligence.ts`  | Gmail inbox sync and classification                       |
+| `playwright-platform.ts` | Browser profile and session management                    |
+| `playwright-apply.ts`    | Playwright-based automated apply                          |
+| `queue.ts`               | BullMQ job queue management                               |
+| `event-bus.ts`           | Webhook/event delivery system                             |
+| `rate-limiter.ts`        | In-memory rate limiting                                   |
+| `telegram.ts`            | Telegram bot operations                                   |
+| `telegram-init.ts`       | Telegram webhook and command registration                 |
+| `job-sources.ts`         | Individual job source importers                           |
+| `job-resolver.ts`        | Job source resolution                                     |
+| `ai-provider.ts`         | Multi-provider AI client abstraction                      |
+| `openrouter.ts`          | OpenRouter API client                                     |
+| `env.ts`                 | Environment variable loading                              |
+| `auto-migrate.ts`        | Database schema migrations                                |
+| `compat.ts`              | Backward compatibility layer                              |
+| `sentry.ts`              | Sentry error reporting initialization                     |
+| `self-healing.ts`        | Automated provider recovery                               |
 
 ### Phase A / B Handler Pattern
 

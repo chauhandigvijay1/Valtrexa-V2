@@ -39,15 +39,7 @@ export async function applyInline(payload: ApplyPayload) {
 export async function playwrightApplyInline(payload: PlaywrightApplyPayload) {
   const [resume, brain] = await Promise.all([
     import("../apply-engine.js").then((m) => m.resolvePrimaryResume(payload.userId)),
-    Promise.resolve(null).then(() =>
-      import("../supabase.js").then(({ supabaseAdmin }) =>
-        supabaseAdmin
-          .from("candidate_profiles")
-          .select("*")
-          .eq("user_id", payload.userId)
-          .maybeSingle(),
-      ),
-    ),
+    import("../candidate-brain.js").then((m) => m.getCandidateBrain(payload.userId)),
   ]);
 
   const pwResult = await applyWithPlaywright({
@@ -56,7 +48,7 @@ export async function playwrightApplyInline(payload: PlaywrightApplyPayload) {
     jobId: payload.jobId,
     jobUrl: payload.jobUrl,
     provider: payload.provider as any,
-    candidateData: { ...((brain?.data || {}) as any), resumeUrl: resume?.resumeId },
+    candidateData: { ...(brain ?? { profile: {}, baseProfile: {} }), resumeUrl: resume?.resumeId },
     headless: process.env.PLAYWRIGHT_HEADLESS !== "false",
     approvalMode: payload.approvalMode ?? false,
   });

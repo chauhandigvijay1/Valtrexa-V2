@@ -1,14 +1,8 @@
-/**
- * Shared job-source resolver.
- *
- * Extracted from `api/[...route].ts` so both the synchronous import path and
- * the Phase A/B providers-import handler use the same credential-hydration
- * logic. No duplicate code.
- */
-
 import { getProvider } from "./providers.js";
 import type { ImportedJob } from "./job-sources.js";
 import { supabaseAdmin } from "./supabase.js";
+import { isProviderEnabled } from "./provider-controls.js";
+import { getCookie } from "./provider-cookies.js";
 
 export type SourceRequest =
   | { source: "greenhouse"; boardToken: string }
@@ -21,7 +15,6 @@ export type SourceRequest =
       headers?: Record<string, string>;
     };
 
-/** Build a provider config object from a raw request + saved integration row. */
 export async function hydrateSource(
   userId: string,
   source: Record<string, any>,
@@ -49,16 +42,20 @@ export async function hydrateSource(
         subdomain: source.subdomain || config.subdomain || "",
         apiKey: source.apiKey || config.api_key || undefined,
       };
-    default:
+    default: {
+      let cookie = "";
+      const fromDB = await getCookie(userId, source.source);
+      if (fromDB) cookie = fromDB.cookie;
+      if (!cookie) cookie = config.session_cookie || config.cookie || "";
       return {
         source: source.source,
         searchUrl: source.searchUrl || config.search_url || "",
         headers: {
           ...(source.headers ?? {}),
-          ...(config.session_cookie ? { cookie: config.session_cookie } : {}),
-          ...(config.cookie ? { cookie: config.cookie } : {}),
+          ...(cookie ? { cookie } : {}),
         },
       };
+    }
   }
 }
 
@@ -66,6 +63,14 @@ export async function resolveSourceJobs(
   userId: string,
   source: Record<string, any>,
 ): Promise<ImportedJob[]> {
+  const providerName = String(source.source ?? "").toLowerCase();
+  const scrapedProviders = ["linkedin", "indeed", "naukri", "wellfound", "instahyre"];
+  if (scrapedProviders.includes(providerName)) {
+    const enabled = await isProviderEnabled(providerName as any, userId);
+    if (!enabled) {
+      return [];
+    }
+  }
   const hydrated = await hydrateSource(userId, source);
   const provider = getProvider(hydrated.source);
   const config: Record<string, any> =

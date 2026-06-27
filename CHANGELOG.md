@@ -25,7 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Browser Profile Management** — Playwright-based authenticated session management with storage state capture, listing, and deletion per provider.
 - **Provider Control System** — Enable, disable, and pause provider integrations with automatic failure detection and self-disabling after 3 consecutive failures. Health event logging.
 - **Telegram Bot** — Real-time notifications and provider management via Telegram. Commands for provider status, enable/disable/pause, interview tracking, and stats.
-- **Event Bus & Webhooks** — Workflow event system with n8n-compatible webhook subscriptions. HMAC-signed webhook deliveries (`x-valtrexa-v2-secret` header).
+- **Event Bus & Telegram** — Workflow event system with Telegram notifications.
 - **Job Queue System** — BullMQ-based background job processing for imports, applications, recruiter discovery, outreach, follow-ups, Gmail sync, and analytics.
 - **Analytics Dashboard** — Summary and daily analytics with key metrics, trends, and activity tracking.
 - **Company CRM** — Target company tracking with quality scoring, strategic value assessment, and founder detection.

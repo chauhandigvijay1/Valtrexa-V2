@@ -1,8 +1,4 @@
-import {
-  discoverContactsViaAI,
-  fallbackContacts,
-  type DiscoveredContact,
-} from "../recruiter-discovery.js";
+import { discoverContactsViaAI, type DiscoveredContact } from "../recruiter-discovery.js";
 import { supabaseAdmin } from "../supabase.js";
 
 export type RecruiterPayload = {
@@ -36,10 +32,9 @@ export async function discoverRecruitersInline(
       roleTitle: payload.roleTitle ?? "Software Engineer",
       context: { research: researchRow.data, existingContacts: existingRow.data ?? [] },
     });
-    if (!contacts.length)
-      contacts = fallbackContacts(payload.companyName, payload.roleTitle ?? "Software Engineer");
+    if (!contacts.length) contacts = [];
   } catch {
-    contacts = fallbackContacts(payload.companyName, payload.roleTitle ?? "Software Engineer");
+    contacts = [];
   }
 
   const inserted: any[] = [];

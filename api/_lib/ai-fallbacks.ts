@@ -309,46 +309,7 @@ export function fallbackCompanyResearch(input: CompanyResearchFallbackInput) {
   };
 }
 
-export function fallbackPainPoints(
-  companyName: string,
-  research: Record<string, unknown> | null,
-  jobs: PainPointSeed[],
-) {
-  const jobText = jobs
-    .map((job) => [job.title, job.description].filter(Boolean).join(" "))
-    .join(" ");
-  const keywords = extractKeywords(jobText || JSON.stringify(research ?? {}), 8);
-  const topKeyword = keywords[0] ?? "delivery";
-  const secondKeyword = keywords[1] ?? "hiring";
-  const sourceLabel = jobs[0]?.source ?? "company evidence";
-
-  return {
-    painPoints: [
-      {
-        title: `${sentenceCase(topKeyword)} capacity is being hired in multiple places`,
-        category: "execution",
-        description: `${companyName} appears to be hiring around ${topKeyword}, which usually signals delivery pressure or roadmap expansion.`,
-        evidence: jobs[0]?.title
-          ? `Observed in active job posting: ${jobs[0].title}.`
-          : `Derived from the available company research and job evidence for ${companyName}.`,
-        severity: 4,
-        suggestedSolution: `Lead with concrete examples that reduce time-to-value for ${topKeyword} initiatives.`,
-        signalSource: sourceLabel,
-      },
-      {
-        title: `Hiring signal suggests a ${sentenceCase(secondKeyword)} coordination gap`,
-        category: "process",
-        description: `${companyName} is signalling sustained demand in adjacent areas, which usually means onboarding, prioritization, or knowledge-sharing pressure.`,
-        evidence: keywords.length
-          ? `Repeated fallback evidence terms included ${keywords.slice(0, 4).join(", ")}.`
-          : `The company evidence set was small, so this point is intentionally conservative.`,
-        severity: 3,
-        suggestedSolution: `Frame outreach around faster execution, clearer delivery loops, and lower coordination overhead.`,
-        signalSource: sourceLabel,
-      },
-    ],
-  };
-}
+// fallbackPainPoints removed — violates "never create fake data" constraint
 
 function candidateName(resume: ResumeStructuredData | Record<string, any>) {
   const name = "name" in resume ? resume.name : resume.full_name;

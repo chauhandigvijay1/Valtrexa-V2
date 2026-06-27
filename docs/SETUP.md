@@ -9,7 +9,6 @@ Local development setup for VALTREXA-V2.
 - A Supabase project (free tier works)
 - A Telegram bot token (from BotFather)
 - Microsoft Edge (for cookie extraction)
-- n8n (optional, for workflow automation)
 
 ## Step 1: Clone & Install
 
@@ -27,22 +26,22 @@ cp .env.example .env
 
 Edit `.env` with your credentials:
 
-| Variable | How to Get |
-|----------|-----------|
-| `SUPABASE_URL` | Supabase dashboard → Settings → API → Project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | Supabase dashboard → Settings → API → service_role key |
-| `SESSION_SECRET` | Generate: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` |
-| `TELEGRAM_BOT_TOKEN` | BotFather → `/newbot` → copy token |
-| `TELEGRAM_CHAT_ID` | Send a message to your bot → `https://api.telegram.org/bot$TOKEN/getUpdates` → copy chat.id |
-| `LINKEDIN_COOKIE` | Extract from Edge session via `scripts/refresh-cookies.ts` |
-| `INDEED_COOKIE` | Same as above |
-| `NAUKRI_COOKIE` | Same as above |
-| `WELLFOUND_COOKIE` | Same as above |
-| `INSTAHYRE_COOKIE` | Same as above |
-| `GMAIL_CLIENT_ID` | Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client ID |
-| `GMAIL_CLIENT_SECRET` | Same as above |
-| `GMAIL_REFRESH_TOKEN` | Run Google OAuth playground with your client ID/secret |
-| `GMAIL_REDIRECT_URI` | `http://localhost:4173/api/auth/gmail/callback` (dev) |
+| Variable                    | How to Get                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------- |
+| `SUPABASE_URL`              | Supabase dashboard → Settings → API → Project URL                                           |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase dashboard → Settings → API → service_role key                                      |
+| `SESSION_SECRET`            | Generate: `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`        |
+| `TELEGRAM_BOT_TOKEN`        | BotFather → `/newbot` → copy token                                                          |
+| `TELEGRAM_CHAT_ID`          | Send a message to your bot → `https://api.telegram.org/bot$TOKEN/getUpdates` → copy chat.id |
+| `LINKEDIN_COOKIE`           | Extract from Edge session via `scripts/refresh-cookies.ts`                                  |
+| `INDEED_COOKIE`             | Same as above                                                                               |
+| `NAUKRI_COOKIE`             | Same as above                                                                               |
+| `WELLFOUND_COOKIE`          | Same as above                                                                               |
+| `INSTAHYRE_COOKIE`          | Same as above                                                                               |
+| `GMAIL_CLIENT_ID`           | Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client ID                  |
+| `GMAIL_CLIENT_SECRET`       | Same as above                                                                               |
+| `GMAIL_REFRESH_TOKEN`       | Run Google OAuth playground with your client ID/secret                                      |
+| `GMAIL_REDIRECT_URI`        | `http://localhost:4173/api/auth/gmail/callback` (dev)                                       |
 
 ## Step 3: Start Redis
 
@@ -59,15 +58,7 @@ npx.cmd supabase link --project-ref <your-project-ref>
 npx.cmd supabase migration up --linked
 ```
 
-Verify 19 migrations applied.
-
-## Step 5: Start n8n (optional)
-
-```bash
-docker run -d -p 5678:5678 -e N8N_SECURE_COOKIE=false n8nio/n8n
-```
-
-Import the master workflow from `n8n-workflows/exported-master-workflow.json`.
+Verify 27 migrations applied.
 
 ## Step 6: Start Dev Server
 
@@ -100,21 +91,26 @@ This extracts cookies from Edge Profile 3 and updates your `.env`.
 ## Troubleshooting
 
 ### Build fails
+
 - Ensure Node.js 22+ is installed
 - Delete `node_modules` and re-run `npm.cmd install`
 
 ### Database connection fails
+
 - Verify `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are correct
 - Run `npx.cmd supabase migration up --linked`
 
 ### Telegram bot not responding
+
 - Verify webhook is set: `curl https://api.telegram.org/bot$TOKEN/getWebhookInfo`
 - Verify `TELEGRAM_BOT_TOKEN` is correct
 
 ### Playwright browser not found
+
 - Run `npx.cmd playwright install chromium`
 - Or: `npx.cmd playwright install --with-deps`
 
 ### Redis not available
+
 - Queues fall back to inline execution automatically
 - Start Redis via Docker to enable queues

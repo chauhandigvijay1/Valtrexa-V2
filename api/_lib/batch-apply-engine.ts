@@ -117,7 +117,7 @@ export async function resolveEligibleJobs(
   // Filter to only enabled providers
   const activeSources: string[] = [];
   for (const s of enabledSources) {
-    if (await isProviderEnabled(s as any)) activeSources.push(s);
+    if (await isProviderEnabled(s as any, userId)) activeSources.push(s);
   }
 
   let query = supabaseAdmin
@@ -197,7 +197,8 @@ export async function runBatchApply(input: {
       const { data: createdItems } = await supabaseAdmin
         .from("batch_apply_items")
         .select("id")
-        .eq("batch_id", batchId);
+        .eq("batch_id", batchId)
+        .eq("user_id", input.userId);
       const itemsForNotification = (createdItems ?? []).map((ci: any, i: number) => ({
         id: ci.id,
         jobTitle: eligible[i]?.title ?? "Unknown",
@@ -254,7 +255,8 @@ export async function executeBatch(
   await supabaseAdmin
     .from("batch_apply_runs")
     .update({ status: "running", started_at: new Date().toISOString() })
-    .eq("id", batchId);
+    .eq("id", batchId)
+    .eq("user_id", userId);
 
   for (const job of eligible) {
     try {
@@ -331,7 +333,8 @@ export async function executeBatch(
       failed_count: failed,
       finished_at: new Date().toISOString(),
     })
-    .eq("id", batchId);
+    .eq("id", batchId)
+    .eq("user_id", userId);
 
   await emitWorkflowEvent({
     userId,

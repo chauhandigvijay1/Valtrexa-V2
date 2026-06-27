@@ -5,7 +5,6 @@ import {
   fallbackJobMatch,
   fallbackLoomScript,
   fallbackOutreach,
-  fallbackPainPoints,
   fallbackResumeAnalysis,
   fallbackTailoredResume,
 } from "./_lib/ai-fallbacks.js";
@@ -14,13 +13,18 @@ import {
   insertDailySummaryCompat,
   insertResumeParseCompat,
   insertResumeVersionCompat,
-  insertWebhookSubscriptionCompat,
   isMissingSchemaError,
-  listWebhookSubscriptionsCompat,
   listWorkflowEventsCompat,
   normalizeResumeVersion,
 } from "./_lib/compat.js";
-import { json, methodNotAllowed, readJson } from "./_lib/http.js";
+import {
+  json,
+  methodNotAllowed,
+  readJson,
+  handleCorsPreflight,
+  addCorsHeaders,
+  safeErrorMessage,
+} from "./_lib/http.js";
 import {
   importAshby,
   importGreenhouse,
@@ -36,6 +40,7 @@ import {
   type ResumeStructuredData,
 } from "./_lib/resume-parser.js";
 import { dedupeRoles, expandRoleVariants } from "./_lib/role-taxonomy.js";
+import { syncResumeToBrain } from "./_lib/candidate-brain.js";
 import { supabaseAdmin } from "./_lib/supabase.js";
 import { emitWorkflowEvent } from "./_lib/workflow-events.js";
 import { processTelegramUpdate } from "./_lib/telegram.js";
@@ -44,40 +49,16 @@ import { checkRateLimit, rateLimitKey } from "./_lib/rate-limiter.js";
 import { initSentry } from "./_lib/sentry.js";
 import { initTelegramBot } from "./_lib/telegram-init.js";
 import { runAutoMigration } from "./_lib/auto-migrate.js";
-
-const SKILL_CATEGORY_LOOKUP: Record<string, string> = {
-  typescript: "Languages",
-  javascript: "Languages",
-  python: "Languages",
-  java: "Languages",
-  go: "Languages",
-  "c++": "Languages",
-  react: "Frameworks",
-  "next.js": "Frameworks",
-  "node.js": "Frameworks",
-  express: "Frameworks",
-  nestjs: "Frameworks",
-  postgres: "Databases",
-  postgresql: "Databases",
-  mysql: "Databases",
-  mongodb: "Databases",
-  supabase: "Databases",
-  redis: "Databases",
-  aws: "Cloud",
-  azure: "Cloud",
-  gcp: "Cloud",
-  docker: "DevOps",
-  kubernetes: "DevOps",
-  terraform: "DevOps",
-  linux: "DevOps",
-  git: "Tools",
-  postman: "Tools",
-  figma: "Tools",
-  playwright: "Tools",
-  vite: "Tools",
-  "tailwind css": "Libraries",
-  graphql: "Libraries",
-};
+import {
+  checkProviderCookie,
+  refreshProviderCookie,
+  checkAllCookies,
+  deleteProviderCookie,
+  validateCookieValue,
+  checkProviderCookieSync,
+  getAllCookieStatuses,
+  getLoginGuide,
+} from "./_lib/cookie-manager.js";
 
 function normalizeResumeWhitespace(value: string | null | undefined) {
   return value?.replace(/\s+/g, " ").trim() ?? "";
@@ -89,256 +70,6 @@ function chooseText(...values: Array<string | null | undefined>) {
     if (normalized) return normalized;
   }
   return null;
-}
-
-function uniqueResumeStrings(values: Array<string | null | undefined>) {
-  const seen = new Set<string>();
-  const result: string[] = [];
-  for (const value of values) {
-    const normalized = normalizeResumeWhitespace(value);
-    if (!normalized) continue;
-    const key = normalized.toLowerCase();
-    if (seen.has(key)) continue;
-    seen.add(key);
-    result.push(normalized);
-  }
-  return result;
-}
-
-function deriveYearsExperience(parsed: ResumeStructuredData, existingYears?: number | null) {
-  if (!parsed.experience.length) return existingYears ?? null;
-  return Math.max(existingYears ?? 0, parsed.experience.length);
-}
-
-function inferRemotePreference(parsed: ResumeStructuredData, existingPreference?: string | null) {
-  const locationText = parsed.preferred_locations.join(" ").toLowerCase();
-  if (locationText.includes("remote")) return "remote";
-  if (locationText.includes("hybrid")) return "hybrid";
-  if (locationText.includes("onsite") || locationText.includes("on-site")) return "onsite";
-  return existingPreference ?? "hybrid";
-}
-
-function categorizeSkill(name: string) {
-  return SKILL_CATEGORY_LOOKUP[name.toLowerCase()] ?? "Tools";
-}
-
-function inferSkillLevel(name: string, parsed: ResumeStructuredData, rawText = "") {
-  const normalized = name.toLowerCase();
-  const hits =
-    parsed.projects.filter((project) =>
-      (project.tech_stack ?? []).some((item) => item.toLowerCase() === normalized),
-    ).length +
-    parsed.experience.filter((experience) =>
-      `${experience.title ?? ""} ${experience.description ?? ""} ${experience.summary ?? ""}`
-        .toLowerCase()
-        .includes(normalized),
-    ).length +
-    (rawText.toLowerCase().match(new RegExp(normalized.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "g"))
-      ?.length ?? 0);
-
-  if (hits >= 6) return "expert";
-  if (hits >= 4) return "advanced";
-  if (hits >= 2) return "intermediate";
-  return "beginner";
-}
-
-function buildSkillRows(parsed: ResumeStructuredData, rawText = "") {
-  const collected = uniqueResumeStrings([
-    ...parsed.skills,
-    ...parsed.projects.flatMap((project) => project.tech_stack ?? []),
-  ]);
-
-  return collected.map((name) => ({
-    name,
-    category: categorizeSkill(name),
-    level: inferSkillLevel(name, parsed, rawText),
-  }));
-}
-
-function buildProjectRows(
-  parsed: ResumeStructuredData,
-  existingProjects: Array<Record<string, any>>,
-) {
-  const existingByName = new Map(
-    existingProjects
-      .filter((project) => typeof project.name === "string")
-      .map((project) => [String(project.name).toLowerCase(), project]),
-  );
-
-  return parsed.projects
-    .map((project) => {
-      const fallback = project.name ? existingByName.get(project.name.toLowerCase()) : null;
-      const features = uniqueResumeStrings([
-        ...(project.features ?? []),
-        ...(fallback?.features ?? []),
-      ]);
-      return {
-        name: chooseText(project.name, fallback?.name, "Project"),
-        description: chooseText(project.description, project.summary, fallback?.description),
-        github_url: chooseText(project.github_url, fallback?.github_url),
-        live_url: chooseText(project.live_url, fallback?.live_url),
-        tech_stack: uniqueResumeStrings([
-          ...(project.tech_stack ?? []),
-          ...(fallback?.tech_stack ?? []),
-        ]),
-        features,
-        impact: chooseText(features.join("; "), fallback?.impact),
-      };
-    })
-    .filter((project) => !!project.name);
-}
-
-async function replaceUserRows(table: string, userId: string, rows: Record<string, unknown>[]) {
-  if (!rows.length) return;
-  await supabaseAdmin.from(table).delete().eq("user_id", userId);
-  for (const row of rows) {
-    const payload = { ...row, user_id: userId } as any;
-    const insert = await supabaseAdmin.from(table).insert(payload);
-    if (insert.error && isMissingSchemaError(insert.error) && "features" in payload) {
-      const { features: _features, ...fallbackPayload } = payload;
-      await supabaseAdmin.from(table).insert(fallbackPayload as any);
-    }
-  }
-}
-
-async function syncCandidateBrain(userId: string, parsed: ResumeStructuredData, rawText?: string) {
-  const [existingProfile, existingBaseProfile, existingProjects] = await Promise.all([
-    supabaseAdmin.from("candidate_profiles").select("*").eq("user_id", userId).maybeSingle(),
-    supabaseAdmin.from("profiles").select("*").eq("id", userId).maybeSingle(),
-    supabaseAdmin.from("projects").select("*").eq("user_id", userId),
-  ]);
-
-  const mergedRoles = dedupeRoles([
-    ...(parsed.preferred_roles ?? []),
-    ...((existingProfile.data?.preferred_roles as string[] | null) ?? []),
-  ]);
-  const expandedRoles = dedupeRoles(mergedRoles.flatMap((role) => expandRoleVariants(role)));
-
-  const profilePayload = {
-    user_id: userId,
-    current_title: chooseText(parsed.experience[0]?.title, existingProfile.data?.current_title),
-    current_company: chooseText(
-      parsed.experience[0]?.company,
-      existingProfile.data?.current_company,
-    ),
-    years_experience: deriveYearsExperience(parsed, existingProfile.data?.years_experience),
-    github_url: chooseText(parsed.github_url, existingProfile.data?.github_url),
-    linkedin_url: chooseText(parsed.linkedin_url, existingProfile.data?.linkedin_url),
-    portfolio_url: chooseText(parsed.portfolio_url, existingProfile.data?.portfolio_url),
-    career_goal: chooseText(parsed.career_goal, existingProfile.data?.career_goal),
-    remote_preference: inferRemotePreference(parsed, existingProfile.data?.remote_preference),
-    summary: chooseText(parsed.summary, existingProfile.data?.summary),
-    communication_style: chooseText(
-      parsed.communication_style,
-      existingProfile.data?.communication_style,
-    ),
-    preferred_roles: mergedRoles.length ? mergedRoles : expandedRoles,
-    preferred_locations: uniqueResumeStrings([
-      ...(parsed.preferred_locations ?? []),
-      parsed.location,
-      ...((existingProfile.data?.preferred_locations as string[] | null) ?? []),
-    ]),
-    salary_expectation:
-      parsed.salary_expectation ?? existingProfile.data?.salary_expectation ?? null,
-    resume_raw_text: rawText ?? existingProfile.data?.resume_raw_text ?? null,
-    parsed_resume: {
-      ...parsed,
-      preferred_roles_expanded: expandedRoles,
-    },
-  };
-
-  if (existingProfile.data?.id) {
-    await supabaseAdmin
-      .from("candidate_profiles")
-      .update(profilePayload)
-      .eq("id", existingProfile.data.id);
-  } else {
-    await supabaseAdmin.from("candidate_profiles").insert(profilePayload as any);
-  }
-
-  const baseProfilePayload = {
-    name: chooseText(parsed.name, existingBaseProfile.data?.name),
-    email: chooseText(parsed.email, existingBaseProfile.data?.email),
-    phone: chooseText(parsed.phone, existingBaseProfile.data?.phone),
-    location: chooseText(parsed.location, existingBaseProfile.data?.location),
-  };
-  const profileUpdate = await supabaseAdmin
-    .from("profiles")
-    .update(baseProfilePayload as any)
-    .eq("id", userId);
-  if (profileUpdate.error && isMissingSchemaError(profileUpdate.error)) {
-    const { phone: _phone, ...fallbackBaseProfilePayload } = baseProfilePayload;
-    await supabaseAdmin
-      .from("profiles")
-      .update(fallbackBaseProfilePayload as any)
-      .eq("id", userId);
-  }
-
-  await replaceUserRows(
-    "skills",
-    userId,
-    buildSkillRows(parsed, rawText).map((skill) => ({
-      name: skill.name,
-      category: skill.category,
-      level: skill.level,
-    })),
-  );
-
-  await replaceUserRows(
-    "education",
-    userId,
-    parsed.education.map((edu) => ({
-      school: chooseText(edu.school, "Unknown School"),
-      degree: chooseText(edu.degree),
-      field: chooseText(edu.field),
-      start_date: chooseText(edu.start_date),
-      end_date: chooseText(edu.end_date),
-      description: chooseText(edu.description, edu.summary),
-    })),
-  );
-
-  await replaceUserRows(
-    "experiences",
-    userId,
-    parsed.experience.map((exp) => ({
-      company: chooseText(exp.company, "Unknown Company"),
-      title: chooseText(exp.title, "Title"),
-      location: chooseText(exp.location),
-      start_date: chooseText(exp.start_date),
-      end_date: chooseText(exp.end_date),
-      is_current: exp.is_current ?? false,
-      description: chooseText(exp.description, exp.summary),
-    })),
-  );
-
-  await replaceUserRows(
-    "projects",
-    userId,
-    buildProjectRows(parsed, (existingProjects.data as Array<Record<string, any>>) ?? []).map(
-      (project) => ({
-        name: project.name,
-        description: project.description,
-        github_url: project.github_url,
-        live_url: project.live_url,
-        tech_stack: project.tech_stack,
-        features: project.features,
-        impact: project.impact,
-      }),
-    ),
-  );
-
-  await replaceUserRows(
-    "certifications",
-    userId,
-    parsed.certifications
-      .filter((cert) => !!chooseText(cert.name))
-      .map((cert) => ({
-        name: chooseText(cert.name, "Certification"),
-        issuer: chooseText(cert.issuer),
-        date: chooseText(cert.date),
-        summary: chooseText(cert.summary),
-      })),
-  );
 }
 
 type SourceRequest =
@@ -411,13 +142,6 @@ type OutreachCampaignBody = {
   companyName: string;
   recruiterId?: string;
   resumeId: string;
-};
-
-type WebhookBody = {
-  eventType: string;
-  targetUrl: string;
-  secret?: string;
-  enabled?: boolean;
 };
 
 type Analysis = {
@@ -802,10 +526,9 @@ function normalizePainPointPayload(
   research: Record<string, unknown> | null,
   jobs: PainPointSourceSeed[],
 ): PainPointResult {
-  const fallback = fallbackPainPoints(companyName, research, jobs);
   const payload = asRecord(value);
   const painPoints = Array.isArray(payload.painPoints) ? payload.painPoints : null;
-  if (!painPoints?.length) return fallback;
+  if (!painPoints?.length) return { painPoints: [] };
 
   const normalized = painPoints
     .map((item) => {
@@ -835,7 +558,7 @@ function normalizePainPointPayload(
     })
     .filter((item): item is PainPointResult["painPoints"][number] => !!item);
 
-  return normalized.length ? { painPoints: normalized } : fallback;
+  return normalized.length ? { painPoints: normalized } : { painPoints: [] };
 }
 
 function normalizeLoomPayload(
@@ -870,7 +593,8 @@ function decodeResearchIntelligence(value: unknown) {
   if (typeof value !== "string" || !value.trim()) return {};
   try {
     return asRecord(JSON.parse(value));
-  } catch {
+  } catch (err) {
+    console.warn("[...route] decodeResearchIntelligence JSON parse failed", err);
     return {};
   }
 }
@@ -938,11 +662,7 @@ async function generatePainPointsForCompany(userId: string, body: PainPointBody)
     35000,
     "Pain-point generation",
   ).catch(() => ({
-    data: fallbackPainPoints(
-      body.companyName,
-      researchResult.data as Record<string, unknown> | null,
-      jobsResult.data ?? [],
-    ),
+    data: { painPoints: [] },
     model: "local-fallback:painpoints",
     usage: null,
     source: "env" as const,
@@ -1026,7 +746,8 @@ async function fetchWebsiteSummary(website?: string) {
       headers: { "user-agent": "VALTREXA-V2/1.0" },
       signal: AbortSignal.timeout(10000),
     });
-  } catch {
+  } catch (err) {
+    console.warn("[...route] fetchWebsiteSummary fetch failed", err);
     return { text: "", techStack: [] as string[], sourceUrls: [website] };
   }
   if (!response.ok) return { text: "", techStack: [] as string[], sourceUrls: [website] };
@@ -1071,7 +792,8 @@ async function fetchNews(companyName: string) {
       headers: { "user-agent": "VALTREXA-V2/1.0" },
       signal: AbortSignal.timeout(10000),
     });
-  } catch {
+  } catch (err) {
+    console.warn("[...route] fetchNews fetch failed", err);
     return "";
   }
   if (!response.ok) return "";
@@ -1217,7 +939,7 @@ async function handleResumeProcess(request: Request) {
     return json({ error: parseInsert.error.message }, { status: 400 });
   }
 
-  await syncCandidateBrain(user.id, parsed.data, rawText);
+  await syncResumeToBrain(user.id, parsed.data, rawText);
 
   await emitWorkflowEvent({
     userId: user.id,
@@ -1710,7 +1432,7 @@ async function handleResumeParse(request: Request) {
     return json({ error: parseInsert.error.message }, { status: 400 });
   }
 
-  await syncCandidateBrain(user.id, parsed.data, rawText);
+  await syncResumeToBrain(user.id, parsed.data, rawText);
 
   await supabaseAdmin
     .from("resume_versions")
@@ -2456,7 +2178,8 @@ async function handleOutreachCampaign(request: Request) {
       try {
         const parsed = campaign.template ? asRecord(JSON.parse(campaign.template)) : {};
         return asString(parsed.companyName) === body.companyName;
-      } catch {
+      } catch (err) {
+        console.warn("[...route] campaign template JSON parse failed", err);
         return false;
       }
     }) ?? null;
@@ -2821,58 +2544,6 @@ async function handleAnalyticsDailySummary(request: Request) {
   return json(upsert.data);
 }
 
-async function handleEvents(request: Request) {
-  const user = await requireApiUser(request);
-  if (request.method === "POST") {
-    const body = await readJson<{
-      eventType: string;
-      entityType: string;
-      entityId?: string | null;
-      payload?: Record<string, unknown>;
-    }>(request);
-    const result = await emitWorkflowEvent({
-      userId: user.id,
-      eventType: body.eventType,
-      entityType: body.entityType,
-      entityId: body.entityId ?? null,
-      payload: body.payload ?? {},
-    });
-    return json(result);
-  }
-
-  if (request.method !== "GET") return methodNotAllowed(["GET", "POST"]);
-  const url = new URL(request.url);
-  const since = url.searchParams.get("since");
-  const limit = Math.min(Number(url.searchParams.get("limit") ?? 50), 200);
-  const { data, error } = await listWorkflowEventsCompat(user.id, since, limit);
-  if (error) return json({ error: error.message }, { status: 400 });
-  return json(data ?? []);
-}
-
-async function handleWebhooks(request: Request) {
-  const user = await requireApiUser(request);
-  if (request.method === "GET") {
-    const { data, error } = await listWebhookSubscriptionsCompat(user.id);
-    if (error) return json({ error: error.message }, { status: 400 });
-    return json(data ?? []);
-  }
-
-  if (request.method === "POST") {
-    const body = await readJson<WebhookBody>(request);
-    const { data, error } = await insertWebhookSubscriptionCompat({
-      userId: user.id,
-      eventType: body.eventType,
-      targetUrl: body.targetUrl,
-      secret: body.secret ?? null,
-      enabled: body.enabled ?? true,
-    });
-    if (error) return json({ error: error.message }, { status: 400 });
-    return json(data);
-  }
-
-  return methodNotAllowed(["GET", "POST"]);
-}
-
 async function handleCandidateBrain(request: Request) {
   const user = await requireApiUser(request);
 
@@ -3176,8 +2847,8 @@ async function handleApplicationPackage(request: Request) {
           .select("*")
           .single();
         if (ansData) storedAnswers.push(ansData);
-      } catch {
-        // Table might not exist — answers still returned in response
+      } catch (err) {
+        console.warn("[...route] storing application answer failed (table may not exist)", err);
         storedAnswers.push(qa);
       }
     }
@@ -3767,16 +3438,7 @@ async function handleRecruiterDiscovery(request: Request) {
     "Recruiter discovery",
   ).catch(() => ({
     data: {
-      recruiters: [
-        {
-          name: `${body.companyName} Recruiting Team`,
-          title: "Technical Recruiter",
-          role: "Recruiter" as const,
-          profile_url: null,
-          reason: "Primary recruiting contact for engineering roles",
-          searchQuery: `"${body.companyName}" recruiter engineering LinkedIn`,
-        },
-      ],
+      recruiters: [],
     },
     model: "local-fallback:recruiter-discovery",
     usage: null,
@@ -3869,7 +3531,8 @@ async function handleApplicationAnswers(request: Request) {
         return json([]);
       }
       return json(data ?? []);
-    } catch {
+    } catch (err) {
+      console.error("[...route] fetching application answers failed", err);
       return json([]);
     }
   }
@@ -3898,8 +3561,8 @@ async function handleApplicationAnswers(request: Request) {
         if (!error && data) {
           inserted.push(data);
         }
-      } catch {
-        // Table may not exist — skip gracefully
+      } catch (err) {
+        console.warn("[...route] inserting application answer failed (table may not exist)", err);
       }
     }
 
@@ -3999,11 +3662,15 @@ async function handleFollowUpAutoCreate(request: Request) {
   return json(data);
 }
 
-async function handleMigrate(request: Request) {
-  return json({ success: true, message: "Migration called." });
-}
-
 async function resolveUserIdFromTelegramChat(chatId: number): Promise<string> {
+  // Primary: telegram_bindings (multi-user)
+  const { data: binding } = await supabaseAdmin
+    .from("telegram_bindings")
+    .select("user_id")
+    .eq("chat_id", chatId)
+    .maybeSingle();
+  if (binding?.user_id) return binding.user_id;
+  // Fallback: telegram_notifications (legacy)
   const { data } = await supabaseAdmin
     .from("telegram_notifications")
     .select("user_id")
@@ -4012,23 +3679,20 @@ async function resolveUserIdFromTelegramChat(chatId: number): Promise<string> {
     .limit(1)
     .maybeSingle();
   if (data?.user_id) return data.user_id;
-  const { data: anyUser } = await supabaseAdmin
-    .from("alert_preferences")
-    .select("user_id")
-    .limit(1)
-    .maybeSingle();
-  if (anyUser?.user_id) return anyUser.user_id;
-  const { data: brainUser } = await supabaseAdmin
-    .from("candidate_brain")
-    .select("user_id")
-    .limit(1)
-    .maybeSingle();
-  return brainUser?.user_id ?? "";
+  // Fallback: env var (legacy single-user mode)
+  return process.env.TELEGRAM_USER_ID?.trim() ?? "";
 }
 
 async function handleTelegramWebhook(request: Request) {
   if (request.method !== "POST") {
     return json({ error: "Use POST" }, { status: 405 });
+  }
+  const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
+  if (secretToken) {
+    const headerToken = request.headers.get("x-telegram-bot-api-secret-token") ?? "";
+    if (headerToken !== secretToken) {
+      return json({ error: "Invalid secret token" }, { status: 403 });
+    }
   }
   const body = await request.json();
   const chatId = body.message?.chat?.id ?? body.callback_query?.message?.chat?.id;
@@ -4041,6 +3705,51 @@ async function handleTelegramWebhook(request: Request) {
 
 // Phase A + B route handlers — see api/phase-handlers.ts
 import * as phase from "./phase-handlers.js";
+import { runCycle } from "./_lib/workflow-runner.js";
+
+async function handleCookiesRefresh(request: Request) {
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  const user = await requireApiUser(request);
+  const body = await readJson<{ provider: string }>(request);
+  const result = await checkProviderCookie(user.id, body.provider);
+  return json(result);
+}
+
+async function handleCookiesValidate(request: Request) {
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  const user = await requireApiUser(request);
+  const body = await readJson<{ provider: string; cookie?: string }>(request);
+  if (body.cookie?.trim()) {
+    return json(validateCookieValue(body.cookie.trim()));
+  }
+  const result = await checkProviderCookie(user.id, body.provider);
+  return json({ valid: result.status === "valid", reason: result.message, status: result.status });
+}
+
+async function handleCookiesSet(request: Request) {
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  const user = await requireApiUser(request);
+  const body = await readJson<{ provider: string; cookie: string }>(request);
+  if (!body.provider || !body.cookie?.trim()) {
+    return json({ ok: false, message: "Provider and cookie value required" }, { status: 400 });
+  }
+  const result = await refreshProviderCookie(user.id, body.provider, body.cookie);
+  return json(result);
+}
+
+async function handleCookiesList(request: Request) {
+  if (request.method !== "GET") return methodNotAllowed(["GET"]);
+  const user = await requireApiUser(request);
+  const statuses = await getAllCookieStatuses(user.id);
+  return json({ cookies: statuses });
+}
+
+async function handleCookiesDelete(request: Request, provider: string) {
+  if (request.method !== "DELETE") return methodNotAllowed(["DELETE"]);
+  const user = await requireApiUser(request);
+  const result = await deleteProviderCookie(user.id, provider);
+  return json(result);
+}
 
 export async function routeRequest(request: Request) {
   const url = new URL(request.url);
@@ -4085,10 +3794,6 @@ export async function routeRequest(request: Request) {
       return handleAnalyticsSummary(request);
     case "analytics/daily-summary":
       return handleAnalyticsDailySummary(request);
-    case "n8n/events":
-      return handleEvents(request);
-    case "n8n/webhooks":
-      return handleWebhooks(request);
     case "candidate-brain":
       return handleCandidateBrain(request);
     case "applications/generate-package":
@@ -4161,8 +3866,6 @@ export async function routeRequest(request: Request) {
       return phase.handleEventBusReplay(request);
     case "event-bus/history":
       return phase.handleEventBusHistory(request);
-    case "admin/migrate":
-      return handleMigrate(request);
     case "telegram/webhook":
       return handleTelegramWebhook(request);
     // ── Phase P endpoints ──
@@ -4182,12 +3885,192 @@ export async function routeRequest(request: Request) {
       return handleOutreachSend(request);
     case "outreach/send-pending":
       return handleOutreachSendPending(request);
+    case "precheck/workflow":
+      return phase.handleWorkflowPrecheck(request);
+    case "workflow/validate":
+      return phase.handleWorkflowValidate(request);
+    case "workflow/cycle":
+      return handleWorkflowCycle(request);
+    case "admin":
+      return handleAdminArea(request);
+    case "admin/users":
+      return handleAdminUsers(request);
+    case "admin/providers":
+      return handleAdminProviders(request);
+    case "admin/queue":
+      return handleAdminQueue(request);
+    case "admin/logs":
+      return handleAdminLogs(request);
+    case "admin/broadcast":
+      return handleAdminBroadcast(request);
+    case "cookies/refresh":
+      return handleCookiesRefresh(request);
+    case "cookies/validate":
+      return handleCookiesValidate(request);
+    case "cookies/set":
+      return handleCookiesSet(request);
+    case "cookies/list":
+      return handleCookiesList(request);
     case "health":
     case "api/health":
       return handleHealthCheck();
-    default:
+    default: {
+      const adminUserInspect = pathname.match(/^admin\/users\/([^/]+)\/inspect$/);
+      if (adminUserInspect) {
+        return handleAdminUserInspect(request, adminUserInspect[1]);
+      }
+      const m = pathname.match(/^cookies\/(\w+)$/);
+      if (m && request.method === "DELETE") {
+        return handleCookiesDelete(request, m[1]);
+      }
       return json({ error: `Unknown API route: /api/${pathname}` }, { status: 404 });
+    }
   }
+}
+
+function isAdmin(user: { email?: string }): boolean {
+  const adminEmails = (process.env.ADMIN_EMAILS ?? "")
+    .split(",")
+    .map((e) => e.trim().toLowerCase());
+  return adminEmails.length === 0 || adminEmails.includes((user.email ?? "").toLowerCase());
+}
+
+async function requireAdmin(request: Request) {
+  const user = await requireApiUser(request);
+  if (!isAdmin(user))
+    throw new Response(JSON.stringify({ error: "Forbidden" }), {
+      status: 403,
+      headers: { "Content-Type": "application/json" },
+    });
+  return user;
+}
+
+async function handleAdminUserInspect(request: Request, targetUserId: string) {
+  if (request.method !== "GET") return methodNotAllowed(["GET"]);
+  await requireAdmin(request);
+
+  const [profiles, candidate, apps, wfState, tgBindings, providers] = await Promise.all([
+    supabaseAdmin.from("profiles").select("*").eq("id", targetUserId).maybeSingle(),
+    supabaseAdmin.from("candidate_profiles").select("*").eq("user_id", targetUserId).maybeSingle(),
+    supabaseAdmin.from("applications").select("*").eq("user_id", targetUserId).limit(20),
+    supabaseAdmin.from("workflow_state").select("*").eq("user_id", targetUserId).maybeSingle(),
+    supabaseAdmin.from("telegram_bindings").select("*").eq("user_id", targetUserId).maybeSingle(),
+    supabaseAdmin.from("provider_controls").select("*").eq("user_id", targetUserId),
+  ]);
+
+  return json({
+    profile: profiles.data ?? null,
+    candidateProfile: candidate.data ?? null,
+    applications: apps.data ?? [],
+    workflowState: wfState.data ?? null,
+    telegramBinding: tgBindings.data ?? null,
+    providers: providers.data ?? [],
+  });
+}
+
+async function handleAdminArea(request: Request) {
+  if (request.method !== "GET") return methodNotAllowed(["GET"]);
+  const user = await requireAdmin(request);
+
+  const [providers, users, workflowStates, bindings, logs] = await Promise.all([
+    supabaseAdmin.from("provider_controls").select("*").order("provider"),
+    supabaseAdmin.from("profiles").select("id, name, email").limit(50),
+    supabaseAdmin.from("workflow_state").select("*"),
+    supabaseAdmin.from("telegram_bindings").select("*"),
+    supabaseAdmin
+      .from("workflow_log")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(20),
+  ]);
+
+  return json({
+    providers: providers.data ?? [],
+    users: users.data ?? [],
+    workflowStates: workflowStates.data ?? [],
+    telegramBindings: bindings.data ?? [],
+    recentLogs: logs.data ?? [],
+  });
+}
+
+async function handleAdminUsers(request: Request) {
+  if (request.method !== "GET") return methodNotAllowed(["GET"]);
+  await requireAdmin(request);
+  const { data } = await supabaseAdmin
+    .from("profiles")
+    .select("id, name, email, created_at, location")
+    .limit(100);
+  return json(data ?? []);
+}
+
+async function handleAdminProviders(request: Request) {
+  await requireAdmin(request);
+  const url = new URL(request.url);
+  if (request.method === "POST") {
+    const body = await readJson<{
+      provider: string;
+      action: "enable" | "disable" | "pause" | "resume";
+    }>(request);
+    await supabaseAdmin
+      .from("provider_controls")
+      .update({ status: body.action })
+      .eq("provider", body.provider);
+    return json({ ok: true });
+  }
+  const { data } = await supabaseAdmin.from("provider_controls").select("*").order("provider");
+  return json(data ?? []);
+}
+
+async function handleAdminQueue(request: Request) {
+  if (request.method !== "GET") return methodNotAllowed(["GET"]);
+  await requireAdmin(request);
+  const { isQueueAvailable } = await import("./_lib/queue.js");
+  const { data: queueJobs } = await supabaseAdmin.from("queue_jobs").select("queue_name, status");
+  const redisAvailable = await isQueueAvailable();
+  const stats: Record<string, Record<string, number>> = {};
+  for (const row of queueJobs ?? []) {
+    const q = (row as any).queue_name;
+    const s = (row as any).status;
+    stats[q] ??= {};
+    stats[q][s] = (stats[q][s] ?? 0) + 1;
+  }
+  return json({ redisAvailable, stats, total: queueJobs?.length ?? 0 });
+}
+
+async function handleAdminLogs(request: Request) {
+  if (request.method !== "GET") return methodNotAllowed(["GET"]);
+  await requireAdmin(request);
+  const url = new URL(request.url);
+  const limit = parseInt(url.searchParams.get("limit") ?? "50");
+  const userId = url.searchParams.get("userId") ?? undefined;
+  let query = supabaseAdmin
+    .from("workflow_log")
+    .select("*")
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (userId) query = query.eq("user_id", userId);
+  const { data } = await query;
+  return json(data ?? []);
+}
+
+async function handleAdminBroadcast(request: Request) {
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  const user = await requireAdmin(request);
+  const body = await readJson<{ title: string; message: string; severity?: string }>(request);
+  const { createNotification } = await import("./_lib/notification-center.js");
+  const { data: users } = await supabaseAdmin.from("profiles").select("id");
+  let sent = 0;
+  for (const u of users ?? []) {
+    await createNotification({
+      userId: u.id,
+      category: "health_alert",
+      title: body.title,
+      message: body.message,
+      severity: (body.severity as any) ?? "info",
+    });
+    sent++;
+  }
+  return json({ ok: true, sent });
 }
 
 async function handleHealthCheck() {
@@ -4258,10 +4141,10 @@ async function handleOutreachSend(request: Request) {
   const body = await readJson<{ outreachId?: string }>(request);
   const { sendOutreachMessage, sendPendingOutreaches } = await import("./_lib/outreach-sender.js");
   if (body.outreachId) {
-    const ok = await sendOutreachMessage(body.outreachId);
+    const ok = await sendOutreachMessage(body.outreachId, user.id);
     return json({ sent: ok });
   }
-  const result = await sendPendingOutreaches();
+  const result = await sendPendingOutreaches(50, user.id);
   return json(result);
 }
 
@@ -4269,12 +4152,26 @@ async function handleOutreachSendPending(request: Request) {
   const user = await requireApiUser(request);
   if (request.method !== "POST") return methodNotAllowed(["POST"]);
   const { sendPendingOutreaches } = await import("./_lib/outreach-sender.js");
-  const result = await sendPendingOutreaches(50);
+  const result = await sendPendingOutreaches(50, user.id);
   return json(result);
+}
+
+async function handleWorkflowCycle(request: Request) {
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  try {
+    const user = await requireApiUser(request);
+    const result = await runCycle(user.id);
+    return json(result);
+  } catch (err: any) {
+    return json({ error: err.message }, { status: 500 });
+  }
 }
 
 export async function safeRouteRequest(request: Request) {
   const url = new URL(request.url);
+  const OPTIONS = handleCorsPreflight(request);
+  if (OPTIONS) return OPTIONS;
+
   const { allowed, remaining, resetAt } = checkRateLimit(rateLimitKey(request));
 
   if (!allowed) {
@@ -4283,7 +4180,7 @@ export async function safeRouteRequest(request: Request) {
       method: request.method,
       remote: rateLimitKey(request),
     });
-    return json(
+    const resp = json(
       { error: "Too many requests. Please slow down.", retryAfterMs: resetAt - Date.now() },
       {
         status: 429,
@@ -4293,6 +4190,7 @@ export async function safeRouteRequest(request: Request) {
         },
       },
     );
+    return addCorsHeaders(resp, request);
   }
 
   try {
@@ -4300,16 +4198,15 @@ export async function safeRouteRequest(request: Request) {
     if (response.status === 200) {
       (response.headers as any).set?.("x-ratelimit-remaining", String(remaining));
     }
-    return response;
+    return addCorsHeaders(response, request);
   } catch (error) {
-    if (error instanceof Response) return error;
+    if (error instanceof Response) return addCorsHeaders(error, request);
     logger.error("API ROUTE ERROR", {
       path: url.pathname,
       method: request.method,
       error: error instanceof Error ? error.message : String(error),
     });
-    const message = error instanceof Error ? error.message : "Unexpected API error.";
-    return json({ error: message }, { status: 500 });
+    return json({ error: safeErrorMessage(error) }, { status: 500 });
   }
 }
 
@@ -4317,7 +4214,7 @@ export async function safeRouteRequest(request: Request) {
 initSentry();
 
 // Run auto-migration if DATABASE_URL is available
-void runAutoMigration().catch(() => {});
+void runAutoMigration().catch((err) => console.error("[auto-migration] Failed:", err));
 
 // Initialize Telegram bot (commands + webhook if PUBLIC_URL set)
 initTelegramBot();

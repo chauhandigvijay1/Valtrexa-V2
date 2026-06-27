@@ -106,7 +106,8 @@ export async function findElementByAriaLabel(
   try {
     const el = await page.$(`[aria-label="${label}"], [aria-label*="${label}"]`);
     return el as ElementHandle<HTMLElement> | null;
-  } catch {
+  } catch (err) {
+    console.warn("[SelfHealing] findElementByAriaLabel failed", err);
     return null;
   }
 }
@@ -153,7 +154,8 @@ export async function findElementFuzzy(
     }
 
     return bestMatch;
-  } catch {
+  } catch (err) {
+    console.warn("[SelfHealing] findElementFuzzy failed", err);
     return null;
   }
 }
@@ -255,6 +257,7 @@ export async function autoHeal(
   url: string,
   provider: ProviderName,
   failures: FailureResult[],
+  userId: string,
 ): Promise<{ healed: boolean; action: string }> {
   for (const f of failures) {
     switch (f.type) {
@@ -266,7 +269,7 @@ export async function autoHeal(
         await page.waitForTimeout(3000);
         const recheck = await detectFailures(page, url, provider);
         if (recheck.length === 0) {
-          await recordProviderSuccess(provider);
+          await recordProviderSuccess(provider, userId);
           return { healed: true, action: `Re-navigated to ${url}` };
         }
         break;
@@ -284,7 +287,7 @@ export async function autoHeal(
         await page.waitForTimeout(5000);
         const recheck2 = await detectFailures(page, url, provider);
         if (recheck2.length === 0) {
-          await recordProviderSuccess(provider);
+          await recordProviderSuccess(provider, userId);
           return { healed: true, action: "Delayed and re-navigated to avoid anti-bot" };
         }
         return { healed: false, action: "Anti-bot persistent — needs manual resolution" };
@@ -298,11 +301,11 @@ export async function autoHeal(
           await page.waitForTimeout(3000);
           const recheck3 = await detectFailures(page, url, provider);
           if (recheck3.length === 0) {
-            await recordProviderSuccess(provider);
+            await recordProviderSuccess(provider, userId);
             return { healed: true, action: "Provider recovered after delay" };
           }
-        } catch {
-          /* provider still down */
+        } catch (err) {
+          console.warn("[SelfHealing] provider recovery check failed", err);
         }
         return { healed: false, action: "Provider still unavailable" };
       }

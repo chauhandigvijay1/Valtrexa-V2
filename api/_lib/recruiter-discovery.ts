@@ -557,38 +557,7 @@ export async function discoverContactsViaAI(input: {
   return contacts;
 }
 
-export function fallbackContacts(companyName: string, roleTitle: string): DiscoveredContact[] {
-  return [
-    {
-      name: `${companyName} Recruiting Team`,
-      title: "Technical Recruiter",
-      role: "Recruiter",
-      profile_url: null,
-      linkedin_url: null,
-      email: null,
-      email_verified: false,
-      email_source: null,
-      reason: "Primary recruiting surface for engineering roles (unverified fallback).",
-      searchQuery: `"${companyName}" recruiter engineering LinkedIn`,
-      source: "fallback",
-      confidence_score: 0.25,
-    },
-    {
-      name: `${companyName} Engineering Hiring`,
-      title: "Hiring Manager",
-      role: "Hiring Manager",
-      profile_url: null,
-      linkedin_url: null,
-      email: null,
-      email_verified: false,
-      email_source: null,
-      reason: "Likely hiring manager for the requested role (unverified fallback).",
-      searchQuery: `"${companyName}" "${roleTitle || "engineering manager"}" LinkedIn`,
-      source: "fallback",
-      confidence_score: 0.22,
-    },
-  ];
-}
+// fallbackContacts removed — violates "never create fake data" constraint
 
 // ───────────────────────────── V3 — Enhanced Discovery ─────────────────────
 

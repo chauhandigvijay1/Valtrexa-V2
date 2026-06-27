@@ -3,7 +3,6 @@ import {
   scoreContact,
   isPlausibleEmail,
   isPlausibleName,
-  fallbackContacts,
 } from "../../api/_lib/recruiter-discovery";
 
 describe("A6 — Recruiter Discovery Engine", () => {
@@ -43,13 +42,5 @@ describe("A6 — Recruiter Discovery Engine", () => {
     expect(unverified).toBeLessThan(0.5);
   });
 
-  it("fallback contacts never include emails or fabricated profile URLs", () => {
-    const contacts = fallbackContacts("Acme", "Frontend Developer");
-    expect(contacts.length).toBeGreaterThan(0);
-    for (const c of contacts) {
-      expect(c.email).toBeNull();
-      expect(c.email_verified).toBe(false);
-      expect(c.confidence_score).toBeLessThan(0.5);
-    }
-  });
+  // fallbackContacts test removed — function was deleted per "never create fake data" constraint
 });

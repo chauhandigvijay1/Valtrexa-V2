@@ -6,6 +6,7 @@ import { applyWithPlaywright, recordPlaywrightApplyResult } from "./playwright-a
 import { notifyApplicationForApproval } from "./telegram.js";
 import { enqueue } from "./queue.js";
 import { isProviderEnabled } from "./provider-controls.js";
+import { getCandidateBrain, getResumeForMatching } from "./candidate-brain.js";
 
 export type ApplyResult = {
   applicationId: string;
@@ -42,26 +43,25 @@ export async function buildApplicationPackage(input: {
   applicationId: string;
   companyName: string;
 }): Promise<{ tier: string; matchScore: number }> {
-  const [jobRow, brainRow, resume] = await Promise.all([
+  const [jobRow, resume, brain] = await Promise.all([
     supabaseAdmin
       .from("jobs")
       .select("*")
       .eq("id", input.jobId)
       .eq("user_id", input.userId)
       .maybeSingle(),
-    supabaseAdmin.from("candidate_profiles").select("*").eq("user_id", input.userId).maybeSingle(),
     resolvePrimaryResume(input.userId),
+    getResumeForMatching(input.userId),
   ]);
 
   const job: any = jobRow.data ?? {};
-  const brain: any = brainRow.data ?? {};
   const breakdown = computeMatchScore({
     resume: {
-      skills: brain.parsed_resume?.skills ?? [],
-      preferred_roles: brain.preferred_roles ?? [],
-      preferred_locations: brain.preferred_locations ?? [],
-      years_experience: brain.years_experience,
-      salary_expectation: brain.salary_expectation,
+      skills: brain?.skills ?? [],
+      preferred_roles: brain?.preferredRoles ?? [],
+      preferred_locations: brain?.preferredLocations ?? [],
+      years_experience: brain?.yearsExperience,
+      salary_expectation: brain?.salaryExpectation,
     },
     job: {
       title: job.title ?? "",
@@ -126,7 +126,10 @@ export async function submitApplication(input: {
 
   // Gate: check provider is enabled
   const scrapedProviders = ["linkedin", "indeed", "naukri", "wellfound", "instahyre"];
-  if (scrapedProviders.includes(source) && !(await isProviderEnabled(source as any))) {
+  if (
+    scrapedProviders.includes(source) &&
+    !(await isProviderEnabled(source as any, input.userId))
+  ) {
     return {
       applicationId: input.applicationId,
       status: "skipped",
@@ -149,11 +152,7 @@ export async function submitApplication(input: {
   ) {
     const [resume, brain] = await Promise.all([
       resolvePrimaryResume(input.userId),
-      supabaseAdmin
-        .from("candidate_profiles")
-        .select("*")
-        .eq("user_id", input.userId)
-        .maybeSingle(),
+      getCandidateBrain(input.userId),
     ]);
 
     const approveFirst = process.env.ENABLE_TELEGRAM_APPROVALS === "true";
@@ -165,7 +164,10 @@ export async function submitApplication(input: {
         jobId: input.jobId,
         jobUrl,
         provider: source as any,
-        candidateData: { ...((brain.data || {}) as any), resumeUrl: resume?.resumeId },
+        candidateData: {
+          ...(brain ?? { profile: {}, baseProfile: {} }),
+          resumeUrl: resume?.resumeId,
+        },
         headless: process.env.PLAYWRIGHT_HEADLESS !== "false",
         approvalMode: true,
       });
@@ -247,7 +249,10 @@ export async function submitApplication(input: {
       jobId: input.jobId,
       jobUrl,
       provider: source as any,
-      candidateData: { ...((brain.data || {}) as any), resumeUrl: resume?.resumeId },
+      candidateData: {
+        ...((brain ?? { profile: {}, baseProfile: {} }) as any),
+        resumeUrl: resume?.resumeId,
+      },
       headless: process.env.PLAYWRIGHT_HEADLESS !== "false",
       approvalMode: false,
     });
@@ -306,6 +311,7 @@ export async function submitApplication(input: {
   }
 
   let providerResult: { status: string; success: boolean; externalId?: string };
+  let submissionError: string | null = null;
 
   try {
     const provider = getProvider(source);
@@ -313,24 +319,30 @@ export async function submitApplication(input: {
       jobUrl,
       companyName: job?.company_name ?? null,
     });
-  } catch {
-    providerResult = { status: "MANUAL_APPLY", success: true };
+  } catch (err: any) {
+    submissionError = err?.message ?? String(err);
+    providerResult = { status: "SUBMISSION_ERROR", success: false, externalId: undefined };
   }
 
-  const success =
-    providerResult.status === "SUCCESS" ||
-    providerResult.status === "MANUAL_APPLY" ||
-    providerResult.status === "MANUAL_APPLY_REQUIRED";
+  const success = providerResult.status === "SUCCESS";
+  const manualRequired = providerResult.status === "MANUAL_APPLY_REQUIRED";
+  const failed = providerResult.status === "SUBMISSION_ERROR" || providerResult.status === "FAILED";
+
+  let dbStatus: string;
+  if (success) dbStatus = "applied";
+  else if (manualRequired) dbStatus = "manual_apply_required";
+  else dbStatus = "failed";
 
   await supabaseAdmin
     .from("applications")
     .update({
-      status: success ? "applied" : "saved",
+      status: dbStatus,
       applied_at: nowIso,
       submitted_at: nowIso,
       provider: source,
       tracking_url: jobUrl,
       submitted_via: "provider_api",
+      ...(submissionError ? { error: submissionError } : {}),
     } as any)
     .eq("id", input.applicationId)
     .eq("user_id", input.userId);
@@ -338,17 +350,30 @@ export async function submitApplication(input: {
   await supabaseAdmin.from("application_events").insert({
     user_id: input.userId,
     application_id: input.applicationId,
-    event_type: success ? "submitted" : "submission_failed",
-    description: `Provider ${source}: ${providerResult.status}`,
+    event_type: success
+      ? "submitted"
+      : manualRequired
+        ? "manual_apply_detected"
+        : "submission_failed",
+    description: `Provider ${source}: ${providerResult.status}${submissionError ? ` — ${submissionError}` : ""}`,
     occurred_at: nowIso,
   });
 
   await emitWorkflowEvent({
     userId: input.userId,
-    eventType: success ? "application_submitted" : "application_submission_failed",
+    eventType: success
+      ? "application_submitted"
+      : failed
+        ? "application_submission_failed"
+        : "application_submission_partial",
     entityType: "applications",
     entityId: input.applicationId,
-    payload: { provider: source, status: providerResult.status, trackingUrl: jobUrl },
+    payload: {
+      provider: source,
+      status: providerResult.status,
+      trackingUrl: jobUrl,
+      ...(submissionError ? { error: submissionError } : {}),
+    },
   });
 
   return {
@@ -375,7 +400,7 @@ export async function submitApprovedApplication(input: {
       .eq("user_id", input.userId)
       .eq("is_primary", true)
       .maybeSingle(),
-    supabaseAdmin.from("candidate_profiles").select("*").eq("user_id", input.userId).maybeSingle(),
+    getCandidateBrain(input.userId),
   ]);
   const pwResult = await applyWithPlaywright({
     userId: input.userId,
@@ -383,7 +408,7 @@ export async function submitApprovedApplication(input: {
     jobId: input.jobId,
     jobUrl: input.jobUrl,
     provider: input.provider as any,
-    candidateData: { ...((brain.data || {}) as any), resumeUrl: resume?.data?.id },
+    candidateData: { ...(brain ?? { profile: {}, baseProfile: {} }), resumeUrl: resume?.data?.id },
     headless: process.env.PLAYWRIGHT_HEADLESS !== "false",
     approvalMode: false,
   });
@@ -459,7 +484,11 @@ export async function queueApplicationSubmit(input: {
   const jobUrl = job?.url ?? null;
   const companyName = job?.company_name ?? "Unknown";
 
-  const { mode, jobId: qJobId } = await enqueue(
+  const {
+    mode,
+    jobId: qJobId,
+    result,
+  } = await enqueue(
     "apply",
     "playwright-apply",
     {
@@ -470,14 +499,24 @@ export async function queueApplicationSubmit(input: {
       provider: source,
       companyName,
     },
-    { userId: input.userId, attempts: 3 },
+    {
+      userId: input.userId,
+      attempts: 3,
+      runInline: async (data) => {
+        const { playwrightApplyInline } = await import("./workers/apply-worker.js");
+        return playwrightApplyInline(data as any);
+      },
+    },
   );
+
+  if (mode === "inline" && result) return result as ApplyResult;
 
   return {
     applicationId: input.applicationId,
     status: `QUEUED_${mode.toUpperCase()}`,
     provider: source,
     trackingUrl: jobUrl,
-    success: true,
+    success: mode !== "db-only",
+    error: mode === "db-only" ? "Queue unavailable — application not submitted" : undefined,
   };
 }

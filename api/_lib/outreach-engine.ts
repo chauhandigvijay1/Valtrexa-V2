@@ -10,8 +10,6 @@ import { supabaseAdmin } from "./supabase.js";
 import { callOpenRouterJson } from "./openrouter.js";
 import { emitWorkflowEvent } from "./workflow-events.js";
 import { getLatestResumeParseCompat } from "./compat.js";
-import { fallbackOutreach } from "./ai-fallbacks.js";
-
 export type OutreachKind =
   | "cold_email"
   | "linkedin_message"
@@ -79,18 +77,33 @@ export async function generateOutreachDraft(input: {
     "outreach_message_v2",
     outreachSchema,
     { userId: input.userId },
-  ).catch(() => ({
-    data: fallbackOutreach({
-      type: input.kind,
-      companyName: input.companyName,
-      recruiter: recruiter.data as any,
-      resume: resumeParse.parsed_data as any,
-      painPoints: (painPoints.data ?? []) as any,
-    }),
-    model: "local-fallback:outreach",
-    usage: null,
-    source: "env" as const,
-  }));
+  );
+
+  const { data: existing } = await supabaseAdmin
+    .from("outreach_messages")
+    .select("id")
+    .eq("user_id", input.userId)
+    .eq("recruiter_id", input.recruiterId ?? null)
+    .eq("kind", input.kind)
+    .eq("company_name", input.companyName)
+    .eq("status", "draft")
+    .maybeSingle();
+
+  if (existing) {
+    const { data: existingRow } = await supabaseAdmin
+      .from("outreach_messages")
+      .select("*")
+      .eq("id", existing.id)
+      .single();
+    if (existingRow) {
+      return {
+        id: existingRow.id,
+        subject: existingRow.subject,
+        body: existingRow.body,
+        kind: existingRow.kind,
+      };
+    }
+  }
 
   const insert = await supabaseAdmin
     .from("outreach_messages")

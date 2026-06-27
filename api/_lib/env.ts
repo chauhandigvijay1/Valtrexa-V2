@@ -9,3 +9,13 @@ export function loadEnv(): void {
   config({ path: resolve(projectRoot, ".env") });
   config({ path: resolve(projectRoot, ".env.local"), override: true });
 }
+
+/** Absolute path to the Microsoft Edge Stable executable (set via EDGE_PATH), if any. */
+export function getEdgePath(): string | undefined {
+  return process.env.EDGE_PATH;
+}
+
+/** Directory for persistent Edge user profile data (set via EDGE_USER_DATA_DIR), if any. */
+export function getEdgeUserDataDir(): string | undefined {
+  return process.env.EDGE_USER_DATA_DIR;
+}

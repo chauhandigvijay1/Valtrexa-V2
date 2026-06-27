@@ -162,7 +162,8 @@ export async function detectFailures(
         try {
           const resp = await page.request.get(url, { timeout: 10000 });
           if (resp.status() >= 500) return true;
-        } catch {
+        } catch (err) {
+          console.warn("[FailureDetection] provider request check failed", err);
           return true;
         }
         return false;
@@ -202,6 +203,7 @@ export type FailureHandler = (failure: FailureResult, provider: ProviderName) =>
 export async function handleFailure(
   failure: FailureResult,
   provider: ProviderName,
+  userId: string,
   extraContext?: string,
 ): Promise<void> {
   const reason = `${failure.type}: ${failure.evidence || extraContext || "No details"}`;
@@ -217,18 +219,21 @@ export async function handleFailure(
 
   const threshold = criticalTypes.includes(failure.type) ? 1 : 3;
 
-  await recordProviderFailure(provider, reason, threshold);
-  await logHealthEvent({
-    provider,
-    event_type: "failure",
-    severity: criticalTypes.includes(failure.type) ? "critical" : "warning",
-    message: reason,
-    details: {
-      failure_type: failure.type,
-      confidence: failure.confidence,
-      evidence: failure.evidence,
+  await recordProviderFailure(provider, reason, userId, threshold);
+  await logHealthEvent(
+    {
+      provider,
+      event_type: "failure",
+      severity: criticalTypes.includes(failure.type) ? "critical" : "warning",
+      message: reason,
+      details: {
+        failure_type: failure.type,
+        confidence: failure.confidence,
+        evidence: failure.evidence,
+      },
     },
-  });
+    userId,
+  );
 }
 
 // ─── Run detection & handle ───────────────────────────────
@@ -237,6 +242,7 @@ export async function detectAndHandle(
   page: Page,
   url: string,
   provider: ProviderName,
+  userId: string,
 ): Promise<FailureResult[]> {
   const failures = await detectFailures(page, url, provider);
 
@@ -254,15 +260,19 @@ export async function detectAndHandle(
       await recordProviderFailure(
         provider,
         `${f.type}: ${f.evidence || ""}`,
+        userId,
         severity === "critical" ? 1 : 3,
       );
-      await logHealthEvent({
-        provider,
-        event_type: "failure",
-        severity: severity as any,
-        message: `${f.type} detected`,
-        details: { failure_type: f.type, evidence: f.evidence, url },
-      });
+      await logHealthEvent(
+        {
+          provider,
+          event_type: "failure",
+          severity: severity as any,
+          message: `${f.type} detected`,
+          details: { failure_type: f.type, evidence: f.evidence, url },
+        },
+        userId,
+      );
     }
   }
 

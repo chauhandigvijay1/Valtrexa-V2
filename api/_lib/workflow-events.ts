@@ -1,4 +1,3 @@
-import { listWebhookSubscriptionsCompat } from "./compat.js";
 import { supabaseAdmin } from "./supabase.js";
 
 export async function emitWorkflowEvent(input: {
@@ -16,7 +15,6 @@ export async function emitWorkflowEvent(input: {
     payload: input.payload,
   });
 
-  // Follow-Up Engine
   if (input.eventType === "application_created" && input.entityId) {
     const days = [3, 7, 14];
     const now = new Date();
@@ -43,35 +41,5 @@ export async function emitWorkflowEvent(input: {
     };
   }
 
-  const subscriptionsResult = await listWebhookSubscriptionsCompat(input.userId);
-  const subscriptions = (subscriptionsResult.data ?? []).filter(
-    (subscription: any) => subscription.event_type === input.eventType && subscription.enabled,
-  );
-
-  let delivered = 0;
-
-  for (const subscription of subscriptions ?? []) {
-    try {
-      const response = await fetch(subscription.target_url, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          ...(subscription.secret ? { "x-valtrexa-v2-secret": subscription.secret } : {}),
-        },
-        body: JSON.stringify({
-          eventType: input.eventType,
-          entityType: input.entityType,
-          entityId: input.entityId ?? null,
-          userId: input.userId,
-          payload: input.payload,
-          occurredAt: new Date().toISOString(),
-        }),
-      });
-      if (response.ok) delivered += 1;
-    } catch {
-      // Keep the event in the queue even if a push attempt fails.
-    }
-  }
-
-  return { persisted: true, delivered, error: null };
+  return { persisted: true, delivered: 0, error: null };
 }

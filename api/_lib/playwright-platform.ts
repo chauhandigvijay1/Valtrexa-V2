@@ -1,23 +1,12 @@
-/**
- * B1 — Playwright Platform.
- *
- * Persistent sessions, storage states, cookie manager, and browser profile
- * manager. Credentials are NEVER hardcoded — read from env per provider.
- *
- * Storage states are persisted in the `browser_sessions` table so the same
- * authenticated browser context can be reused across runs and workers.
- *
- * Env contract (already declared in .env.example):
- *   LINKEDIN_COOKIE, NAUKRI_COOKIE, WELLFOUND_COOKIE, INDEED_COOKIE,
- *   INSTAHYRE_COOKIE  — raw `Cookie:` header strings or `name=value` pairs.
- *
- * If Playwright is unavailable at runtime (e.g. serverless without browsers),
- * every function degrades gracefully and returns a structured status.
- */
-
+import { execSync } from "node:child_process";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { supabaseAdmin } from "./supabase.js";
+import { getCookie } from "./provider-cookies.js";
 
 export type BrowserProviderName = "linkedin" | "indeed" | "naukri" | "instahyre" | "wellfound";
+
+export type BrowserEngine = "chromium" | "edge";
 
 type StoredSession = {
   id: string;
@@ -45,7 +34,6 @@ const COOKIE_DOMAIN_HINT: Record<BrowserProviderName, string> = {
   wellfound: ".wellfound.com",
 };
 
-/** Parse a raw cookie header / "name=value" list into Playwright cookie objects. */
 export function parseCookieHeader(
   rawHeader: string,
   domainHint: string,
@@ -60,7 +48,6 @@ export function parseCookieHeader(
   sameSite: "Lax" | "Strict" | "None";
 }> {
   if (!rawHeader?.trim()) return [];
-  // Accept both "cookie: a=1; b=2" and "a=1; b=2" forms.
   const cleaned = rawHeader.replace(/^cookie:\s*/i, "").trim();
   return cleaned
     .split(/;\s*/)
@@ -86,8 +73,7 @@ export function parseCookieHeader(
     .filter((c) => c.name && c.value);
 }
 
-/** Load a storage state from env (cookie header) — no credentials in code. */
-export function buildStorageStateFromEnv(provider: BrowserProviderName): {
+function buildStorageStateFromEnv(provider: BrowserProviderName): {
   storageState: any;
   cookies: any[];
   empty: boolean;
@@ -96,14 +82,22 @@ export function buildStorageStateFromEnv(provider: BrowserProviderName): {
   const raw = process.env[envVar] ?? "";
   const domain = COOKIE_DOMAIN_HINT[provider];
   const cookies = parseCookieHeader(raw, domain);
-  const storageState = {
-    cookies,
-    origins: [],
-  };
-  return { storageState, cookies, empty: cookies.length === 0 };
+  return { storageState: { cookies, origins: [] }, cookies, empty: cookies.length === 0 };
 }
 
-/** Fetch the persisted session row for a user/provider (if any). */
+export async function buildStorageStateFromDB(
+  userId: string,
+  provider: BrowserProviderName,
+): Promise<{ storageState: any; cookies: any[]; empty: boolean }> {
+  const entry = await getCookie(userId, provider);
+  if (entry) {
+    const domain = COOKIE_DOMAIN_HINT[provider];
+    const cookies = parseCookieHeader(entry.cookie, domain);
+    return { storageState: { cookies, origins: [] }, cookies, empty: cookies.length === 0 };
+  }
+  return { storageState: { cookies: [], origins: [] }, cookies: [], empty: true };
+}
+
 export async function loadStoredSession(
   userId: string,
   provider: BrowserProviderName,
@@ -118,11 +112,15 @@ export async function loadStoredSession(
   return data as unknown as StoredSession;
 }
 
-/** Merge env cookie + stored storage state, preferring env (most recent manual update). */
 export async function resolveStorageState(
   userId: string,
   provider: BrowserProviderName,
-): Promise<{ storageState: any; source: "env" | "stored" | "empty"; cookies: any[] }> {
+): Promise<{ storageState: any; source: string; cookies: any[] }> {
+  const fromDB = await buildStorageStateFromDB(userId, provider);
+  if (!fromDB.empty) {
+    await upsertStoredSession(userId, provider, fromDB.storageState, fromDB.cookies, "ready");
+    return { storageState: fromDB.storageState, source: "db", cookies: fromDB.cookies };
+  }
   const fromEnv = buildStorageStateFromEnv(provider);
   if (!fromEnv.empty) {
     await upsertStoredSession(userId, provider, fromEnv.storageState, fromEnv.cookies, "ready");
@@ -162,7 +160,6 @@ async function touchStoredSession(id: string) {
     .eq("id", id);
 }
 
-/** Save a fresh storage state captured from a live Playwright context (post-login). */
 export async function saveCapturedStorageState(
   userId: string,
   provider: BrowserProviderName,
@@ -173,10 +170,6 @@ export async function saveCapturedStorageState(
   return { saved: true, cookieCount: cookies.length };
 }
 
-/**
- * Launch an authenticated Playwright browser context for a provider.
- * Falls back to an inert status if Playwright or browsers are not installed.
- */
 export async function launchAuthenticatedContext(
   userId: string,
   provider: BrowserProviderName,
@@ -187,29 +180,38 @@ export async function launchAuthenticatedContext(
   cookies: any[];
   message: string;
 }> {
+  if (process.env.VERCEL === "1") {
+    const { storageState, cookies } = await resolveStorageState(userId, provider);
+    return {
+      status: "unavailable",
+      storageState,
+      cookies,
+      message:
+        "Browser automation requires a dedicated worker. Deploy to Railway/VPS or run locally.",
+    };
+  }
   const { storageState, source, cookies } = await resolveStorageState(userId, provider);
   if (source === "empty") {
     return {
       status: "ready_for_credentials",
       storageState,
       cookies,
-      message: `No session found for ${provider}. Set the ${ENV_COOKIE_BY_PROVIDER[provider]} env var or run a login capture.`,
+      message: `No session found for ${provider}. Add a cookie in Settings > Cookies.`,
     };
   }
-
-  // Playwright is imported lazily so this module loads cleanly in serverless.
   try {
-    const { chromium } = await import("playwright");
-    const browser = await chromium.launch({ headless: options?.headless ?? true });
+    const { browser, engine } = await getBrowserForProvider(provider, {
+      headless: options?.headless ?? true,
+    });
     const context = await browser.newContext({ storageState });
-    // The caller is responsible for closing; we just verify it boots.
     await context.close();
     await browser.close();
+    const engineLabel = engine === "edge" ? "Edge" : "Chromium";
     return {
       status: "ready",
       storageState,
       cookies,
-      message: `Playwright context ready for ${provider} (${cookies.length} cookies, source=${source}).`,
+      message: `${engineLabel} context ready for ${provider} (${cookies.length} cookies, source=${source}).`,
     };
   } catch (err: any) {
     return {
@@ -221,7 +223,6 @@ export async function launchAuthenticatedContext(
   }
 }
 
-/** List all browser session profiles for a user. */
 export async function listBrowserProfiles(userId: string) {
   const { data, error } = await supabaseAdmin
     .from("browser_sessions")
@@ -235,7 +236,6 @@ export async function listBrowserProfiles(userId: string) {
   }));
 }
 
-/** Delete a stored session profile (env cookies are untouched). */
 export async function deleteBrowserProfile(userId: string, provider: BrowserProviderName) {
   const { error } = await supabaseAdmin
     .from("browser_sessions")
@@ -244,4 +244,60 @@ export async function deleteBrowserProfile(userId: string, provider: BrowserProv
     .eq("provider", provider);
   if (error) throw new Error(error.message);
   return { deleted: true };
+}
+
+export function detectEdgePath(): string | null {
+  const override = process.env.EDGE_PATH;
+  if (override && existsSync(override)) {
+    return override;
+  }
+  const candidates = [
+    join("C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"),
+    join("C:\\Program Files\\Microsoft\\Edge\\Application\\msedge.exe"),
+    process.env.LOCALAPPDATA
+      ? join(process.env.LOCALAPPDATA, "Microsoft\\Edge\\Application\\msedge.exe")
+      : null,
+  ].filter(Boolean) as string[];
+  for (const candidate of candidates) {
+    if (existsSync(candidate)) {
+      return candidate;
+    }
+  }
+  try {
+    const result = execSync(
+      'REG QUERY "HKEY_LOCAL_MACHINE\\SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\App Paths\\msedge.exe" /ve',
+      { encoding: "utf-8", timeout: 3000 },
+    );
+    const match = result.match(/:\s+(.+\.exe)/i);
+    if (match && existsSync(match[1].trim())) {
+      return match[1].trim();
+    }
+  } catch {
+    // registry lookup is best-effort
+  }
+  return null;
+}
+
+export async function getBrowserForProvider(
+  provider: BrowserProviderName,
+  options?: { headless?: boolean },
+): Promise<{ browser: any; engine: BrowserEngine }> {
+  const { chromium } = await import("playwright");
+  if (provider === "linkedin" || provider === "indeed") {
+    const edgePath = detectEdgePath();
+    if (edgePath) {
+      const launchOptions: any = {
+        executablePath: edgePath,
+        headless: options?.headless ?? true,
+      };
+      const userDataDir = process.env.EDGE_USER_DATA_DIR;
+      if (userDataDir) {
+        launchOptions.args = [`--user-data-dir=${userDataDir}`];
+      }
+      const browser = await chromium.launch(launchOptions);
+      return { browser, engine: "edge" };
+    }
+  }
+  const browser = await chromium.launch({ headless: options?.headless ?? true });
+  return { browser, engine: "chromium" };
 }

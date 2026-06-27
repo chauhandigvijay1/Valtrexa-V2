@@ -1,142 +1,203 @@
 # Deployment Guide
 
-This document covers deploying VALTREXA-V2 to production.
+> **Last Updated:** 2026-06-26
 
-## Target: Vercel (Recommended)
+## Prerequisites
 
-The project is pre-configured for Vercel deployment. Nitro SSR handles all API and rendering.
+- [Vercel](https://vercel.com) account
+- [Supabase](https://supabase.com) project (PostgreSQL database)
+- [@BotFather](https://t.me/botfather) Telegram bot token
+- [OpenRouter](https://openrouter.ai) API key
+- Google OAuth credentials (optional, for Gmail sync)
+- Upstash Redis (optional, for BullMQ queues)
 
-## Pre-Deployment Checklist
+## Deployment Architecture
 
-- [ ] Run `npm.cmd run build` — must succeed with `✓ built in X.XXs`
-- [ ] Run `node node_modules\tsx\dist\cli.mjs scripts/validate-provider-controls.ts` — 80/80 must pass
-- [ ] Run `node node_modules\tsx\dist\cli.mjs scripts/e2e-playwright-real.ts` — 43/43 must pass
-- [ ] Verify all 5 provider cookies are present in `.env`
-- [ ] Verify Supabase migrations are applied: `npx.cmd supabase migration up --linked`
-- [ ] Verify n8n is running: `curl http://127.0.0.1:5678/healthz`
-- [ ] Verify Redis is running: `redis-cli ping` → PONG
-- [ ] Verify `.gitignore` covers `.env`, `supabase/.temp/`, `dist/`, `node_modules`
+```mermaid
+flowchart TB
+    V[Vercel\nEdge Functions + Serverless] --> S[(Supabase PostgreSQL)]
+    V --> R[(Upstash Redis)]
+    V -.-> PW[Playwright\nBrowser Automation]
+    TB[Telegram Bot\nWebhook] --> V
+    V --> OR[OpenRouter AI Gateway]
+    V --> GQ[Groq API]
+```
 
-## Deployment Steps
+## Step 1: Supabase Setup
 
-### 1. GitHub Push
+### Create Project
+
+1. Go to [supabase.com](https://supabase.com) → New project
+2. Note your project URL and API keys (anon, service_role)
+3. Enable Auth → configure email/password or Google OAuth
+
+### Run Migrations
 
 ```bash
-git add .
-git commit -m "Production deployment"
-git push origin main
+# Option A: Supabase CLI
+supabase link --project-ref <project-ref>
+supabase db push
+
+# Option B: Manual SQL
+# Open Supabase SQL Editor → paste contents of supabase/current_schema.sql
 ```
 
-### 2. Vercel Import
+### Configure Auth (Google OAuth)
 
-1. Go to https://vercel.com/new
-2. Import the GitHub repository
-3. Framework preset: **Other** (TanStack Start/Nitro)
-4. Build command: `npm run build` (pre-configured in vercel.json)
-5. Output directory: `dist/client` (pre-configured in vercel.json)
-6. Environment variables: see Section 3
+1. Supabase Dashboard → Authentication → Providers → Google
+2. Set up OAuth consent screen in Google Cloud Console
+3. Add redirect URI: `https://<project>.supabase.co/auth/v1/callback`
+4. Copy Client ID and Client Secret to Supabase
 
-### 3. Environment Variables
+## Step 2: Vercel Deployment
 
-Set ALL of these in Vercel dashboard:
+### Connect Repository
 
-| Variable | Value | Notes |
-|----------|-------|-------|
-| `SUPABASE_URL` | Your Supabase project URL | Required |
-| `SUPABASE_SERVICE_ROLE_KEY` | Your service role key | Required, keep secret |
-| `SESSION_SECRET` | Random 64-char hex string | Required |
-| `TELEGRAM_BOT_TOKEN` | From BotFather | For Telegram |
-| `TELEGRAM_CHAT_ID` | Your Telegram chat ID | For Telegram |
-| `PUBLIC_URL` | `https://your-app.vercel.app` | Set AFTER deploy |
-| `N8N_WEBHOOK_URL` | Your n8n instance URL | For n8n |
-| `N8N_API_KEY` | n8n API key | For n8n auth |
-| `LINKEDIN_COOKIE` | 2392-char cookie string | For LinkedIn |
-| `INDEED_COOKIE` | 4778-char cookie string | For Indeed |
-| `NAUKRI_COOKIE` | 1156-char cookie string | For Naukri |
-| `WELLFOUND_COOKIE` | 2691-char cookie string | For Wellfound |
-| `INSTAHYRE_COOKIE` | 245-char cookie string | For Instahyre |
-| `GMAIL_CLIENT_ID` | Google OAuth client ID | For Gmail |
-| `GMAIL_CLIENT_SECRET` | Google OAuth secret | For Gmail |
-| `GMAIL_REFRESH_TOKEN` | Google OAuth refresh | For Gmail |
-| `GMAIL_REDIRECT_URI` | `$PUBLIC_URL/api/auth/gmail/callback` | See section 6 |
-| `NITRO_PRESET` | `vercel` | Required for Vercel SSR |
-| `REDIS_URL` | Redis connection string | For BullMQ |
-| `ENABLE_TELEGRAM_APPROVALS` | `true` | To enable approvals |
+1. Go to [vercel.com](https://vercel.com) → Add New Project
+2. Import your GitHub repository
+3. Framework preset: **Other** (TanStack Start uses Vite/Nitro)
 
-### 4. Post-Deployment
+### Environment Variables
 
-#### 4a. Register Telegram Webhook
+Add all variables from [ENVIRONMENT.md](ENVIRONMENT.md). Required minimum:
+
+```env
+SUPABASE_URL=https://xxx.supabase.co
+SUPABASE_ANON_KEY=eyJ...
+SUPABASE_SERVICE_ROLE_KEY=eyJ...
+SESSION_SECRET=<min 32 chars>
+TELEGRAM_BOT_TOKEN=123456:ABC...
+TELEGRAM_BOT_USERNAME=valtrexa_bot
+OPENROUTER_API_KEY=sk-or-...
+```
+
+### Build & Deploy
 
 ```bash
-curl -F "url=$PUBLIC_URL/api/telegram" \
-  https://api.telegram.org/bot$TELEGRAM_BOT_TOKEN/setWebhook
+# Build Command (vercel.json)
+npm.cmd run build
+
+# Output Directory
+.output/public
+
+# Install Command
+npm.cmd install
 ```
 
-Expected response: `{"ok":true,"result":true,"description":"Webhook was set"}`
+The `vercel.json` configuration:
 
-#### 4b. Verify Telegram Commands
-
-Send `/provider-status` to your Telegram bot.
-Expected: All 5 providers listed (linkedin disabled, others enabled).
-
-Send `/health` to verify system health.
-
-#### 4c. Verify n8n Connectivity
-
-```bash
-curl $PUBLIC_URL/api/n8n/webhooks
+```json
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": ".output/public",
+  "installCommand": "npm install",
+  "framework": null
+}
 ```
 
-Expected: List of registered webhooks.
+## Step 3: Telegram Bot Setup
 
-#### 4d. Update Gmail Redirect URI
+1. Talk to [@BotFather](https://t.me/botfather)
+2. Create bot → get token
+3. Set bot commands (auto-registered by `telegram-init.ts`):
 
-In Google Cloud Console, update the authorized redirect URI to:
 ```
-https://your-app.vercel.app/api/auth/gmail/callback
-```
-
-### 5. First Production Run
-
-1. Send `/provider-enable linkedin` via Telegram (if needed for import only)
-2. Import jobs from a provider
-3. Verify jobs appear: `/jobs`
-4. Run a test match
-5. Submit an application in approval mode
-6. Verify Telegram notification arrives
-
-## Deployment to Railway (Alternative)
-
-```bash
-# Add Redis plugin in Railway dashboard
-# Set NITRO_PRESET=node-server
-# Railway auto-detects Node.js projects
+start - Initialize bot
+link - Link Telegram to your account
+status - System status
+pause - Pause workflow
+resume - Resume workflow
+providers - List provider status
+check - Validate cookies
+jobs - Recent job matches
+apply - Trigger apply cycle
+analytics - Application statistics
+broadcast - (admin) Send broadcast
+inspect - (admin) View user details
 ```
 
-## Deployment to Render (Alternative)
+4. Bot auto-registers webhook at `/api/telegram/webhook` on startup
 
-```bash
-# Create render.yaml or use Blueprint
-# Set NITRO_PRESET=node-server
-# Add Redis sidecar or use Render Managed Redis
+## Step 4: Redis (Optional)
+
+For BullMQ background queues, set up Upstash Redis:
+
+1. Create database at [upstash.com](https://upstash.com)
+2. Add env vars:
+
+```env
+REDIS_URL=redis://:password@host:port
+# or
+REDIS_TOKEN=xxxxxxxx
 ```
+
+If `REDIS_URL` is not set, the system falls back to inline execution (no background queues).
+
+## Step 5: Playwright in Production
+
+Playwright requires browser binaries. Vercel serverless functions have limited support:
+
+### Option A: Remote Browser
+
+Set `PLAYWRIGHT_WS_ENDPOINT` to a browserless service:
+
+```env
+PLAYWRIGHT_WS_ENDPOINT=wss://chrome.browserless.io/ws
+```
+
+### Option B: Vercel with Chromium
+
+Vercel includes Chromium in the execution environment by default for serverless functions. Playwright will auto-detect it.
+
+## Post-Deployment Verification
+
+```mermaid
+flowchart LR
+    A[Deploy] --> B{Health Check}
+    B --> C[/api/health returns 200]
+    B --> D[Telegram /status works]
+    B --> E[Supabase queries succeed]
+    B --> F[Auth flow works]
+    C & D & E & F --> G[✅ System Ready]
+```
+
+### Health Check URLs
+
+| Endpoint | Expected |
+|---|---|
+| `https://your-domain.vercel.app/` | 200 (dashboard) |
+| `https://your-domain.vercel.app/api/health` | 200 (health) |
+| `https://your-domain.vercel.app/api/telegram/webhook` | Accepts POST from Telegram |
+
+### Verify
+
+1. Visit the dashboard → should load with login
+2. Create account → should redirect to onboarding
+3. Run `/start` on Telegram → bot should respond
+4. Run `/status` → should show workflow status
+5. Check provider controls → should list providers
+
+## Production Checklist
+
+- [ ] All required env vars configured in Vercel
+- [ ] Supabase migrations applied
+- [ ] Telegram bot responds to `/start`
+- [ ] Google OAuth configured (if using)
+- [ ] Redis configured (optional)
+- [ ] Playwright browser endpoint configured
+- [ ] Sentry DSN set (optional but recommended)
+- [ ] Custom domain configured (optional)
+- [ ] Rate limiting considered for Telegram webhook
+- [ ] Database backups configured (Supabase Pro)
 
 ## Troubleshooting
 
-### Build fails
-- Ensure `NITRO_PRESET=vercel` is set
-- Run `npm install` locally first
-- Check Node.js version (22+)
-
-### 404 on API routes
-- Verify `vercel.json` rewrites are correct
-- Check `api/_dist/` was created during build
-
-### n8n webhook 404
-- Verify `N8N_WEBHOOK_URL` includes the full path
-- Check n8n instance is running and reachable
-
-### Telegram commands not responding
-- Verify webhook URL was set correctly
-- Send any message to the bot first to wake it up
-- Check `TELEGRAM_BOT_TOKEN` is correct
+| Problem | Likely Cause | Fix |
+|---|---|---|
+| Build fails | Missing dependencies | Check install/build commands in vercel.json |
+| 404 on API routes | Nitro output not configured | Ensure `.output/public` is set as output |
+| Telegram bot silent | Webhook misconfigured | Check bot token, hit `/api/telegram/webhook` |
+| Database errors | Migrations not applied | Run `supabase db push` or paste SQL |
+| Auth fails | Wrong Supabase keys | Verify anon/service_role keys |
+| 500 on Playwright | Browser not available | Set `PLAYWRIGHT_WS_ENDPOINT` or use Vercel Chromium |
+| Rate limited | Too many requests | Adjust `WORKFLOW_INTERVAL_MINUTES` |

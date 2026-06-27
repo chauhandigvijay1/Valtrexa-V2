@@ -13,6 +13,16 @@ import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
+import { Trash2, ShieldCheck } from "lucide-react";
 
 type Provider = {
   key: string;
@@ -70,35 +80,29 @@ const PROVIDERS: Provider[] = [
   {
     key: "linkedin",
     label: "LinkedIn",
-    description: "Saved search URL and cookie for HTML-based import.",
+    description:
+      "Saved search URL for HTML-based import. Manage your cookie on the Cookie Health page.",
     workflow: "Opportunity Radar import flow",
     backendUsage: "Passed as headers/search defaults to /api/jobs/import for LinkedIn scraping",
-    fields: [
-      { name: "search_url", label: "Search URL" },
-      { name: "session_cookie", label: "Session cookie", type: "password" },
-    ],
+    fields: [{ name: "search_url", label: "Search URL" }],
   },
   {
     key: "wellfound",
     label: "Wellfound",
-    description: "Saved search URL and cookie for HTML-based import.",
+    description:
+      "Saved search URL for HTML-based import. Manage your cookie on the Cookie Health page.",
     workflow: "Opportunity Radar import flow",
     backendUsage: "Passed as headers/search defaults to /api/jobs/import for Wellfound scraping",
-    fields: [
-      { name: "search_url", label: "Search URL" },
-      { name: "cookie", label: "Cookie", type: "password" },
-    ],
+    fields: [{ name: "search_url", label: "Search URL" }],
   },
   {
     key: "naukri",
     label: "Naukri",
-    description: "Saved search URL and cookie for HTML-based import.",
+    description:
+      "Saved search URL for HTML-based import. Manage your cookie on the Cookie Health page.",
     workflow: "Opportunity Radar import flow",
     backendUsage: "Passed as headers/search defaults to /api/jobs/import for Naukri scraping",
-    fields: [
-      { name: "search_url", label: "Search URL" },
-      { name: "cookie", label: "Cookie", type: "password" },
-    ],
+    fields: [{ name: "search_url", label: "Search URL" }],
   },
 ];
 
@@ -112,10 +116,12 @@ function SettingsPage() {
         description="Only live integrations stay here. Each card saves to the database and is consumed by a real workflow."
       />
       <Alert>
-        <AlertTitle>Removed from the release surface</AlertTitle>
+        <AlertTitle>Configured via environment variables</AlertTitle>
         <AlertDescription>
-          Telegram, Gmail, Groq, Indeed, and Instahyre were removed from settings because they were
-          not wired into the current production workflow.
+          Telegram (bot), Gmail (OAuth), Groq (AI fallback), Indeed (scraping), and Instahyre
+          (scraping) are fully wired into the production workflow but configured through server-side
+          environment variables rather than this UI. LinkedIn, Naukri, and Wellfound cookies can
+          also be set globally via WELLFOUND_COOKIE in .env.
         </AlertDescription>
       </Alert>
       <div className="grid gap-4 xl:grid-cols-2">
@@ -167,7 +173,20 @@ function IntegrationCard({ provider }: { provider: Provider }) {
   const save = useMutation({
     mutationFn: async () => {
       if (!user) throw new Error("Not signed in");
-      const payload = { user_id: user.id, provider: provider.key, config, enabled };
+      const cleanConfig: Record<string, string> = {};
+      for (const [key, value] of Object.entries(config)) {
+        if (key.toLowerCase().includes("cookie") && value?.trim()) {
+          const resp = await fetch("/api/cookies/set", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ provider: provider.key, cookie: value }),
+          });
+          if (!resp.ok) throw new Error((await resp.json()).error ?? "Failed to store cookie");
+        } else {
+          cleanConfig[key] = value;
+        }
+      }
+      const payload = { user_id: user.id, provider: provider.key, config: cleanConfig, enabled };
       if (q.data?.id) {
         const { error } = await supabase.from("integrations").update(payload).eq("id", q.data.id);
         if (error) throw error;
@@ -182,6 +201,49 @@ function IntegrationCard({ provider }: { provider: Provider }) {
     },
     onError: (error: Error) => toast.error(error.message),
   });
+
+  const [validateResults, setValidateResults] = useState<
+    Record<string, { valid: boolean; reason?: string }>
+  >({});
+  const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
+
+  const validateCookie = useMutation({
+    mutationFn: async (cookieValue: string) => {
+      const resp = await fetch("/api/cookies/validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ provider: provider.key, cookie: cookieValue }),
+      });
+      if (!resp.ok) throw new Error((await resp.json()).error ?? "Validation failed");
+      return resp.json() as Promise<{ valid: boolean; reason?: string }>;
+    },
+    onSuccess: (data) => {
+      setValidateResults({ [provider.key]: data });
+      if (data.valid) {
+        toast.success(`${provider.label} cookie format is valid`);
+      } else {
+        toast.error(`${provider.label} cookie: ${data.reason}`);
+      }
+    },
+    onError: (e: any) => {
+      setValidateResults({ [provider.key]: { valid: false, reason: e.message } });
+      toast.error(e.message);
+    },
+  });
+
+  const removeCookie = useMutation({
+    mutationFn: async () => {
+      const resp = await fetch(`/api/cookies/${provider.key}`, { method: "DELETE" });
+      if (!resp.ok) throw new Error((await resp.json()).error ?? "Remove failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey });
+      toast.success(`${provider.label} cookie removed`);
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const isCookieProvider = ["linkedin", "wellfound", "naukri"].includes(provider.key);
 
   return (
     <Card className="space-y-4 p-5">
@@ -227,18 +289,94 @@ function IntegrationCard({ provider }: { provider: Provider }) {
       ) : (
         <>
           <div className="grid gap-3 md:grid-cols-2">
-            {provider.fields.map((field) => (
-              <div key={field.name} className="space-y-1">
-                <Label className="text-xs">{field.label}</Label>
-                <Input
-                  type={field.type === "password" ? "password" : "text"}
-                  value={config[field.name] ?? ""}
-                  onChange={(event) => setConfig({ ...config, [field.name]: event.target.value })}
-                  placeholder={field.type === "password" ? "••••••••" : ""}
-                />
-              </div>
-            ))}
+            {provider.fields.map((field) => {
+              const isCookieField = field.name.toLowerCase().includes("cookie");
+              return (
+                <div key={field.name} className="space-y-1">
+                  <Label className="text-xs">{field.label}</Label>
+                  <div className="flex gap-2">
+                    <Input
+                      type={field.type === "password" ? "password" : "text"}
+                      value={config[field.name] ?? ""}
+                      onChange={(event) => {
+                        setConfig({ ...config, [field.name]: event.target.value });
+                        if (isCookieField) {
+                          setValidateResults({});
+                        }
+                      }}
+                      placeholder={field.type === "password" ? "••••••••" : ""}
+                      className="flex-1"
+                    />
+                    {isCookieField && config[field.name]?.trim() && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0 text-xs"
+                        onClick={() => validateCookie.mutate(config[field.name])}
+                        disabled={validateCookie.isPending}
+                      >
+                        <ShieldCheck className="h-3 w-3 mr-1" /> Validate
+                      </Button>
+                    )}
+                  </div>
+                  {validateResults[provider.key] && isCookieField && (
+                    <p
+                      className={`text-xs ${
+                        validateResults[provider.key].valid ? "text-green-500" : "text-red-500"
+                      }`}
+                    >
+                      {validateResults[provider.key].valid
+                        ? "Valid format"
+                        : validateResults[provider.key].reason}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
           </div>
+
+          {isCookieProvider && (
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Need help extracting your cookie? Visit{" "}
+                <a href="/cookies" className="underline text-primary">
+                  Cookie Health
+                </a>{" "}
+                for step-by-step guides.
+              </p>
+              <Dialog open={showRemoveConfirm} onOpenChange={setShowRemoveConfirm}>
+                <DialogTrigger asChild>
+                  <Button variant="destructive" size="sm" disabled={removeCookie.isPending}>
+                    <Trash2 className="h-3 w-3 mr-1" /> Remove Cookie
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Remove {provider.label} cookie?</DialogTitle>
+                    <DialogDescription>
+                      This will delete the stored cookie for {provider.label}. You will need to
+                      paste it again to resume job imports from this provider.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <DialogFooter>
+                    <Button variant="outline" onClick={() => setShowRemoveConfirm(false)}>
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={() => {
+                        setShowRemoveConfirm(false);
+                        removeCookie.mutate();
+                      }}
+                    >
+                      Remove
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+          )}
+
           <div className="flex items-center justify-between border-t border-border pt-3">
             <label className="flex items-center gap-2 text-sm">
               <Switch checked={enabled} onCheckedChange={setEnabled} />

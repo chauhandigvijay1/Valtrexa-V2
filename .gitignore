@@ -84,10 +84,6 @@ test-results/
 cookies*
 storage-state*.json
 
-# n8n exports (may contain credentials)
-# n8n exports (may contain credentials) � canonical workflow is tracked
-n8n-workflows/*.json
-!n8n-workflows/exported-master-workflow.json
 # Artifacts
 artifacts/
 output/

@@ -17,6 +17,10 @@ import {
   Brain,
   AlertTriangle,
   Building2,
+  Activity,
+  Shield,
+  Cookie,
+  Bell,
 } from "lucide-react";
 import {
   Sidebar,
@@ -48,6 +52,10 @@ const items = [
   { title: "Interview Prep", url: "/interview-prep", icon: Brain },
   { title: "Pain Points", url: "/painpoints", icon: AlertTriangle },
   { title: "Company Research", url: "/company-research", icon: Building2 },
+  { title: "Workflow", url: "/workflow-timeline", icon: Activity },
+  { title: "Notifications", url: "/notifications", icon: Bell },
+  { title: "Cookie Health", url: "/cookies", icon: Cookie },
+  { title: "Admin", url: "/admin", icon: Shield },
   { title: "Analytics", url: "/analytics", icon: BarChart3 },
   { title: "Settings", url: "/settings", icon: SettingsIcon },
 ] as const;

@@ -21,7 +21,6 @@ export default defineConfig({
       GMAIL_CLIENT_ID: "test-client-id",
       GMAIL_CLIENT_SECRET: "test-client-secret",
       GMAIL_REFRESH_TOKEN: "test-refresh-token",
-      N8N_WEBHOOK_URL: "http://localhost:5678/webhook/test",
     },
   },
 });

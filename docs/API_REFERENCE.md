@@ -11,7 +11,7 @@ All requests are dispatched by `api/[...route].ts` via the `routeRequest` functi
 
 Handlers live in two locations:
 
-- **`api/[...route].ts`** — inline handlers for resume processing, job import, company research, outreach, analytics, n8n webhooks, Telegram webhook, and legacy endpoints.
+- **`api/[...route].ts`** — inline handlers for resume processing, job import, company research, outreach, analytics, Telegram webhook, and legacy endpoints.
 - **`api/phase-handlers.ts`** — Phase A (Data) and Phase B (Action) handlers wired after the initial route block.
 
 ---
@@ -247,13 +247,13 @@ The client obtains the token from `supabase.auth.getSession()` and attaches it v
 
 Powered by Playwright (`api/_lib/playwright-platform.ts`).
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/browser/profiles` | GET | List all browser profiles for the user |
-| `/api/browser/profiles?provider=` | DELETE | Delete a browser profile |
-| `/api/browser/session` | POST | Launch an authenticated browser context for a provider |
-| `/api/browser/storage-state?provider=` | GET | Get the saved storage state for a provider |
-| `/api/browser/capture` | POST | Save captured storage state after manual login |
+| Endpoint                               | Method | Description                                            |
+| -------------------------------------- | ------ | ------------------------------------------------------ |
+| `/api/browser/profiles`                | GET    | List all browser profiles for the user                 |
+| `/api/browser/profiles?provider=`      | DELETE | Delete a browser profile                               |
+| `/api/browser/session`                 | POST   | Launch an authenticated browser context for a provider |
+| `/api/browser/storage-state?provider=` | GET    | Get the saved storage state for a provider             |
+| `/api/browser/capture`                 | POST   | Save captured storage state after manual login         |
 
 ### Apply Evidence
 
@@ -269,12 +269,12 @@ Returns Playwright-generated evidence (screenshots, logs) from an automated appl
 
 Provider status is managed through Telegram bot commands and the `provider_controls` table.
 
-| Bot Command | Action |
-|---|---|
-| `/provider-status` | List all providers with current status |
-| `/provider-enable <name>` | Enable a provider |
-| `/provider-disable <name>` | Disable a provider |
-| `/provider-pause <name>` | Pause a provider |
+| Bot Command                | Action                                 |
+| -------------------------- | -------------------------------------- |
+| `/provider-status`         | List all providers with current status |
+| `/provider-enable <name>`  | Enable a provider                      |
+| `/provider-disable <name>` | Disable a provider                     |
+| `/provider-pause <name>`   | Pause a provider                       |
 
 Supported providers: `linkedin`, `indeed`, `naukri`, `wellfound`, `instahyre`.
 
@@ -295,16 +295,6 @@ Bulk import jobs from any registered provider source.
 
 ## Webhook Endpoints
 
-### n8n Webhooks
-
-**`GET/POST /api/n8n/events`**
-
-List or emit workflow events. Used by n8n to read events and trigger automations.
-
-**`GET/POST /api/n8n/webhooks`**
-
-List or create webhook subscriptions. Subscriptions include a secret used to sign outgoing webhook payloads with the `x-valtrexa-v2-secret` header.
-
 ### Telegram Webhook
 
 **`POST /api/telegram/webhook`**
@@ -319,12 +309,12 @@ Auto-registered at startup via `initTelegramBot()` when `PUBLIC_URL` is set.
 
 Gmail integration uses server-side OAuth2 with a refresh token. Configured via environment variables:
 
-| Variable | Purpose |
-|---|---|
-| `GMAIL_CLIENT_ID` | Google OAuth client ID |
-| `GMAIL_CLIENT_SECRET` | Google OAuth client secret |
-| `GMAIL_REFRESH_TOKEN` | Stored refresh token for offline access |
-| `GMAIL_REDIRECT_URI` | OAuth redirect URI (default: `http://localhost:4173/api/auth/gmail/callback`) |
+| Variable              | Purpose                                                                       |
+| --------------------- | ----------------------------------------------------------------------------- |
+| `GMAIL_CLIENT_ID`     | Google OAuth client ID                                                        |
+| `GMAIL_CLIENT_SECRET` | Google OAuth client secret                                                    |
+| `GMAIL_REFRESH_TOKEN` | Stored refresh token for offline access                                       |
+| `GMAIL_REDIRECT_URI`  | OAuth redirect URI (default: `http://localhost:4173/api/auth/gmail/callback`) |
 
 Used by:
 
@@ -339,22 +329,22 @@ The OAuth helper scripts are available in the repository for initial token gener
 
 ### Queues (BullMQ via `api/_lib/queue.ts`)
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/queue/enqueue` | POST | Enqueue a job into a named queue |
-| `/api/queue/stats` | GET | Get queue statistics for the user |
+| Endpoint             | Method | Description                       |
+| -------------------- | ------ | --------------------------------- |
+| `/api/queue/enqueue` | POST   | Enqueue a job into a named queue  |
+| `/api/queue/stats`   | GET    | Get queue statistics for the user |
 
 Queue names: `job-import`, `apply`, `recruiter`, `outreach`, `followup`, `gmail`, `analytics`.
 
 ### Event Bus (`api/_lib/event-bus.ts`)
 
-| Endpoint | Method | Description |
-|---|---|---|
-| `/api/event-bus/consumers` | GET/POST | List or register event consumers |
-| `/api/event-bus/replay` | POST | Replay a workflow event to all consumers |
-| `/api/event-bus/history` | GET | Get delivery history for an event |
+| Endpoint                   | Method   | Description                              |
+| -------------------------- | -------- | ---------------------------------------- |
+| `/api/event-bus/consumers` | GET/POST | List or register event consumers         |
+| `/api/event-bus/replay`    | POST     | Replay a workflow event to all consumers |
+| `/api/event-bus/history`   | GET      | Get delivery history for an event        |
 
-Consumer types: `webhook`, `telegram`, `n8n`, `worker`.
+Consumer types: `telegram`, `worker`.
 
 ---
 

@@ -6,7 +6,6 @@
 
 <br>
 
-[![Build](https://img.shields.io/badge/build-passing-22c55e?style=flat-square)](https://github.com/chauhandigvijay1/Valtrexa-V2/actions)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white)](https://react.dev/)
 [![TanStack Start](https://img.shields.io/badge/TanStack%20Start-FF4154?style=flat-square&logo=react&logoColor=white)](https://tanstack.com/start)
@@ -26,9 +25,88 @@
 
 ## Overview
 
-VALTREXA-V2 automates the end-to-end software engineering job search — from resume parsing and job discovery through automated applications and outreach orchestration. It replaces spreadsheets, manual tracking, and repetitive browser work with an integrated workspace.
+VALTREXA-V2 automates the end-to-end software engineering job search — from resume parsing and job discovery through automated applications and outreach orchestration. It integrates with nine job sources (LinkedIn, Indeed, Naukri, Wellfound, Instahyre, Greenhouse, Lever, Ashby, Workable), uses multi-provider AI for matching and discovery, runs Playwright-based browser automation for applications, and surfaces everything through a dashboard and Telegram bot.
 
-The system integrates with **eight job sources**, uses **multi-provider AI** for matching and discovery, runs **Playwright-based browser automation** for applications, and surfaces everything through a **dashboard** and **Telegram bot**.
+## Architecture
+
+The system is a **server-rendered React frontend** (TanStack Start + Vite) with a **Nitro-powered API layer** (file-based routing in `api/[...route].ts`), **Supabase PostgreSQL** for persistence (25+ migrations, RLS on every table), **BullMQ/Redis** for optional background job queues with inline fallback, and **Telegram** for notifications and interactive operations. Browser automation uses **Playwright** with persistent cookie-based sessions stored encrypted (AES-256-GCM) in the `provider_cookies` table. A **workflow runner** orchestrates Pipeline A (auto-apply for matched jobs) and Pipeline B (high-value company research, recruiter discovery, outreach approval) through a persistent state machine.
+
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full architecture.
+
+---
+
+## Quick Start
+
+```bash
+git clone https://github.com/chauhandigvijay1/Valtrexa-V2.git
+cd Valtrexa-V2
+npm.cmd install
+cp .env.example .env
+# Edit .env with your credentials (see docs/ENVIRONMENT.md)
+npm.cmd run dev
+```
+
+Full setup: [docs/SETUP.md](docs/SETUP.md)
+
+---
+
+## Documentation
+
+| Document | Description |
+|---|---|
+| [Architecture](docs/ARCHITECTURE.md) | System design, data flow, stack decisions |
+| [Environment Variables](docs/ENVIRONMENT.md) | Complete env reference organized by category |
+| [Cookie Guide](docs/COOKIE_GUIDE.md) | Cookie-based auth, encryption, extraction guides |
+| [Provider Guide](docs/PROVIDER_GUIDE.md) | Provider integrations, auth methods, capabilities |
+| [Workflow Guide](docs/WORKFLOW.md) | Pipeline A/B, state machine, recovery |
+| [Deployment](docs/DEPLOYMENT.md) | Production deployment (Vercel) |
+| [Admin Guide](docs/ADMIN.md) | Admin dashboard, user inspection, queue management |
+| [Telegram Operations](docs/TELEGRAM_OPERATIONS.md) | Bot commands, notifications, approval workflow |
+| [Setup Guide](docs/SETUP.md) | Local development setup |
+| [Security](docs/SECURITY.md) | Auth, RLS, secrets management |
+| [Contributing](CONTRIBUTING.md) | Development guide and conventions |
+| [Changelog](CHANGELOG.md) | Release history |
+
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|---|---|
+| Frontend | TanStack Start (React 19), TanStack Router, TanStack Query, Tailwind CSS v4, shadcn/ui |
+| API | Nitro SSR (Vite 7), file-based routing in `api/[...route].ts` (72+ endpoints) |
+| Database | Supabase PostgreSQL with Row Level Security (27 migrations) |
+| AI | OpenRouter gateway (GPT-4o, Claude 3.5 Sonnet, Gemini 2.5 Pro, DeepSeek V3), Groq |
+| Automation | Playwright with self-healing selectors and persistent Edge profiles |
+| Queues | BullMQ (Redis) with inline fallback |
+| Notifications | In-app notification center + Telegram bot |
+| Auth | Supabase Auth (email/password, Google OAuth) |
+| Monitoring | Sentry (node + react), Pino structured logging |
+
+---
+
+## Key Features
+
+- **Onboarding Wizard** — 10-step guided setup: resume upload, brain review, role/location preferences, provider configuration, Telegram binding
+- **Resume Intelligence** — Parse, store, version resumes; extract skills, experience, goals; auto-detect gaps
+- **Candidate Brain** — Dynamic profile memory; single source of truth for all modules (skills, experience, education, projects, preferences)
+- **Job Import** — Import from 9 providers (LinkedIn, Indeed, Naukri, Wellfound, Instahyre, Greenhouse, Lever, Ashby, Workable)
+- **AI-Powered Matching** — Multi-factor match scoring (skills, role, experience, location, salary, freshness) with configurable thresholds
+- **Pipeline A** — Auto-apply for all matched jobs via Playwright browser automation with approval mode
+- **Pipeline B** — High-value company research → recruiter discovery → outreach draft generation → approval flow
+- **Batch Apply Engine** — Three strategies (conservative/balanced/aggressive) with configurable filters
+- **Playwright Automation** — Self-healing selectors, cookie-based auth, approval mode, evidence capture
+- **Cookie Management** — Encrypted cookie storage (AES-256-GCM), per-provider validation via real HTTP checks
+- **Provider Controls** — Per-provider enable/disable/pause with health tracking and auto-disable on failures
+- **Recruiter Discovery** — Multi-strategy contact discovery (Lusha, SignalHire, API, Google search)
+- **Outreach Orchestration** — AI-generated personalized drafts, follow-up cadence (3/7/14 day), Telegram approval
+- **Inbox Intelligence** — Gmail sync + message classification (interview, assessment, offer, rejection)
+- **Telegram Bot** — Full operations interface: provider status, health checks, approval, jobs, analytics
+- **Workflow Timeline** — Live stage tracking with progress bars, duration counters, start/pause/stop controls
+- **Multi-User Isolation** — user_id scoping on all tables, RLS policies, `auth.uid()` checks
+- **Event Bus** — Persisted workflow events with delivery tracking, follow-up scheduling
+- **Admin Dashboard** — Multi-tab admin: user inspection, provider controls, queue monitoring, workflow state
+- **Notification Center** — In-app notifications with filter tabs, severity icons, category badges
 
 ---
 
@@ -78,117 +156,6 @@ The system integrates with **eight job sources**, uses **multi-provider AI** for
     </tr>
   </table>
 </div>
-
----
-
-## Features
-
-### Resume Intelligence
-Parse, store, and version resumes. Extract skills, experience, career goals, and role preferences. Side-by-side comparison across versions. Auto-detect gaps and recommend improvements.
-
-### Application Automation
-Browser-automated submissions via Playwright with real browser profiles. Self-healing selectors adapt to UI changes. Approval mode for manual review before submission. Batch processing with configurable daily limits and random delays to avoid detection.
-
-### Recruiter Discovery
-Multi-strategy contact discovery — Lusha, SignalHire, API-based enrichment, and Google search. Confidence scoring and email validation. Automatic integration with outreach campaigns.
-
-### AI-Powered Matching
-Compute match scores between your profile and job descriptions using multi-provider AI (GPT-4o, Claude 3.5 Sonnet, Gemini 2.5 Pro, DeepSeek V3). Strategic value analysis identifies high-impact opportunities.
-
-### Outreach Orchestration
-Generate personalized outreach drafts per role and company. Schedule follow-up cadences with smart timing. Track responses, replies, and bounce rates. Context-aware follow-ups based on previous interactions.
-
-### Interview Pipeline
-Full interview lifecycle — schedule, prep materials, feedback tracking. Calendar integration and automated reminders.
-
-### Inbox Intelligence
-Classify Gmail messages by relevance. Surface recruiter replies and application responses. High-value message detection with priority routing.
-
-### Provider Operations
-Manage five job providers (LinkedIn, Indeed, Naukri, Wellfound, Instahyre) plus four ATS platforms (Greenhouse, Lever, Ashby, Workable). Enable/disable per provider. Auto-disable on critical failures. Cookie-based authentication with scheduled refresh.
-
-### Telegram Operations
-Full operations interface via Telegram bot — provider status, health checks, approval workflows, job listings, system statistics.
-
-### Workflow Automation
-Event bus with n8n integration (optional). Webhook-based notifications for job imports, applications, recruiter discoveries, follow-ups, and system alerts.
-
----
-
-## Architecture
-
-```
-  Frontend (TanStack Start)     API/BFF (Nitro SSR)     Supabase (PostgreSQL + RLS)
-  React 19 · Tailwind CSS       [...route].ts routing          19 migrations
-  File-based routing            Phase A/B handlers         Row Level Security
-  TanStack Query                Multi-provider AI              Events table
-  shadcn/ui                     Playwright automation       Queue state
-```
-
-The system uses a **server-rendered React frontend** with a **Nitro-powered API layer**, **Supabase for persistence**, **Redis/BullMQ for background jobs**, and **n8n for optional notification workflows**.
-
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a detailed breakdown.
-
----
-
-## Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | TanStack Start (React 19), TanStack Router, TanStack Query, Tailwind CSS v4, shadcn/ui |
-| API | Nitro SSR (Vite-powered), file-based routing in `api/[...route].ts` |
-| Database | Supabase PostgreSQL with Row Level Security |
-| AI | OpenRouter gateway (GPT-4o, Claude 3.5 Sonnet, Gemini 2.5 Pro, DeepSeek V3) |
-| Automation | Playwright with self-healing selectors and real Edge profiles |
-| Queues | BullMQ (Redis) with inline fallback |
-| Notifications | Event bus → n8n webhooks → Telegram (or direct Telegram) |
-| Auth | Supabase Auth (email/password, Google OAuth) |
-
----
-
-## Quick Start
-
-```bash
-git clone https://github.com/chauhandigvijay1/Valtrexa-V2.git
-cd Valtrexa-V2
-npm.cmd install
-cp .env.example .env
-# Edit .env with your credentials (see docs/SETUP.md)
-npm.cmd run dev
-```
-
-Full setup instructions: [docs/SETUP.md](docs/SETUP.md)
-
----
-
-## Documentation
-
-| Document | Description |
-|----------|-------------|
-| [Architecture](docs/ARCHITECTURE.md) | System design, stack decisions, data flow |
-| [Setup Guide](docs/SETUP.md) | Local development environment setup |
-| [Deployment](docs/DEPLOYMENT.md) | Production deployment (Vercel, Railway, Render) |
-| [Database](docs/DATABASE.md) | Schema, migrations, RLS policies |
-| [API Reference](docs/API_REFERENCE.md) | Internal API routes and handlers |
-| [Provider Operations](docs/PROVIDER_OPERATIONS.md) | Job provider integration guide |
-| [Provider Failure Registry](docs/PROVIDER_FAILURE_REGISTRY.md) | Known failure patterns and recovery |
-| [Telegram Operations](docs/TELEGRAM_OPERATIONS.md) | Bot commands and operations |
-| [n8n Operations](docs/N8N_OPERATIONS.md) | Workflow automation and event bus |
-| [Security](docs/SECURITY.md) | Auth, RLS, secrets management |
-| [Contributing](CONTRIBUTING.md) | Development guide and conventions |
-| [Changelog](CHANGELOG.md) | Release history |
-
----
-
-## Contributing
-
-We welcome contributions. See [CONTRIBUTING.md](CONTRIBUTING.md) for:
-
-- Development setup and conventions
-- Code style and linting
-- Testing requirements
-- Pull request process
-- Adding support for new job providers
 
 ---
 

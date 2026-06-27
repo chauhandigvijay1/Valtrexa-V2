@@ -28,7 +28,6 @@ type TableName =
   | "resume_analyses"
   | "tailored_resumes"
   | "workflow_events"
-  | "n8n_webhook_subscriptions"
   | "job_import_runs"
   | "companies"
   | "candidate_profiles"
@@ -143,23 +142,8 @@ export function useCrudSave<T extends { id?: string }>(table: TableName, queryKe
         return initial.data;
       }
     },
-    onSuccess: async (row) => {
-      const createdRow = row as { id?: string } | null;
-      const eventType = WORKFLOW_EVENT_BY_TABLE[table];
-      if (createdRow?.id && eventType) {
-        try {
-          await apiPost("/api/n8n/events", {
-            eventType,
-            entityType: table,
-            entityId: createdRow.id,
-            payload: createdRow as Record<string, unknown>,
-          });
-        } catch {
-          // Persisting the primary record takes priority over auxiliary event emission.
-        }
-      }
-      qc.invalidateQueries({ queryKey: [queryKeyPrefix] });
-      toast.success("Saved");
+    onSuccess: async () => {
+      // Event emission via workflow-events is handled server-side.
     },
     onError: (e: Error) => toast.error(e.message),
   });

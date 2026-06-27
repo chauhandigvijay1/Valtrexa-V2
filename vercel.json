@@ -1,12 +1,18 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "buildCommand": "npm run build",
+  "buildCommand": "npm.cmd run build",
   "outputDirectory": "dist/client",
   "functions": {
     "api/**/*.ts": {
       "includeFiles": "api/_dist/**"
     }
   },
+  "crons": [
+    {
+      "path": "/api/workflow/cycle",
+      "schedule": "*/30 * * * *"
+    }
+  ],
   "rewrites": [
     {
       "source": "/api/:path*",

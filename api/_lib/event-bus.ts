@@ -2,9 +2,9 @@
  * B4 — Event Bus.
  *
  * The publisher (`emitWorkflowEvent` in workflow-events.ts) already persists to
- * `workflow_events` and fires webhook subscriptions. This module adds:
+ * `workflow_events` and records delivery attempts. This module adds:
  *
- *   - consumer registry: register named consumers (workers, telegram, n8n)
+ *   - consumer registry: register named consumers (workers, telegram)
  *   - delivery history: every delivery attempt is recorded in
  *     `workflow_event_deliveries` so the UI can show per-consumer status
  *   - replay: re-deliver an event to a specific consumer
@@ -13,10 +13,9 @@
  */
 
 import { supabaseAdmin } from "./supabase.js";
-import { listWebhookSubscriptionsCompat } from "./compat.js";
 import { sendTelegramMessage } from "./telegram.js";
 
-export type ConsumerType = "webhook" | "telegram" | "n8n" | "worker";
+export type ConsumerType = "telegram" | "worker";
 
 export type RegisteredConsumer = {
   name: string;
@@ -31,31 +30,6 @@ export async function registerConsumer(
   userId: string,
   consumer: RegisteredConsumer,
 ): Promise<{ registered: boolean }> {
-  // Webhook consumers are stored in n8n_webhook_subscriptions (existing table).
-  // Other consumers are stored as integrations config for visibility.
-  if (consumer.type === "webhook" || consumer.type === "n8n") {
-    for (const eventType of consumer.eventTypes.length ? consumer.eventTypes : ["*"]) {
-      const existing = await supabaseAdmin
-        .from("n8n_webhook_subscriptions")
-        .select("id")
-        .eq("user_id", userId)
-        .eq("target_url", consumer.target)
-        .eq("event_type", eventType)
-        .maybeSingle();
-      if (existing.data?.id) continue;
-      const { error } = await supabaseAdmin.from("n8n_webhook_subscriptions").insert({
-        user_id: userId,
-        event_type: eventType,
-        target_url: consumer.target,
-        secret: consumer.secret ?? null,
-        enabled: true,
-      } as any);
-      if (error) throw new Error(error.message);
-    }
-    return { registered: true };
-  }
-
-  // Non-webhook consumers (telegram / worker) — store in integrations.
   const { error } = await supabaseAdmin.from("integrations").upsert(
     {
       user_id: userId,
@@ -74,27 +48,15 @@ export async function registerConsumer(
   return { registered: true };
 }
 
-/** List all consumers registered for a user (webhooks + integrations). */
+/** List all consumers registered for a user. */
 export async function listConsumers(userId: string): Promise<RegisteredConsumer[]> {
-  const [webhooks, integrations] = await Promise.all([
-    listWebhookSubscriptionsCompat(userId),
-    supabaseAdmin
-      .from("integrations")
-      .select("provider,config,enabled")
-      .eq("user_id", userId)
-      .like("provider", "event_consumer:%"),
-  ]);
+  const integrations = await supabaseAdmin
+    .from("integrations")
+    .select("provider,config,enabled")
+    .eq("user_id", userId)
+    .like("provider", "event_consumer:%");
 
   const consumers: RegisteredConsumer[] = [];
-  for (const row of webhooks.data ?? []) {
-    consumers.push({
-      name: `webhook:${(row as any).event_type}`,
-      type: "webhook",
-      target: (row as any).target_url,
-      eventTypes: [(row as any).event_type],
-      secret: (row as any).secret ?? null,
-    });
-  }
   for (const row of integrations.data ?? []) {
     const config = ((row as any).config ?? {}) as Record<string, unknown>;
     consumers.push({
@@ -119,20 +81,7 @@ export async function deliverToConsumer(
   let snippet = "";
 
   try {
-    if (consumer.type === "webhook" || consumer.type === "n8n") {
-      const response = await fetch(consumer.target, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          ...(consumer.secret ? { "x-valtrexa-v2-secret": consumer.secret } : {}),
-        },
-        body: JSON.stringify({ userId, eventId, payload, occurredAt: new Date().toISOString() }),
-        signal: AbortSignal.timeout(10000),
-      });
-      statusCode = response.status;
-      status = response.ok ? "delivered" : "failed";
-      snippet = (await response.text()).slice(0, 500);
-    } else if (consumer.type === "telegram") {
+    if (consumer.type === "telegram") {
       const result = await sendTelegramMessage(
         consumer.target,
         JSON.stringify(payload).slice(0, 2000),

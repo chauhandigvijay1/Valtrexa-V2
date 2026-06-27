@@ -52,47 +52,46 @@ Sensitive environment variables are documented in `.env.example` and include:
 
 ### Session & Auth Secrets
 
-| Variable | Purpose |
-|---|---|
-| `SESSION_SECRET` | Server-side session signing key |
+| Variable                    | Purpose                                 |
+| --------------------------- | --------------------------------------- |
+| `SESSION_SECRET`            | Server-side session signing key         |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase admin bypass key (server-only) |
 
 ### API Keys
 
-| Variable | Purpose |
-|---|---|
-| `OPENROUTER_API_KEY` | OpenRouter AI provider authorization |
-| `GROQ_API_KEY` | Groq AI provider authorization |
-| `N8N_API_KEY` | n8n workflow authentication |
-| `GREENHOUSE_API_KEY` | Greenhouse Harvest API key |
-| `LEVER_API_KEY` / `LEVER_SITE_TOKEN` | Lever ATS integration |
-| `ASHBY_API_KEY` | Ashby job board integration |
-| `WORKABLE_API_KEY` | Workable API integration |
-| `LINKEDIN_API_KEY` | LinkedIn API integration |
-| `INDEED_API_KEY` | Indeed API integration |
+| Variable                             | Purpose                              |
+| ------------------------------------ | ------------------------------------ |
+| `OPENROUTER_API_KEY`                 | OpenRouter AI provider authorization |
+| `GROQ_API_KEY`                       | Groq AI provider authorization       |
+| `GREENHOUSE_API_KEY`                 | Greenhouse Harvest API key           |
+| `LEVER_API_KEY` / `LEVER_SITE_TOKEN` | Lever ATS integration                |
+| `ASHBY_API_KEY`                      | Ashby job board integration          |
+| `WORKABLE_API_KEY`                   | Workable API integration             |
+| `LINKEDIN_API_KEY`                   | LinkedIn API integration             |
+| `INDEED_API_KEY`                     | Indeed API integration               |
 
 ### Provider Cookies
 
-| Variable | Purpose |
-|---|---|
-| `LINKEDIN_COOKIE` | LinkedIn session cookie for scraping |
-| `WELLFOUND_COOKIE` | Wellfound session cookie |
-| `INDEED_COOKIE` | Indeed session cookie |
-| `NAUKRI_COOKIE` | Naukri session cookie |
-| `INSTAHYRE_COOKIE` | Instahyre session cookie |
+| Variable           | Purpose                              |
+| ------------------ | ------------------------------------ |
+| `LINKEDIN_COOKIE`  | LinkedIn session cookie for scraping |
+| `WELLFOUND_COOKIE` | Wellfound session cookie             |
+| `INDEED_COOKIE`    | Indeed session cookie                |
+| `NAUKRI_COOKIE`    | Naukri session cookie                |
+| `INSTAHYRE_COOKIE` | Instahyre session cookie             |
 
 ### Gmail OAuth Credentials
 
-| Variable | Purpose |
-|---|---|
-| `GMAIL_CLIENT_ID` | Google OAuth client ID |
-| `GMAIL_CLIENT_SECRET` | Google OAuth client secret |
+| Variable              | Purpose                              |
+| --------------------- | ------------------------------------ |
+| `GMAIL_CLIENT_ID`     | Google OAuth client ID               |
+| `GMAIL_CLIENT_SECRET` | Google OAuth client secret           |
 | `GMAIL_REFRESH_TOKEN` | OAuth refresh token (offline access) |
 
 ### Telegram Bot Token
 
-| Variable | Purpose |
-|---|---|
+| Variable             | Purpose                                               |
+| -------------------- | ----------------------------------------------------- |
 | `TELEGRAM_BOT_TOKEN` | Telegram Bot API token for notifications and commands |
 
 All environment variables are loaded from `.env` and `.env.local` files at startup via `api/_lib/env.ts`. Production deployments should use the platform's secret management (e.g., Vercel Environment Variables, Docker secrets).
@@ -104,7 +103,7 @@ All environment variables are loaded from `.env` and `.env.local` files at start
 VALTREXA-V2 uses Supabase RLS policies for multi-tenant data isolation. All database operations include the `user_id` filter:
 
 ```typescript
-supabaseAdmin.from("jobs").select("*").eq("user_id", user.id)
+supabaseAdmin.from("jobs").select("*").eq("user_id", user.id);
 ```
 
 Key tables with user-scoped access:
@@ -134,8 +133,6 @@ When a webhook consumer is registered, an optional `secret` is stored. This secr
 
 Event bus consumers support types:
 
-- `webhook` — HTTP POST to a target URL with HMAC header
-- `n8n` — Webhook delivery to n8n
 - `telegram` — Message delivery to Telegram chat
 - `worker` — Internal queue worker processing
 

@@ -89,6 +89,16 @@ const SKILL_CATALOG: Record<string, string[]> = {
     "SQL",
     "HTML",
     "CSS",
+    "Rust",
+    "Swift",
+    "Kotlin",
+    "Scala",
+    "R",
+    "Dart",
+    "Perl",
+    "Shell",
+    "Bash",
+    "Zig",
   ],
   Frameworks: [
     "React",
@@ -103,6 +113,18 @@ const SKILL_CATALOG: Record<string, string[]> = {
     "Flask",
     "FastAPI",
     "Laravel",
+    "Ruby on Rails",
+    "ASP.NET",
+    "Svelte",
+    "Nuxt.js",
+    "Gatsby",
+    "Remix",
+    "Solid.js",
+    "Electron",
+    "React Native",
+    "Flutter",
+    ".NET",
+    "Express.js",
   ],
   Libraries: [
     "Redux",
@@ -115,6 +137,24 @@ const SKILL_CATALOG: Record<string, string[]> = {
     "TensorFlow",
     "PyTorch",
     "GraphQL",
+    "Zustand",
+    "MobX",
+    "RxJS",
+    "Three.js",
+    "D3.js",
+    "Sass",
+    "Less",
+    "Material UI",
+    "Shadcn UI",
+    "Prisma",
+    "TypeORM",
+    "Sequelize",
+    "Mongoose",
+    "OpenAI",
+    "LangChain",
+    "Jest",
+    "Vitest",
+    "Cypress",
   ],
   Databases: [
     "PostgreSQL",
@@ -125,10 +165,73 @@ const SKILL_CATALOG: Record<string, string[]> = {
     "SQLite",
     "DynamoDB",
     "Elasticsearch",
+    "MariaDB",
+    "Cassandra",
+    "Neo4j",
+    "Firestore",
+    "BigQuery",
+    "Snowflake",
+    "ClickHouse",
+    "CouchDB",
   ],
-  Cloud: ["AWS", "Azure", "GCP", "Vercel", "Netlify", "Firebase", "Cloudflare"],
-  DevOps: ["Docker", "Kubernetes", "Terraform", "GitHub Actions", "CI/CD", "Jenkins", "Linux"],
-  Tools: ["Git", "Figma", "Postman", "Jira", "Notion", "Playwright", "Vitest", "Webpack", "Vite"],
+  Cloud: [
+    "AWS",
+    "Azure",
+    "GCP",
+    "Vercel",
+    "Netlify",
+    "Firebase",
+    "Cloudflare",
+    "Heroku",
+    "DigitalOcean",
+    "Railway",
+    "Fly.io",
+    "Supabase",
+    "Render",
+  ],
+  DevOps: [
+    "Docker",
+    "Kubernetes",
+    "Terraform",
+    "GitHub Actions",
+    "CI/CD",
+    "Jenkins",
+    "Linux",
+    "Ansible",
+    "Puppet",
+    "Chef",
+    "Helm",
+    "Prometheus",
+    "Grafana",
+    "Datadog",
+    "Sentry",
+    "Nginx",
+    "Apache",
+  ],
+  Tools: [
+    "Git",
+    "Figma",
+    "Postman",
+    "Jira",
+    "Notion",
+    "Playwright",
+    "Vitest",
+    "Webpack",
+    "Vite",
+    "ESLint",
+    "Prettier",
+    "Yarn",
+    "pnpm",
+    "npm",
+    "Babel",
+    "Rollup",
+    "Turborepo",
+    "Nx",
+    "Storybook",
+    "Slack",
+    "Linear",
+    "Confluence",
+  ],
 };
 
 const ROLE_RULES: Array<{ roles: string[]; requiredSkills: string[] }> = [
@@ -346,6 +449,64 @@ const resumeSchema = {
   ],
 } as const;
 
+const MONTH_NAMES: Record<string, string> = {
+  jan: "01",
+  feb: "02",
+  mar: "03",
+  apr: "04",
+  may: "05",
+  jun: "06",
+  jul: "07",
+  aug: "08",
+  sep: "09",
+  oct: "10",
+  nov: "11",
+  dec: "12",
+  january: "01",
+  february: "02",
+  march: "03",
+  april: "04",
+  june: "06",
+  july: "07",
+  august: "08",
+  september: "09",
+  october: "10",
+  november: "11",
+  december: "12",
+};
+
+function parseResumeDate(text: string): string | null {
+  if (!text) return null;
+  const t = text.trim();
+  if (/^(present|current|now)$/i.test(t)) {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  }
+  const mmmYyyy = t.match(/^([A-Za-z]{3,9})\s+(\d{4})$/);
+  if (mmmYyyy) {
+    const month = MONTH_NAMES[mmmYyyy[1].toLowerCase()];
+    if (month) return `${mmmYyyy[2]}-${month}`;
+    return null;
+  }
+  const mmYyyy = t.match(/^(\d{1,2})\/(\d{4})$/);
+  if (mmYyyy) {
+    const m = mmYyyy[1].padStart(2, "0");
+    if (+m >= 1 && +m <= 12) return `${mmYyyy[2]}-${m}`;
+    return null;
+  }
+  const yyyyMm = t.match(/^(\d{4})-(\d{2})$/);
+  if (yyyyMm) {
+    const m = yyyyMm[2];
+    if (+m >= 1 && +m <= 12) return t;
+    return null;
+  }
+  const yyyyOnly = t.match(/^(\d{4})$/);
+  if (yyyyOnly) {
+    return `${yyyyOnly[1]}-01`;
+  }
+  return null;
+}
+
 function normalizeWhitespace(value: string) {
   return value
     .replace(/\u00a0/g, " ")
@@ -483,12 +644,16 @@ function splitBullets(section: string) {
     .filter((line) => line.length > 5);
 }
 
+function skillToRegex(skill: string): RegExp {
+  const escaped = skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(?:^|[^a-zA-Z0-9])${escaped}(?:$|[^a-zA-Z0-9])`, "gi");
+}
+
 function extractKnownSkills(rawText: string) {
   const found: string[] = [];
   for (const values of Object.values(SKILL_CATALOG)) {
     for (const skill of values) {
-      const pattern = new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i");
-      if (pattern.test(rawText)) found.push(skill);
+      if (skillToRegex(skill).test(rawText)) found.push(skill);
     }
   }
   return uniqueStrings(found);
@@ -534,11 +699,7 @@ function inferPreferredRoles(skills: string[], experience: ResumeExperience[], r
 }
 
 function inferProjectTech(projectText: string, knownSkills: string[]) {
-  return uniqueStrings(
-    knownSkills.filter((skill) =>
-      new RegExp(`\\b${skill.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`, "i").test(projectText),
-    ),
-  );
+  return uniqueStrings(knownSkills.filter((skill) => skillToRegex(skill).test(projectText)));
 }
 
 function inferProjects(rawText: string, skills: string[]) {
@@ -585,13 +746,31 @@ function inferExperiences(rawText: string) {
     const company = titleCompany[1] ?? null;
     const description = lines.slice(1).join(" ");
     const isCurrent = /present|current/i.test(chunk);
+
+    let startDate: string | null = null;
+    let endDate: string | null = null;
+    const dateMatch = chunk.match(
+      /((?:[A-Za-z]{3,9}\s+\d{4}|\d{1,2}\/\d{4}|\d{4}-\d{2}|\d{4})\s*(?:-|to|–)\s*([A-Za-z]{3,9}\s+\d{4}|\d{1,2}\/\d{4}|\d{4}-\d{2}|\d{4}|present|current|now))/i,
+    );
+    if (dateMatch) {
+      startDate = parseResumeDate(dateMatch[1].trim());
+      endDate = parseResumeDate(dateMatch[2].trim());
+    } else {
+      const singleDate = chunk.match(
+        /((?:[A-Za-z]{3,9}\s+\d{4}|\d{1,2}\/\d{4}|\d{4}-\d{2}|\d{4}))/,
+      );
+      if (singleDate) {
+        startDate = parseResumeDate(singleDate[1].trim());
+      }
+    }
+
     return {
       company: firstNonEmpty(company),
       title: firstNonEmpty(title),
       location: null,
-      start_date: null,
-      end_date: null,
-      is_current: isCurrent,
+      start_date: startDate,
+      end_date: endDate,
+      is_current: isCurrent || (endDate ? /present|current|now/i.test(endDate) : false),
       description: firstNonEmpty(description),
       summary: firstNonEmpty(description),
     } satisfies ResumeExperience;
@@ -830,8 +1009,19 @@ export async function parseResumeText(
       [
         {
           role: "system",
-          content:
-            "Extract resume data into strict JSON. Populate contact details, summary, project URLs, project features, skills, work history, education, certifications, and likely preferred roles. Use empty arrays for missing lists, null for missing scalars, and a confidence_score from 0 to 1.",
+          content: `You are a resume extraction engine. Extract resume data into strict JSON.
+
+CRITICAL RULES:
+- NEVER classify section headings (like "Experience", "Education", "Skills") as achievements or job titles
+- NEVER classify contact information (email, phone, address, LinkedIn URL) as skills or technologies
+- NEVER classify random text fragments or generic bullets as specific technologies
+- ONLY extract real skills that are explicitly listed as technical abilities
+- Extract skills with proficiency levels where mentioned (beginner/intermediate/advanced/expert)
+- Normalize job titles to standard forms (e.g., "React Dev" → "Frontend Developer", "Sr. Eng" → "Senior Engineer")
+- For education, extract degree type, field of study, institution name, and dates separately
+- For experience, extract company name, job title, start/end dates, and key responsibilities
+- If a section cannot be parsed reliably, return null for that section rather than guessing
+Use empty arrays for missing lists, null for missing scalars, and a confidence_score from 0 to 1.`,
         },
         {
           role: "user",

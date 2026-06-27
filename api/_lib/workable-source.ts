@@ -20,7 +20,8 @@ export async function importWorkable(boardUrl: string, apiKey?: string): Promise
     } else if (host === "apply.workable.com") {
       account = parsed.pathname.split("/").filter(Boolean)[0] ?? null;
     }
-  } catch {
+  } catch (err) {
+    console.warn("[WorkableSource] URL parsing failed", err);
     account = boardUrl.split("/").filter(Boolean).pop() ?? null;
   }
 
@@ -54,8 +55,8 @@ export async function importWorkable(boardUrl: string, apiKey?: string): Promise
         rawPayload: job,
       }));
     }
-  } catch {
-    // fall through to HTML scrape
+  } catch (err) {
+    console.warn("[WorkableSource] SPI feed fetch failed, falling back to HTML scrape", err);
   }
 
   // 3. Fall back to scraping the public board HTML.
@@ -87,7 +88,8 @@ export async function importWorkable(boardUrl: string, apiKey?: string): Promise
       });
     });
     return jobs;
-  } catch {
+  } catch (err) {
+    console.warn("[WorkableSource] HTML scrape failed", err);
     return [];
   }
 }

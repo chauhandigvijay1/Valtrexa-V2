@@ -15,6 +15,7 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedWorkflowTimelineRouteImport } from './routes/_authenticated/workflow-timeline'
 import { Route as AuthenticatedSkillsRouteImport } from './routes/_authenticated/skills'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedResumesRouteImport } from './routes/_authenticated/resumes'
@@ -24,13 +25,17 @@ import { Route as AuthenticatedProfileRouteImport } from './routes/_authenticate
 import { Route as AuthenticatedPainpointsRouteImport } from './routes/_authenticated/painpoints'
 import { Route as AuthenticatedOutreachRouteImport } from './routes/_authenticated/outreach'
 import { Route as AuthenticatedOpportunitiesRouteImport } from './routes/_authenticated/opportunities'
+import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
+import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authenticated/notifications'
 import { Route as AuthenticatedJobMatchesRouteImport } from './routes/_authenticated/job-matches'
 import { Route as AuthenticatedInterviewsRouteImport } from './routes/_authenticated/interviews'
 import { Route as AuthenticatedInterviewPrepRouteImport } from './routes/_authenticated/interview-prep'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCookiesRouteImport } from './routes/_authenticated/cookies'
 import { Route as AuthenticatedCompanyResearchRouteImport } from './routes/_authenticated/company-research'
 import { Route as AuthenticatedApplicationsRouteImport } from './routes/_authenticated/applications'
 import { Route as AuthenticatedAnalyticsRouteImport } from './routes/_authenticated/analytics'
+import { Route as AuthenticatedAdminRouteImport } from './routes/_authenticated/admin'
 
 const SignupRoute = SignupRouteImport.update({
   id: '/signup',
@@ -61,6 +66,12 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedWorkflowTimelineRoute =
+  AuthenticatedWorkflowTimelineRouteImport.update({
+    id: '/workflow-timeline',
+    path: '/workflow-timeline',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedSkillsRoute = AuthenticatedSkillsRouteImport.update({
   id: '/skills',
   path: '/skills',
@@ -107,6 +118,17 @@ const AuthenticatedOpportunitiesRoute =
     path: '/opportunities',
     getParentRoute: () => AuthenticatedRoute,
   } as any)
+const AuthenticatedOnboardingRoute = AuthenticatedOnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
+const AuthenticatedNotificationsRoute =
+  AuthenticatedNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => AuthenticatedRoute,
+  } as any)
 const AuthenticatedJobMatchesRoute = AuthenticatedJobMatchesRouteImport.update({
   id: '/job-matches',
   path: '/job-matches',
@@ -128,6 +150,11 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedCookiesRoute = AuthenticatedCookiesRouteImport.update({
+  id: '/cookies',
+  path: '/cookies',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 const AuthenticatedCompanyResearchRoute =
   AuthenticatedCompanyResearchRouteImport.update({
     id: '/company-research',
@@ -145,6 +172,11 @@ const AuthenticatedAnalyticsRoute = AuthenticatedAnalyticsRouteImport.update({
   path: '/analytics',
   getParentRoute: () => AuthenticatedRoute,
 } as any)
+const AuthenticatedAdminRoute = AuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => AuthenticatedRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -152,13 +184,17 @@ export interface FileRoutesByFullPath {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/applications': typeof AuthenticatedApplicationsRoute
   '/company-research': typeof AuthenticatedCompanyResearchRoute
+  '/cookies': typeof AuthenticatedCookiesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/interview-prep': typeof AuthenticatedInterviewPrepRoute
   '/interviews': typeof AuthenticatedInterviewsRoute
   '/job-matches': typeof AuthenticatedJobMatchesRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/opportunities': typeof AuthenticatedOpportunitiesRoute
   '/outreach': typeof AuthenticatedOutreachRoute
   '/painpoints': typeof AuthenticatedPainpointsRoute
@@ -168,6 +204,7 @@ export interface FileRoutesByFullPath {
   '/resumes': typeof AuthenticatedResumesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/skills': typeof AuthenticatedSkillsRoute
+  '/workflow-timeline': typeof AuthenticatedWorkflowTimelineRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -175,13 +212,17 @@ export interface FileRoutesByTo {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/admin': typeof AuthenticatedAdminRoute
   '/analytics': typeof AuthenticatedAnalyticsRoute
   '/applications': typeof AuthenticatedApplicationsRoute
   '/company-research': typeof AuthenticatedCompanyResearchRoute
+  '/cookies': typeof AuthenticatedCookiesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/interview-prep': typeof AuthenticatedInterviewPrepRoute
   '/interviews': typeof AuthenticatedInterviewsRoute
   '/job-matches': typeof AuthenticatedJobMatchesRoute
+  '/notifications': typeof AuthenticatedNotificationsRoute
+  '/onboarding': typeof AuthenticatedOnboardingRoute
   '/opportunities': typeof AuthenticatedOpportunitiesRoute
   '/outreach': typeof AuthenticatedOutreachRoute
   '/painpoints': typeof AuthenticatedPainpointsRoute
@@ -191,6 +232,7 @@ export interface FileRoutesByTo {
   '/resumes': typeof AuthenticatedResumesRoute
   '/settings': typeof AuthenticatedSettingsRoute
   '/skills': typeof AuthenticatedSkillsRoute
+  '/workflow-timeline': typeof AuthenticatedWorkflowTimelineRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -200,13 +242,17 @@ export interface FileRoutesById {
   '/login': typeof LoginRoute
   '/reset-password': typeof ResetPasswordRoute
   '/signup': typeof SignupRoute
+  '/_authenticated/admin': typeof AuthenticatedAdminRoute
   '/_authenticated/analytics': typeof AuthenticatedAnalyticsRoute
   '/_authenticated/applications': typeof AuthenticatedApplicationsRoute
   '/_authenticated/company-research': typeof AuthenticatedCompanyResearchRoute
+  '/_authenticated/cookies': typeof AuthenticatedCookiesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/interview-prep': typeof AuthenticatedInterviewPrepRoute
   '/_authenticated/interviews': typeof AuthenticatedInterviewsRoute
   '/_authenticated/job-matches': typeof AuthenticatedJobMatchesRoute
+  '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
+  '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/_authenticated/opportunities': typeof AuthenticatedOpportunitiesRoute
   '/_authenticated/outreach': typeof AuthenticatedOutreachRoute
   '/_authenticated/painpoints': typeof AuthenticatedPainpointsRoute
@@ -216,6 +262,7 @@ export interface FileRoutesById {
   '/_authenticated/resumes': typeof AuthenticatedResumesRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/skills': typeof AuthenticatedSkillsRoute
+  '/_authenticated/workflow-timeline': typeof AuthenticatedWorkflowTimelineRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -225,13 +272,17 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/signup'
+    | '/admin'
     | '/analytics'
     | '/applications'
     | '/company-research'
+    | '/cookies'
     | '/dashboard'
     | '/interview-prep'
     | '/interviews'
     | '/job-matches'
+    | '/notifications'
+    | '/onboarding'
     | '/opportunities'
     | '/outreach'
     | '/painpoints'
@@ -241,6 +292,7 @@ export interface FileRouteTypes {
     | '/resumes'
     | '/settings'
     | '/skills'
+    | '/workflow-timeline'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -248,13 +300,17 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/signup'
+    | '/admin'
     | '/analytics'
     | '/applications'
     | '/company-research'
+    | '/cookies'
     | '/dashboard'
     | '/interview-prep'
     | '/interviews'
     | '/job-matches'
+    | '/notifications'
+    | '/onboarding'
     | '/opportunities'
     | '/outreach'
     | '/painpoints'
@@ -264,6 +320,7 @@ export interface FileRouteTypes {
     | '/resumes'
     | '/settings'
     | '/skills'
+    | '/workflow-timeline'
   id:
     | '__root__'
     | '/'
@@ -272,13 +329,17 @@ export interface FileRouteTypes {
     | '/login'
     | '/reset-password'
     | '/signup'
+    | '/_authenticated/admin'
     | '/_authenticated/analytics'
     | '/_authenticated/applications'
     | '/_authenticated/company-research'
+    | '/_authenticated/cookies'
     | '/_authenticated/dashboard'
     | '/_authenticated/interview-prep'
     | '/_authenticated/interviews'
     | '/_authenticated/job-matches'
+    | '/_authenticated/notifications'
+    | '/_authenticated/onboarding'
     | '/_authenticated/opportunities'
     | '/_authenticated/outreach'
     | '/_authenticated/painpoints'
@@ -288,6 +349,7 @@ export interface FileRouteTypes {
     | '/_authenticated/resumes'
     | '/_authenticated/settings'
     | '/_authenticated/skills'
+    | '/_authenticated/workflow-timeline'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -342,6 +404,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated/workflow-timeline': {
+      id: '/_authenticated/workflow-timeline'
+      path: '/workflow-timeline'
+      fullPath: '/workflow-timeline'
+      preLoaderRoute: typeof AuthenticatedWorkflowTimelineRouteImport
+      parentRoute: typeof AuthenticatedRoute
     }
     '/_authenticated/skills': {
       id: '/_authenticated/skills'
@@ -406,6 +475,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedOpportunitiesRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/onboarding': {
+      id: '/_authenticated/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof AuthenticatedOnboardingRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
+    '/_authenticated/notifications': {
+      id: '/_authenticated/notifications'
+      path: '/notifications'
+      fullPath: '/notifications'
+      preLoaderRoute: typeof AuthenticatedNotificationsRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/job-matches': {
       id: '/_authenticated/job-matches'
       path: '/job-matches'
@@ -434,6 +517,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/cookies': {
+      id: '/_authenticated/cookies'
+      path: '/cookies'
+      fullPath: '/cookies'
+      preLoaderRoute: typeof AuthenticatedCookiesRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
     '/_authenticated/company-research': {
       id: '/_authenticated/company-research'
       path: '/company-research'
@@ -455,17 +545,28 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAnalyticsRouteImport
       parentRoute: typeof AuthenticatedRoute
     }
+    '/_authenticated/admin': {
+      id: '/_authenticated/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AuthenticatedAdminRouteImport
+      parentRoute: typeof AuthenticatedRoute
+    }
   }
 }
 
 interface AuthenticatedRouteChildren {
+  AuthenticatedAdminRoute: typeof AuthenticatedAdminRoute
   AuthenticatedAnalyticsRoute: typeof AuthenticatedAnalyticsRoute
   AuthenticatedApplicationsRoute: typeof AuthenticatedApplicationsRoute
   AuthenticatedCompanyResearchRoute: typeof AuthenticatedCompanyResearchRoute
+  AuthenticatedCookiesRoute: typeof AuthenticatedCookiesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedInterviewPrepRoute: typeof AuthenticatedInterviewPrepRoute
   AuthenticatedInterviewsRoute: typeof AuthenticatedInterviewsRoute
   AuthenticatedJobMatchesRoute: typeof AuthenticatedJobMatchesRoute
+  AuthenticatedNotificationsRoute: typeof AuthenticatedNotificationsRoute
+  AuthenticatedOnboardingRoute: typeof AuthenticatedOnboardingRoute
   AuthenticatedOpportunitiesRoute: typeof AuthenticatedOpportunitiesRoute
   AuthenticatedOutreachRoute: typeof AuthenticatedOutreachRoute
   AuthenticatedPainpointsRoute: typeof AuthenticatedPainpointsRoute
@@ -475,16 +576,21 @@ interface AuthenticatedRouteChildren {
   AuthenticatedResumesRoute: typeof AuthenticatedResumesRoute
   AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
   AuthenticatedSkillsRoute: typeof AuthenticatedSkillsRoute
+  AuthenticatedWorkflowTimelineRoute: typeof AuthenticatedWorkflowTimelineRoute
 }
 
 const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
+  AuthenticatedAdminRoute: AuthenticatedAdminRoute,
   AuthenticatedAnalyticsRoute: AuthenticatedAnalyticsRoute,
   AuthenticatedApplicationsRoute: AuthenticatedApplicationsRoute,
   AuthenticatedCompanyResearchRoute: AuthenticatedCompanyResearchRoute,
+  AuthenticatedCookiesRoute: AuthenticatedCookiesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedInterviewPrepRoute: AuthenticatedInterviewPrepRoute,
   AuthenticatedInterviewsRoute: AuthenticatedInterviewsRoute,
   AuthenticatedJobMatchesRoute: AuthenticatedJobMatchesRoute,
+  AuthenticatedNotificationsRoute: AuthenticatedNotificationsRoute,
+  AuthenticatedOnboardingRoute: AuthenticatedOnboardingRoute,
   AuthenticatedOpportunitiesRoute: AuthenticatedOpportunitiesRoute,
   AuthenticatedOutreachRoute: AuthenticatedOutreachRoute,
   AuthenticatedPainpointsRoute: AuthenticatedPainpointsRoute,
@@ -494,6 +600,7 @@ const AuthenticatedRouteChildren: AuthenticatedRouteChildren = {
   AuthenticatedResumesRoute: AuthenticatedResumesRoute,
   AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
   AuthenticatedSkillsRoute: AuthenticatedSkillsRoute,
+  AuthenticatedWorkflowTimelineRoute: AuthenticatedWorkflowTimelineRoute,
 }
 
 const AuthenticatedRouteWithChildren = AuthenticatedRoute._addFileChildren(

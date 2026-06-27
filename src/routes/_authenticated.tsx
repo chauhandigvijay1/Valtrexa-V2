@@ -1,8 +1,10 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Outlet, useNavigate, useLocation } from "@tanstack/react-router";
 import { useEffect } from "react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { NotificationBell } from "@/components/notification-bell";
+import { OnboardingWizard } from "@/components/onboarding-wizard";
 import { useAuth } from "@/hooks/use-auth";
 import { Skeleton } from "@/components/ui/skeleton";
 import { hasAuthCallbackParams } from "@/lib/auth-callback";
@@ -14,6 +16,7 @@ export const Route = createFileRoute("/_authenticated")({
 function AuthedLayout() {
   const { user, loading } = useAuth();
   const nav = useNavigate();
+  const location = useLocation();
   const waitingForCallback = hasAuthCallbackParams();
 
   useEffect(() => {
@@ -32,12 +35,14 @@ function AuthedLayout() {
 
   return (
     <SidebarProvider>
+      {location.pathname !== "/onboarding" && <OnboardingWizard />}
       <div className="min-h-screen flex w-full bg-background text-foreground">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">
           <header className="h-12 flex items-center border-b border-border px-3 gap-2">
             <SidebarTrigger />
-            <div className="ml-auto">
+            <div className="ml-auto flex items-center gap-1">
+              <NotificationBell />
               <ThemeToggle />
             </div>
           </header>

@@ -43,7 +43,7 @@ const FIX_MAP: Record<string, string> = {
   layout_change: "Provider site layout changed — review and update scrape logic",
   upload_failure: "Resume upload failed — retry or check file format/size",
   submission_failure: "Application submission failed — provider may have validation errors",
-  stuck_workflow: "n8n workflow stuck — check n8n UI and restart workflow",
+  stuck_workflow: "Workflow is stuck — check worker logs and restart",
   stuck_queue: "BullMQ queue stuck — check Redis and queue consumers",
   repeated_retries: "Repeated retries detected — provider may be blocking or down",
   provider_downtime: "Provider is down — wait for recovery or disable temporarily",
@@ -218,9 +218,9 @@ export async function alertSelectorFailure(
 
 // ─── Daily Health Summary ─────────────────────────────────
 
-export async function sendDailyHealthSummary(): Promise<void> {
+export async function sendDailyHealthSummary(userId: string): Promise<void> {
   try {
-    const controls = await getProviderControls();
+    const controls = await getProviderControls(userId);
     const chatId = ensureChatId();
 
     let text = "<b>📊 Daily Provider Health Summary</b>\n\n";

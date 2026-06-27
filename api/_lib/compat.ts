@@ -30,7 +30,8 @@ export function decodeMeta(text?: string | null) {
   try {
     const parsed = JSON.parse(text.slice(META_PREFIX.length));
     return isObject(parsed) ? parsed : {};
-  } catch {
+  } catch (err) {
+    console.warn("[Compat] decodeMeta JSON parse failed", err);
     return {};
   }
 }
@@ -149,34 +150,6 @@ export async function getLatestResumeParseCompat(userId: string, resumeId: strin
 
   if (!direct.error && direct.data) return direct.data;
   return null;
-}
-
-export async function insertWebhookSubscriptionCompat(input: {
-  userId: string;
-  eventType: string;
-  targetUrl: string;
-  secret?: string | null;
-  enabled?: boolean;
-}) {
-  return supabaseAdmin
-    .from("n8n_webhook_subscriptions")
-    .insert({
-      user_id: input.userId,
-      event_type: input.eventType,
-      target_url: input.targetUrl,
-      secret: input.secret ?? null,
-      enabled: input.enabled ?? true,
-    } as any)
-    .select("*")
-    .single();
-}
-
-export async function listWebhookSubscriptionsCompat(userId: string) {
-  return supabaseAdmin
-    .from("n8n_webhook_subscriptions")
-    .select("*")
-    .eq("user_id", userId)
-    .order("created_at", { ascending: false });
 }
 
 export async function insertDailySummaryCompat(input: {

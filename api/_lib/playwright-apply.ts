@@ -3,6 +3,14 @@ import { emitWorkflowEvent } from "./workflow-events.js";
 import { resolveStorageState } from "./playwright-platform.js";
 import { isProviderEnabled } from "./provider-controls.js";
 import type { BrowserProviderName } from "./playwright-platform.js";
+import {
+  autoFillFromMemory,
+  isMemorizable,
+  storeInMemory,
+  notifyUnknownQuestion,
+  shouldAlwaysRegenerate,
+  generateDynamicAnswer,
+} from "./dynamic-profile-memory.js";
 
 type PlatformHandlerInput = {
   jobUrl: string;
@@ -14,7 +22,12 @@ type PlatformHandlerInput = {
   approvalMode?: boolean;
 };
 
-export type ApplyFlowStatus = "APPLIED" | "PARTIAL" | "REQUIRES_APPROVAL" | "FAILED";
+export type ApplyFlowStatus =
+  | "APPLIED"
+  | "PARTIAL"
+  | "REQUIRES_APPROVAL"
+  | "FAILED"
+  | "MANUAL_APPLY_REQUIRED";
 
 export type ApplyFlowResult = {
   status: ApplyFlowStatus;
@@ -269,7 +282,8 @@ async function uploadResume(page: any, resumeUrl?: string): Promise<boolean> {
       }
     }
     return false;
-  } catch {
+  } catch (err) {
+    console.warn(`[playwright-apply] uploadResume: ${err}`);
     return false;
   }
 }
@@ -279,6 +293,8 @@ async function fillKnownFields(
   candidateData: Record<string, any>,
   context?: string,
   aiGeneratedAnswers?: Record<string, string>,
+  userId?: string,
+  jobContext?: { company?: string; jobTitle?: string; jobDescription?: string },
 ): Promise<{ filled: number; aiGenerated: Record<string, string> }> {
   let filled = 0;
   const aiGen: Record<string, string> = { ...(aiGeneratedAnswers || {}) };
@@ -289,6 +305,32 @@ async function fillKnownFields(
       if (await fillField(page, selectors, value)) filled++;
       continue;
     }
+
+    // Fields that should always be regenerated with context (cover letter, why this company, etc.)
+    if (userId && shouldAlwaysRegenerate(fieldName)) {
+      const generated = await generateDynamicAnswer(
+        userId,
+        fieldName,
+        jobContext?.company,
+        jobContext?.jobTitle,
+        jobContext?.jobDescription,
+      );
+      if (generated) {
+        aiGen[fieldName] = generated;
+        if (await fillField(page, selectors, generated)) filled++;
+      }
+      continue;
+    }
+
+    // Check Dynamic Profile Memory before generating AI answer
+    if (userId) {
+      const remembered = await autoFillFromMemory(userId, fieldName);
+      if (remembered) {
+        if (await fillField(page, selectors, remembered)) filled++;
+        continue;
+      }
+    }
+
     const generated = await generateAnswerForField(
       page,
       fieldName,
@@ -297,6 +339,11 @@ async function fillKnownFields(
     if (generated) {
       aiGen[fieldName] = generated;
       if (await fillField(page, selectors, generated)) filled++;
+
+      // Store memorizable answers for future use
+      if (userId && isMemorizable(fieldName)) {
+        await storeInMemory(userId, fieldName, generated, "permanent");
+      }
     }
   }
   return { filled, aiGenerated: aiGen };
@@ -317,7 +364,8 @@ async function fillField(page: any, selectors: string[], value: string): Promise
         }
         return true;
       }
-    } catch {
+    } catch (err) {
+      console.warn(`[playwright-apply] fillField: ${err}`);
       continue;
     }
   }
@@ -370,7 +418,8 @@ async function generateAnswerForField(page: any, label: string, context: string)
       },
     ]);
     return (result as any).content?.trim() || "";
-  } catch {
+  } catch (err) {
+    console.warn(`[playwright-apply] generateAnswerForField: ${err}`);
     return "";
   }
 }
@@ -378,25 +427,114 @@ async function generateAnswerForField(page: any, label: string, context: string)
 async function handleScreeningQuestions(
   page: any,
   candidateData: Record<string, any>,
+  userId?: string,
+  options?: {
+    applicationId?: string;
+    provider?: string;
+    companyName?: string;
+    jobTitle?: string;
+  },
 ): Promise<number> {
   let answered = 0;
   try {
-    const questions = await page.evaluate(() => {
-      const form = document.querySelector("form") || document.body;
-      const radios = form.querySelectorAll('fieldset, div[role="radiogroup"]');
-      return Array.from(radios)
-        .map((r) => r.textContent?.trim() || "")
-        .filter(Boolean);
-    });
-    for (let i = 0; i < questions.length; i++) {
-      const radios = await page.$$('input[type="radio"]');
-      if (radios[i]) {
-        await radios[i].check().catch(() => {});
-        answered++;
+    if (!userId) return 0;
+    const groups = await page.$$('fieldset, div[role="radiogroup"]');
+    for (const group of groups) {
+      const questionText = await group.evaluate((el: any) => {
+        const legend = el.querySelector("legend");
+        if (legend) return (legend.textContent || "").trim();
+        const aria = el.getAttribute("aria-label");
+        if (aria) return aria.trim();
+        return (el.textContent || "").trim();
+      });
+      if (!questionText) continue;
+
+      const answer = await autoFillFromMemory(userId, questionText);
+      if (answer) {
+        const radios = await group.$$('input[type="radio"]');
+        for (const radio of radios) {
+          const labelText = await radio.evaluate((el: any) => {
+            const label = el.closest("label");
+            if (label) return (label.textContent || "").replace(el.value || "", "").trim();
+            if (el.id) {
+              const forLabel = document.querySelector('label[for="' + el.id + '"]');
+              if (forLabel) return (forLabel.textContent || "").trim();
+            }
+            return (
+              el.getAttribute("aria-label") ||
+              (el.parentElement?.textContent || "").replace(el.value || "", "").trim() ||
+              el.value ||
+              ""
+            );
+          });
+          const ansLower = answer.toLowerCase();
+          const labLower = labelText.toLowerCase();
+          if (labLower.includes(ansLower) || ansLower.includes(labLower)) {
+            await radio
+              .check()
+              .catch((err: any) =>
+                console.warn(`[playwright-apply] handleScreeningQuestions radio check: ${err}`),
+              );
+            answered++;
+            break;
+          }
+        }
+        continue;
+      }
+
+      // Unknown question — generate AI suggestion and notify user
+      if (options?.applicationId && options?.provider) {
+        const suggestedAnswer = await generateDynamicAnswer(
+          userId,
+          questionText,
+          options.companyName,
+          options.jobTitle,
+        );
+
+        if (suggestedAnswer) {
+          const radios = await group.$$('input[type="radio"]');
+          for (const radio of radios) {
+            const labelText = await radio.evaluate((el: any) => {
+              const label = el.closest("label");
+              if (label) return (label.textContent || "").replace(el.value || "", "").trim();
+              if (el.id) {
+                const forLabel = document.querySelector('label[for="' + el.id + '"]');
+                if (forLabel) return (forLabel.textContent || "").trim();
+              }
+              return (
+                el.getAttribute("aria-label") ||
+                (el.parentElement?.textContent || "").replace(el.value || "", "").trim() ||
+                el.value ||
+                ""
+              );
+            });
+            const sugLower = suggestedAnswer.toLowerCase();
+            const labLower = labelText.toLowerCase();
+            if (labLower.includes(sugLower) || sugLower.includes(labLower)) {
+              await radio
+                .check()
+                .catch((err: any) =>
+                  console.warn(`[playwright-apply] handleScreeningQuestions radio check: ${err}`),
+                );
+              answered++;
+              break;
+            }
+          }
+        }
+
+        await notifyUnknownQuestion(
+          userId,
+          questionText,
+          suggestedAnswer || "Unable to generate suggestion",
+          options.applicationId,
+          options.provider,
+          options.companyName || "Unknown",
+          options.jobTitle || "Unknown",
+        );
       }
     }
-  } catch {
-    /* noop */
+  } catch (err) {
+    console.warn(`[playwright-apply] handleScreeningQuestions block: ${err}`);
   }
   return answered;
 }
@@ -405,7 +543,8 @@ async function takeScreenshot(page: any, label: string): Promise<string | null> 
   try {
     const screenshot = await page.screenshot({ type: "png", fullPage: false });
     return Buffer.from(screenshot).toString("base64");
-  } catch {
+  } catch (err) {
+    console.warn(`[playwright-apply] takeScreenshot: ${err}`);
     return null;
   }
 }
@@ -413,7 +552,8 @@ async function takeScreenshot(page: any, label: string): Promise<string | null> 
 async function captureHtmlSnapshot(page: any): Promise<string | null> {
   try {
     return await page.content();
-  } catch {
+  } catch (err) {
+    console.warn(`[playwright-apply] captureHtmlSnapshot: ${err}`);
     return null;
   }
 }
@@ -428,7 +568,8 @@ async function clickAnyMatching(page: any, selectors: string[]): Promise<boolean
           return true;
         }
       }
-    } catch {
+    } catch (err) {
+      console.warn(`[playwright-apply] clickAnyMatching: ${err}`);
       continue;
     }
   }
@@ -446,13 +587,24 @@ async function detectReviewPage(page: any): Promise<boolean> {
         (text.includes("summary") && text.includes("application"))
       );
     });
-  } catch {
+  } catch (err) {
+    console.warn(`[playwright-apply] detectReviewPage: ${err}`);
     return false;
   }
 }
 
 async function detectConfirmation(page: any): Promise<boolean> {
   try {
+    const url = page.url().toLowerCase();
+    if (
+      url.includes("applied") ||
+      url.includes("application-success") ||
+      url.includes("submission") ||
+      url.includes("confirm")
+    ) {
+      return true;
+    }
+
     return await page.evaluate(() => {
       const text = document.body.innerText.toLowerCase();
       return (
@@ -460,10 +612,22 @@ async function detectConfirmation(page: any): Promise<boolean> {
         text.includes("thank you for applying") ||
         text.includes("application received") ||
         text.includes("successfully submitted") ||
-        text.includes("your application has been")
+        text.includes("your application has been") ||
+        text.includes("application sent") ||
+        text.includes("we have received your application") ||
+        text.includes("已提交") ||
+        text.includes("申請已提交") ||
+        text.includes("応募完了") ||
+        text.includes("solicitud enviada") ||
+        text.includes("candidature envoyée") ||
+        document.querySelector('[class*="applied"]') !== null ||
+        document.querySelector('[class*="success"]') !== null ||
+        document.querySelector('[class*="confirmation"]') !== null ||
+        document.querySelector('[aria-label*="Applied"]') !== null
       );
     });
-  } catch {
+  } catch (err) {
+    console.warn(`[playwright-apply] detectConfirmation: ${err}`);
     return false;
   }
 }
@@ -494,7 +658,8 @@ async function storeEvidence(input: {
       .select("id")
       .single();
     return data?.id ?? null;
-  } catch {
+  } catch (err) {
+    console.warn(`[playwright-apply] storeEvidence: ${err}`);
     return null;
   }
 }
@@ -531,7 +696,7 @@ async function runPlaywrightFlow(input: {
   let aiGeneratedAnswers: Record<string, string> = {};
 
   try {
-    if (!(await isProviderEnabled(input.provider))) {
+    if (!(await isProviderEnabled(input.provider, input.userId))) {
       return { status: "FAILED", error: `Provider "${input.provider}" is disabled` };
     }
     const { chromium } = await import("playwright");
@@ -642,7 +807,12 @@ async function runPlaywrightFlow(input: {
   } catch (err: any) {
     return { status: "FAILED", error: `Playwright error: ${err.message}` };
   } finally {
-    if (browser) await browser.close().catch(() => {});
+    if (browser)
+      await browser
+        .close()
+        .catch((err: any) =>
+          console.warn(`[playwright-apply] browser.close (runPlaywrightFlow): ${err}`),
+        );
   }
 }
 
@@ -774,7 +944,12 @@ async function runPlaywrightSubmit(input: {
   } catch (err: any) {
     return { status: "FAILED", error: `Playwright submit error: ${err.message}` };
   } finally {
-    if (browser) await browser.close().catch(() => {});
+    if (browser)
+      await browser
+        .close()
+        .catch((err: any) =>
+          console.warn(`[playwright-apply] browser.close (runPlaywrightSubmit): ${err}`),
+        );
   }
 }
 
@@ -822,12 +997,19 @@ async function applyLinkedIn(
       input.candidateData || {},
       `Job application for LinkedIn position`,
       input.candidateData?.ai_generated_answers,
+      undefined,
+      { company: input.candidateData?.company_name, jobTitle: input.candidateData?.role_title },
     );
     submittedFields = fillResult.filled;
     aiGeneratedAnswers = { ...aiGeneratedAnswers, ...fillResult.aiGenerated };
 
     if (input.candidateData) {
-      const answered = await handleScreeningQuestions(page, input.candidateData);
+      const answered = await handleScreeningQuestions(page, input.candidateData, input.userId, {
+        applicationId: input.applicationId,
+        provider: "linkedin",
+        companyName: input.candidateData?.company_name,
+        jobTitle: input.candidateData?.role_title,
+      });
       submittedFields += answered;
     }
 
@@ -854,12 +1036,25 @@ async function applyLinkedIn(
         page,
         input.candidateData || {},
         `Job application for LinkedIn step ${step}`,
+        undefined,
+        input.userId,
+        { company: input.candidateData?.company_name, jobTitle: input.candidateData?.role_title },
       );
       submittedFields += moreFill.filled;
       aiGeneratedAnswers = { ...aiGeneratedAnswers, ...moreFill.aiGenerated };
 
       if (input.candidateData) {
-        const moreAnswered = await handleScreeningQuestions(page, input.candidateData);
+        const moreAnswered = await handleScreeningQuestions(
+          page,
+          input.candidateData,
+          input.userId,
+          {
+            applicationId: input.applicationId,
+            provider: "linkedin",
+            companyName: input.candidateData?.company_name,
+            jobTitle: input.candidateData?.role_title,
+          },
+        );
         submittedFields += moreAnswered;
       }
 
@@ -1000,12 +1195,20 @@ async function applyIndeed(
       page,
       input.candidateData || {},
       `Job application for Indeed position`,
+      undefined,
+      input.userId,
+      { company: input.candidateData?.company_name, jobTitle: input.candidateData?.role_title },
     );
     submittedFields = fillResult.filled;
     aiGeneratedAnswers = fillResult.aiGenerated;
 
     if (input.candidateData) {
-      const answered = await handleScreeningQuestions(page, input.candidateData);
+      const answered = await handleScreeningQuestions(page, input.candidateData, input.userId, {
+        applicationId: input.applicationId,
+        provider: "indeed",
+        companyName: input.candidateData?.company_name,
+        jobTitle: input.candidateData?.role_title,
+      });
       submittedFields += answered;
     }
 
@@ -1031,12 +1234,25 @@ async function applyIndeed(
         page,
         input.candidateData || {},
         `Indeed step ${step}`,
+        undefined,
+        input.userId,
+        { company: input.candidateData?.company_name, jobTitle: input.candidateData?.role_title },
       );
       submittedFields += moreFill.filled;
       aiGeneratedAnswers = { ...aiGeneratedAnswers, ...moreFill.aiGenerated };
 
       if (input.candidateData) {
-        const moreAnswered = await handleScreeningQuestions(page, input.candidateData);
+        const moreAnswered = await handleScreeningQuestions(
+          page,
+          input.candidateData,
+          input.userId,
+          {
+            applicationId: input.applicationId,
+            provider: "indeed",
+            companyName: input.candidateData?.company_name,
+            jobTitle: input.candidateData?.role_title,
+          },
+        );
         submittedFields += moreAnswered;
       }
     }
@@ -1098,6 +1314,22 @@ async function applyNaukri(
     await page.goto(input.jobUrl, { waitUntil: "domcontentloaded", timeout: 20000 });
     await page.waitForTimeout(3000);
 
+    const alreadyApplied = await detectConfirmation(page);
+    if (alreadyApplied) {
+      await storeEvidence({
+        userId: input.userId,
+        applicationId: input.applicationId,
+        jobId: input.jobId,
+        provider: "naukri",
+        evidenceType: "already_applied",
+      });
+      return {
+        status: "already_applied" as any,
+        confirmationScreenshot: (await takeScreenshot(page, "already-applied")) ?? undefined,
+        trackingUrl: input.jobUrl,
+      };
+    }
+
     const selectors = [
       '[class*="apply"]',
       'a[href*="apply"]',
@@ -1120,12 +1352,20 @@ async function applyNaukri(
       page,
       input.candidateData || {},
       `Naukri job application`,
+      undefined,
+      input.userId,
+      { company: input.candidateData?.company_name, jobTitle: input.candidateData?.role_title },
     );
     submittedFields = fillResult.filled;
     aiGeneratedAnswers = fillResult.aiGenerated;
 
     if (input.candidateData) {
-      const answered = await handleScreeningQuestions(page, input.candidateData);
+      const answered = await handleScreeningQuestions(page, input.candidateData, input.userId, {
+        applicationId: input.applicationId,
+        provider: "naukri",
+        companyName: input.candidateData?.company_name,
+        jobTitle: input.candidateData?.role_title,
+      });
       submittedFields += answered;
     }
 
@@ -1151,6 +1391,14 @@ async function applyNaukri(
           trackingUrl: input.jobUrl,
           aiGeneratedAnswers,
         };
+      return {
+        status: "PARTIAL",
+        error: "Submit clicked but confirmation not detected",
+        submittedFields,
+        totalFields,
+        trackingUrl: input.jobUrl,
+        aiGeneratedAnswers,
+      };
     }
 
     const screenshot1 = await takeScreenshot(page, "naukri-result");
@@ -1166,7 +1414,8 @@ async function applyNaukri(
     }
 
     return {
-      status: submitted ? "APPLIED" : "PARTIAL",
+      status: "PARTIAL",
+      error: "No submit button found",
       submittedFields,
       totalFields,
       trackingUrl: input.jobUrl,
@@ -1190,6 +1439,24 @@ async function applyWellfound(
     await page.goto(input.jobUrl, { waitUntil: "domcontentloaded", timeout: 20000 });
     await page.waitForTimeout(3000);
 
+    const alreadyApplied = await detectConfirmation(page);
+    if (alreadyApplied) {
+      await storeEvidence({
+        userId: input.userId,
+        applicationId: input.applicationId,
+        jobId: input.jobId,
+        provider: "wellfound",
+        evidenceType: "already_applied",
+      });
+      return {
+        status: "already_applied" as any,
+        confirmationScreenshot: (await takeScreenshot(page, "already-applied")) ?? undefined,
+        trackingUrl: input.jobUrl,
+      };
+    }
+
+    const preApplyUrl = page.url();
+
     const selectors = [
       'a[class*="apply"]',
       'button:has-text("Apply")',
@@ -1207,9 +1474,10 @@ async function applyWellfound(
     totalFields = formInfo.totalFields;
 
     if (totalFields === 0) {
+      const urlChanged = page.url() !== preApplyUrl;
       return {
-        status: "APPLIED",
-        error: "Wellfound: redirected to external site or already applied",
+        status: urlChanged ? "MANUAL_APPLY_REQUIRED" : "PARTIAL",
+        error: urlChanged ? "Redirected to external site" : "No form fields detected",
         submittedFields: 0,
         totalFields: 0,
         trackingUrl: input.jobUrl,
@@ -1222,12 +1490,20 @@ async function applyWellfound(
       page,
       input.candidateData || {},
       `Wellfound application`,
+      undefined,
+      input.userId,
+      { company: input.candidateData?.company_name, jobTitle: input.candidateData?.role_title },
     );
     submittedFields = fillResult.filled;
     aiGeneratedAnswers = fillResult.aiGenerated;
 
     if (input.candidateData) {
-      const answered = await handleScreeningQuestions(page, input.candidateData);
+      const answered = await handleScreeningQuestions(page, input.candidateData, input.userId, {
+        applicationId: input.applicationId,
+        provider: "wellfound",
+        companyName: input.candidateData?.company_name,
+        jobTitle: input.candidateData?.role_title,
+      });
       submittedFields += answered;
     }
 
@@ -1253,6 +1529,14 @@ async function applyWellfound(
           trackingUrl: input.jobUrl,
           aiGeneratedAnswers,
         };
+      return {
+        status: "PARTIAL",
+        error: "Submit clicked but confirmation not detected",
+        submittedFields,
+        totalFields,
+        trackingUrl: input.jobUrl,
+        aiGeneratedAnswers,
+      };
     }
 
     const screenshot1 = await takeScreenshot(page, "wellfound-result");
@@ -1268,7 +1552,8 @@ async function applyWellfound(
     }
 
     return {
-      status: submitted ? "APPLIED" : "PARTIAL",
+      status: "PARTIAL",
+      error: "No submit button found",
       submittedFields,
       totalFields,
       trackingUrl: input.jobUrl,
@@ -1292,6 +1577,22 @@ async function applyInstahyre(
     await page.goto(input.jobUrl, { waitUntil: "domcontentloaded", timeout: 20000 });
     await page.waitForTimeout(3000);
 
+    const alreadyApplied = await detectConfirmation(page);
+    if (alreadyApplied) {
+      await storeEvidence({
+        userId: input.userId,
+        applicationId: input.applicationId,
+        jobId: input.jobId,
+        provider: "instahyre",
+        evidenceType: "already_applied",
+      });
+      return {
+        status: "already_applied" as any,
+        confirmationScreenshot: (await takeScreenshot(page, "already-applied")) ?? undefined,
+        trackingUrl: input.jobUrl,
+      };
+    }
+
     const selectors = [
       'button:has-text("Apply")',
       'a[class*="apply"]',
@@ -1312,12 +1613,20 @@ async function applyInstahyre(
       page,
       input.candidateData || {},
       `Instahyre application`,
+      undefined,
+      input.userId,
+      { company: input.candidateData?.company_name, jobTitle: input.candidateData?.role_title },
     );
     submittedFields = fillResult.filled;
     aiGeneratedAnswers = fillResult.aiGenerated;
 
     if (input.candidateData) {
-      const answered = await handleScreeningQuestions(page, input.candidateData);
+      const answered = await handleScreeningQuestions(page, input.candidateData, input.userId, {
+        applicationId: input.applicationId,
+        provider: "instahyre",
+        companyName: input.candidateData?.company_name,
+        jobTitle: input.candidateData?.role_title,
+      });
       submittedFields += answered;
     }
 
@@ -1343,6 +1652,14 @@ async function applyInstahyre(
           trackingUrl: input.jobUrl,
           aiGeneratedAnswers,
         };
+      return {
+        status: "PARTIAL",
+        error: "Submit clicked but confirmation not detected",
+        submittedFields,
+        totalFields,
+        trackingUrl: input.jobUrl,
+        aiGeneratedAnswers,
+      };
     }
 
     const screenshot1 = await takeScreenshot(page, "instahyre-result");
@@ -1358,7 +1675,8 @@ async function applyInstahyre(
     }
 
     return {
-      status: submitted ? "APPLIED" : "PARTIAL",
+      status: "PARTIAL",
+      error: "No submit button found",
       submittedFields,
       totalFields,
       trackingUrl: input.jobUrl,
@@ -1374,7 +1692,8 @@ async function findFirstVisible(page: any, selectors: string[]): Promise<any> {
     try {
       const el = await page.$(selector);
       if (el && (await el.isVisible())) return el;
-    } catch {
+    } catch (err) {
+      console.warn(`[playwright-apply] findFirstVisible: ${err}`);
       continue;
     }
   }
@@ -1392,6 +1711,7 @@ export async function recordPlaywrightApplyResult(input: {
     PARTIAL: "saved",
     REQUIRES_APPROVAL: "saved",
     FAILED: "saved",
+    MANUAL_APPLY_REQUIRED: "saved",
   };
   const newStatus = statusMap[input.result.status] || "saved";
   const isSuccess = input.result.status === "APPLIED";

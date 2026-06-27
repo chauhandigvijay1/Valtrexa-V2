@@ -9,11 +9,7 @@ import { requireApiUser } from "./_lib/auth.js";
 import { json, methodNotAllowed, readJson } from "./_lib/http.js";
 import { computeMatchScore } from "./_lib/match-engine.js";
 import { computeStrategicValue, computeStrategicValueWithAI } from "./_lib/high-value-engine.js";
-import {
-  discoverContactsViaAI,
-  fallbackContacts,
-  discoverContactsV3,
-} from "./_lib/recruiter-discovery.js";
+import { discoverContactsViaAI, discoverContactsV3 } from "./_lib/recruiter-discovery.js";
 import {
   buildApplicationPackage,
   submitApplication,
@@ -54,6 +50,8 @@ import { getProvider, PROVIDER_REGISTRY, isKnownProvider } from "./_lib/provider
 import { supabaseAdmin } from "./_lib/supabase.js";
 import { emitWorkflowEvent } from "./_lib/workflow-events.js";
 import { verifyAndStoreEmailsForRecruiters } from "./_lib/email-discovery.js";
+import { validatePrerequisites } from "./_lib/workflow-runner.js";
+import { runWorkflowPrecheck } from "./_lib/workflow-precheck.js";
 
 // ───────────────────────────── A1 — Provider Audit ─────────────────────────
 
@@ -268,7 +266,8 @@ function safeParse(value: string): Record<string, unknown> {
   try {
     const parsed = JSON.parse(value);
     return parsed && typeof parsed === "object" ? parsed : {};
-  } catch {
+  } catch (err) {
+    console.warn("[PhaseHandlers] safeParse JSON parse failed", err);
     return {};
   }
 }
@@ -294,7 +293,7 @@ export async function handleRecruiterDiscoveryV2(request: Request) {
       .ilike("company", body.companyName),
   ]);
 
-  let contacts;
+  let contacts: any[] = [];
   try {
     contacts = await discoverContactsViaAI({
       userId: user.id,
@@ -302,10 +301,10 @@ export async function handleRecruiterDiscoveryV2(request: Request) {
       roleTitle: body.roleTitle ?? "Software Engineer",
       context: { research: researchRow.data, existingContacts: existingRow.data ?? [] },
     });
-    if (!contacts.length)
-      contacts = fallbackContacts(body.companyName, body.roleTitle ?? "Software Engineer");
-  } catch {
-    contacts = fallbackContacts(body.companyName, body.roleTitle ?? "Software Engineer");
+    if (!contacts.length) contacts = [];
+  } catch (err) {
+    console.warn("[PhaseHandlers] handleRecruiterDiscoveryV2 AI discovery failed", err);
+    contacts = [];
   }
 
   const inserted: any[] = [];
@@ -986,6 +985,24 @@ export async function handlePlaywrightEvidence(request: Request) {
   const applicationId = url.searchParams.get("applicationId");
   if (!applicationId) return json({ error: "applicationId required" }, { status: 400 });
   return json(await getApplyEvidence(applicationId, user.id));
+}
+
+// ───────────────────────────── Workflow Precheck ─────────────────────────
+
+export async function handleWorkflowPrecheck(request: Request) {
+  if (request.method !== "GET") return methodNotAllowed(["GET"]);
+  const user = await requireApiUser(request);
+  const result = await runWorkflowPrecheck(user.id);
+  return json(result);
+}
+
+// ───────────────────────────── Workflow Validate ──────────────────────────
+
+export async function handleWorkflowValidate(request: Request) {
+  if (request.method !== "GET") return methodNotAllowed(["GET"]);
+  const user = await requireApiUser(request);
+  const result = await validatePrerequisites(user.id);
+  return json(result);
 }
 
 // ───────────────────────────── P8 — Approval Status ────────────────────────

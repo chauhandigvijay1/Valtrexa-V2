@@ -28,7 +28,8 @@ function extractDomain(url: string): string | null {
   try {
     const u = new URL(url.startsWith("http") ? url : `https://${url}`);
     return u.hostname.replace(/^www\./, "");
-  } catch {
+  } catch (err) {
+    console.warn("[EmailDiscovery] extractDomain failed", err);
     return null;
   }
 }
@@ -58,7 +59,8 @@ export async function verifyEmailMX(email: string): Promise<{ valid: boolean; re
     const records: string[] = (data.Answer || []).map((r: any) => r.data);
     const valid = records.length > 0;
     return { valid, records };
-  } catch {
+  } catch (err) {
+    console.warn("[EmailDiscovery] checkEmailMX DNS lookup failed", err);
     return { valid: false, records: [] };
   }
 }
@@ -78,7 +80,8 @@ export async function extractEmailsFromPage(url: string): Promise<string[]> {
       const domain = e.split("@")[1]?.toLowerCase();
       return domain && !/example\.com|test\.com|domain\.com/i.test(domain);
     });
-  } catch {
+  } catch (err) {
+    console.warn("[EmailDiscovery] extractEmailsFromPage fetch failed", err);
     return [];
   }
 }

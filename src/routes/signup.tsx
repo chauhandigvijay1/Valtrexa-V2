@@ -23,7 +23,7 @@ function SignupPage() {
 
   useEffect(() => {
     if (!loading && user) {
-      nav({ to: "/dashboard", replace: true });
+      nav({ to: "/onboarding", replace: true });
     }
   }, [loading, user, nav]);
 
@@ -45,7 +45,7 @@ function SignupPage() {
     }
 
     toast.success("Account created. Check your inbox if email confirmation is enabled.");
-    nav({ to: "/dashboard" });
+    nav({ to: "/onboarding" });
   };
 
   return (

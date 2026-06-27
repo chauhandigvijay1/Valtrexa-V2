@@ -10,6 +10,7 @@
  */
 
 import type { ResumeStructuredData } from "./resume-parser.js";
+import { normalizeTitle, scoreTitleMatch } from "./title-normalization.js";
 
 export type MatchBreakdown = {
   skillsScore: number;
@@ -21,6 +22,7 @@ export type MatchBreakdown = {
   companyQualityScore: number;
   recruiterScore: number;
   score: number;
+  matched: boolean;
 };
 
 export type MatchWeights = {
@@ -44,6 +46,8 @@ export const DEFAULT_MATCH_WEIGHTS: MatchWeights = {
   companyQuality: 0.05,
   recruiter: 0.03,
 };
+
+export const DEFAULT_MATCH_THRESHOLD = 70;
 
 export type MatchInputs = {
   resume:
@@ -88,7 +92,7 @@ function jaccardOverlap(
 ): { matched: string[]; missing: string[]; ratio: number } {
   const setA = new Set(a);
   const setB = new Set(b);
-  if (!setB.size) return { matched: [], missing: [], ratio: 0.6 }; // neutral when job lists nothing
+  if (!setB.size) return { matched: [], missing: [], ratio: 0.6 };
   let matched = 0;
   const matchedNames: string[] = [];
   for (const item of setA) {
@@ -133,7 +137,6 @@ export function scoreSkills(resumeSkills: string[], jobDescription: string): num
     const escaped = s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     if (new RegExp(`\\b${escaped}\\b`).test(text)) hits += 1;
   }
-  // Coverage ratio of the candidate's skills against the JD, but reward breadth too.
   const coverage = hits / resumeSkills.length;
   return clampInt(coverage * 100);
 }
@@ -142,8 +145,17 @@ export function scoreRole(candidateRoles: string[], jobRoles: string[], jobTitle
   const roles = lowerList(jobRoles?.length ? jobRoles : [jobTitle]);
   if (!roles.length) return 50;
   const candidate = lowerList(candidateRoles);
-  const { ratio } = jaccardOverlap(candidate, roles);
-  return clampInt(ratio * 100);
+  // Use title normalization to normalize both sides
+  const normalizedCandidate = candidate.map(normalizeTitle).filter(Boolean);
+  const normalizedRoles = roles.map(normalizeTitle).filter(Boolean);
+
+  // First try exact family match via scoreTitleMatch
+  const titleMatchScore = scoreTitleMatch(candidateRoles, jobTitle, jobRoles);
+  if (titleMatchScore >= 1.0) return 100;
+
+  // Fall back to jaccard on normalized names
+  const { ratio } = jaccardOverlap(normalizedCandidate, normalizedRoles);
+  return clampInt(Math.max(ratio * 100, titleMatchScore * 100));
 }
 
 export function scoreExperience(
@@ -172,11 +184,9 @@ export function scoreLocation(
   const job = lower(jobLocation);
   const prefs = lowerList(candidateLocations);
   if (!prefs.length) return 55;
-  // Match if any candidate location keyword appears in the job location (or vice versa).
   for (const pref of prefs) {
     if (pref && (job.includes(pref) || pref.includes(job))) return 90;
   }
-  // Remote-preferring candidates get partial credit for any job.
   if (prefs.some((p) => p.includes("remote"))) return 50;
   return 40;
 }
@@ -211,6 +221,7 @@ export function scoreRecruiter(recruiterAvailable: boolean | null | undefined): 
 export function computeMatchScore(
   inputs: MatchInputs,
   weights: MatchWeights = DEFAULT_MATCH_WEIGHTS,
+  threshold: number = DEFAULT_MATCH_THRESHOLD,
 ): MatchBreakdown {
   const resume = inputs.resume as ResumeStructuredData & {
     years_experience?: number | null;
@@ -240,6 +251,8 @@ export function computeMatchScore(
     companyQualityScore * weights.companyQuality +
     recruiterScore * weights.recruiter;
 
+  const overall = clampInt(total);
+
   return {
     skillsScore,
     roleScore,
@@ -249,6 +262,16 @@ export function computeMatchScore(
     freshnessScore,
     companyQualityScore,
     recruiterScore,
-    score: clampInt(total),
+    score: overall,
+    matched: overall >= threshold,
   };
+}
+
+export function isJobMatch(
+  inputs: MatchInputs,
+  weights?: MatchWeights,
+  threshold?: number,
+): { matched: boolean; breakdown: MatchBreakdown } {
+  const breakdown = computeMatchScore(inputs, weights, threshold);
+  return { matched: breakdown.matched, breakdown };
 }

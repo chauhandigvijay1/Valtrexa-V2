@@ -223,7 +223,8 @@ export class GeminiProvider implements AiProvider {
         { temperature: 0 },
       );
       return result.content.toLowerCase().includes("ok");
-    } catch {
+    } catch (err) {
+      console.warn("[AIProvider] healthCheck failed", err);
       return false;
     }
   }
@@ -388,7 +389,8 @@ export class GroqProvider implements AiProvider {
         { temperature: 0 },
       );
       return result.content.toLowerCase().includes("ok");
-    } catch {
+    } catch (err) {
+      console.warn("[AIProvider] healthCheck failed", err);
       return false;
     }
   }
@@ -490,7 +492,8 @@ export class OpenRouterProvider implements AiProvider {
         { temperature: 0 },
       );
       return result.content.toLowerCase().includes("ok");
-    } catch {
+    } catch (err) {
+      console.warn("[AIProvider] healthCheck failed", err);
       return false;
     }
   }
