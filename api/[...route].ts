@@ -18,6 +18,7 @@ import {
   normalizeResumeVersion,
 } from "./_lib/compat.js";
 import {
+  getBaseUrl,
   json,
   methodNotAllowed,
   readJson,
@@ -1361,7 +1362,7 @@ async function handleResumeCenter(request: Request) {
   const rows = [];
   for (const resume of resumesResult.data ?? []) {
     const detailsResult = await handleResumeDetails(
-      new Request(`http://localhost/api/resumes/details?resumeId=${resume.id}`, {
+      new Request(`${getBaseUrl(request)}/api/resumes/details?resumeId=${resume.id}`, {
         method: "GET",
         headers: request.headers,
       }),
@@ -2226,7 +2227,7 @@ async function handleOutreachCampaign(request: Request) {
 
   const authHeader = request.headers.get("authorization") ?? "";
   const requestInit = (path: string, payload: unknown) =>
-    new Request(`http://localhost/api/${path}`, {
+    new Request(`${getBaseUrl(request)}/api/${path}`, {
       method: "POST",
       headers: {
         authorization: authHeader,
@@ -3163,7 +3164,7 @@ Return a strict JSON object with:
   // Trigger Research (which also generates pain points)
   const authHeader = request.headers.get("authorization") ?? "";
   const requestInit = (path: string, payload: unknown) =>
-    new Request(`http://localhost/api/${path}`, {
+    new Request(`${getBaseUrl(request)}/api/${path}`, {
       method: "POST",
       headers: {
         authorization: authHeader,

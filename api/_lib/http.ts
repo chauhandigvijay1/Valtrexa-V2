@@ -64,6 +64,19 @@ export function methodNotAllowed(methods: string[]) {
   return json({ error: `Method not allowed. Use ${methods.join(", ")}.` }, { status: 405 });
 }
 
+export function getBaseUrl(request: Request): string {
+  const fromOrigin = request.headers.get("origin");
+  if (fromOrigin) return fromOrigin.replace(/\/+$/, "");
+  const fromEnv = process.env.PUBLIC_URL || process.env.FRONTEND_URL;
+  if (fromEnv) return fromEnv.replace(/\/+$/, "");
+  try {
+    const url = new URL(request.url);
+    return `${url.protocol}//${url.host}`;
+  } catch {
+    return "http://localhost:5173";
+  }
+}
+
 export function safeErrorMessage(err: unknown): string {
   return "An unexpected error occurred";
 }
