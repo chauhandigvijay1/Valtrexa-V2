@@ -22,7 +22,8 @@ async function requestOpenRouter(body: string, apiKey: string) {
     headers: {
       Authorization: `Bearer ${apiKey}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://valtrexa-v2.local",
+      "HTTP-Referer":
+        process.env.PUBLIC_URL || process.env.FRONTEND_URL || "https://valtrexa-v2.local",
       "X-Title": "VALTREXA-V2",
     },
     body,

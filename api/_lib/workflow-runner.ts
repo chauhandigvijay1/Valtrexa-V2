@@ -6,7 +6,7 @@ import { getResumeForMatching, getCandidateBrain } from "./candidate-brain.js";
 import { startStage, completeStage, failStage } from "./workflow-timeline.js";
 import { createNotification } from "./notification-center.js";
 import { logger } from "./logger.js";
-import { checkProviderCookieSync } from "./cookie-manager.js";
+import { checkProviderCookie } from "./cookie-manager.js";
 import { runWorkflowPrecheck } from "./workflow-precheck.js";
 
 const supabaseUrl = process.env.SUPABASE_URL!;
@@ -714,14 +714,25 @@ export async function validatePrerequisites(userId: string): Promise<{
   blockers: string[];
 }> {
   const blockers: string[] = [];
+  const { PROVIDERS, getProviderControl, setProviderStatus } = await import("./provider-controls.js");
 
   const enabledProviders = await getEnabledProviders(userId);
   for (const provider of enabledProviders) {
-    const cookieStatus = checkProviderCookieSync(provider);
-    if (!cookieStatus.available || !cookieStatus.valid) {
-      blockers.push(
-        `Provider "${provider}" has no valid cookie: ${cookieStatus.reason ?? "unknown error"}`,
-      );
+    const cookieStatus = await checkProviderCookie(userId, provider);
+    if (cookieStatus.status !== "valid") {
+      blockers.push(`Provider "${provider}" has no valid cookie: ${cookieStatus.message}`);
+    }
+  }
+
+  // Auto-resume paused providers that now have valid cookies
+  for (const provider of PROVIDERS) {
+    if (enabledProviders.includes(provider)) continue;
+    const control = await getProviderControl(provider, userId);
+    if (!control || control.status !== "paused") continue;
+    const cookieStatus = await checkProviderCookie(userId, provider);
+    if (cookieStatus.status === "valid") {
+      await setProviderStatus(provider, "enabled", userId, "auto");
+      logger.info(`Auto-resumed provider ${provider} — cookie is now valid`, { userId });
     }
   }
 

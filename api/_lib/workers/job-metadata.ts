@@ -6,6 +6,7 @@
 
 import { dedupeRoles, expandRoleVariants } from "../role-taxonomy.js";
 import type { ImportedJob } from "../job-sources.js";
+import { extractSalaries } from "../salary-parser.js";
 
 function chooseText(...values: Array<string | null | undefined>) {
   for (const value of values) {
@@ -45,6 +46,15 @@ export function inferSalaryBounds(text: string) {
   return { salaryMin: normalize(min), salaryMax: normalize(max) };
 }
 
+export function inferSalaryBoundsV2(
+  title: string,
+  description: string,
+  location: string | null,
+) {
+  const { salary_min, salary_max } = extractSalaries(title, description, location);
+  return { salaryMin: salary_min, salaryMax: salary_max };
+}
+
 export function inferCompanySize(description: string) {
   const text = description.toLowerCase();
   if (/startup|seed|series a|series b|small team/.test(text)) return "startup";
@@ -76,6 +86,6 @@ export function buildJobMetadata(job: ImportedJob) {
       /easy apply|quick apply|one click/i.test(description) ||
       ["linkedin", "wellfound", "naukri"].includes(job.source),
     freshness_bucket: inferFreshnessBucket(job.postedAt),
-    ...inferSalaryBounds(`${job.title}\n${description}`),
+    ...inferSalaryBoundsV2(job.title, description, job.location),
   };
 }

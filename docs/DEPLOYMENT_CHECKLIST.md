@@ -19,7 +19,7 @@
 ### Vercel
 - [ ] Connect GitHub repository
 - [ ] Configure Build: `npm.cmd run build`
-- [ ] Configure Output: `dist/`
+- [ ] Configure Output: `dist/client`
 - [ ] Set Node.js version: 20.x
 - [ ] Add all environment variables
 - [ ] Deploy to preview branch first
@@ -53,17 +53,14 @@ curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=ht
 - [ ] Verify API key has sufficient credits
 - [ ] Test AI provider chain: `curl -X POST https://valtrexa-v2.vercel.app/api/health`
 
-### Cron Job (Required for Automation)
-- [ ] Add Vercel Cron Job in `vercel.json`:
-```json
-{
-  "crons": [{
-    "path": "/api/workflow/cycle",
-    "schedule": "*/30 * * * *"
-  }]
-}
-```
-- [ ] OR configure external cron (cron-job.org, GitHub Actions) hitting `POST https://valtrexa-v2.vercel.app/api/workflow/cycle`
+### Railway Worker (Required for Automation)
+- [ ] Deploy `api/worker.ts` on Railway:
+  ```bash
+  # railway.toml configures the worker with tsx api/worker.ts
+  railway up
+  ```
+  The worker runs the workflow cycle every 30 minutes automatically.
+  No external cron provider needed.
 
 ### Redis (Optional)
 - [ ] Set up Upstash Redis (free tier sufficient)
@@ -133,7 +130,7 @@ curl -H "Authorization: Bearer <valid-jwt>" https://valtrexa-v2.vercel.app/api/p
 
 - [ ] Build passes
 - [ ] TypeScript 0 errors
-- [ ] 70/70 tests pass
+- [ ] 82/82 tests pass
 - [ ] Lint 0 errors
 - [ ] Health endpoint returns OK
 - [ ] Auth works (login/signup)

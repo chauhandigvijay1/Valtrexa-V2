@@ -60,8 +60,10 @@ OPERATIONS_RUNBOOK.md
 
 # Screenshots & evidence
 screenshots/
+!docs/screenshots/
 evidence/
 *.png
+!docs/screenshots/*.png
 *.jpg
 *.jpeg
 *.gif

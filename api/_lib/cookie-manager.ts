@@ -223,7 +223,11 @@ export async function refreshCookieViaPlaywright(
   });
   return {
     ok: true,
-    message: `ℹ️ Automated refresh not available for ${provider}.\n\nFollow these steps:\n${guide}\n\nThen paste the cookie in Settings > Cookies.`,
+    message: `ℹ️ Automated refresh not available from server for ${provider}.\n\n` +
+      `For one-click extraction from your local browser, run:\n` +
+      `npx tsx scripts/refresh-cookies.ts --provider ${provider} --user-id ${userId}\n\n` +
+      `Alternatively, follow these steps:\n${guide}\n\n` +
+      `Then paste the cookie in Settings > Cookies or use /cookie ${provider} <value> in Telegram.`,
   };
 }
 

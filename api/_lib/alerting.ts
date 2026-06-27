@@ -32,7 +32,7 @@ function ensureChatId(): string {
 // ─── Fix Suggestions ──────────────────────────────────────
 
 const FIX_MAP: Record<string, string> = {
-  cookie_expired: "Run cookie refresh (scripts/refresh-cookies.ts) or re-authenticate manually",
+  cookie_expired: "Run npx tsx scripts/refresh-cookies.ts or re-authenticate manually",
   session_expired: "Re-authenticate on the provider website",
   login_redirect: "Session expired — re-authenticate or refresh cookies",
   captcha_detected: "Solve CAPTCHA manually or rotate IP/proxy",

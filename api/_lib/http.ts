@@ -16,7 +16,6 @@ export function json(data: unknown, init?: ResponseInit) {
     ...init,
     headers: {
       "content-type": "application/json; charset=utf-8",
-      "access-control-allow-origin": "*",
       "access-control-allow-methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
       "access-control-allow-headers":
         "Content-Type, Authorization, x-telegram-bot-api-secret-token",
@@ -73,7 +72,7 @@ export function getBaseUrl(request: Request): string {
     const url = new URL(request.url);
     return `${url.protocol}//${url.host}`;
   } catch {
-    return "http://localhost:5173";
+    return process.env.PUBLIC_URL || process.env.FRONTEND_URL || "http://localhost:5173";
   }
 }
 

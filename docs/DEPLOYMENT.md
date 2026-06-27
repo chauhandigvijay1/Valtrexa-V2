@@ -78,7 +78,7 @@ OPENROUTER_API_KEY=sk-or-...
 npm.cmd run build
 
 # Output Directory
-.output/public
+dist/client
 
 # Install Command
 npm.cmd install
@@ -89,11 +89,13 @@ The `vercel.json` configuration:
 ```json
 {
   "buildCommand": "npm run build",
-  "outputDirectory": ".output/public",
+  "outputDirectory": "dist/client",
   "installCommand": "npm install",
   "framework": null
 }
 ```
+
+> **Note:** The build script in `package.json` also runs `node scripts/prepare-vercel-ssr.mjs` after Vite build, which generates the SSR server bundle at `api/_dist/server.js`.
 
 ## Step 3: Telegram Bot Setup
 
@@ -195,7 +197,7 @@ flowchart LR
 | Problem | Likely Cause | Fix |
 |---|---|---|
 | Build fails | Missing dependencies | Check install/build commands in vercel.json |
-| 404 on API routes | Nitro output not configured | Ensure `.output/public` is set as output |
+| 404 on API routes | Nitro output not configured | Ensure `dist/client` is set as output |
 | Telegram bot silent | Webhook misconfigured | Check bot token, hit `/api/telegram/webhook` |
 | Database errors | Migrations not applied | Run `supabase db push` or paste SQL |
 | Auth fails | Wrong Supabase keys | Verify anon/service_role keys |

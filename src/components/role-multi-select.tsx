@@ -71,10 +71,11 @@ export function RoleMultiSelect({
                 key={role}
                 type="button"
                 size="sm"
-                variant="outline"
+                variant="ghost"
                 onClick={() => addRole(role)}
+                className="text-muted-foreground"
               >
-                {role}
+                + {role}
               </Button>
             ))}
           </div>

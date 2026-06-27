@@ -10,6 +10,7 @@ import {
   notifyUnknownQuestion,
   shouldAlwaysRegenerate,
   generateDynamicAnswer,
+  isNeverAsked,
 } from "./dynamic-profile-memory.js";
 
 type PlatformHandlerInput = {
@@ -159,10 +160,17 @@ const NEXT_BUTTON_SELECTORS = [
   'button[aria-label*="next" i]',
   'button:has-text("Next")',
   'button:has-text("Continue")',
+  'button:has-text("Save & Continue")',
+  'button:has-text("Save and Continue")',
+  'button:has-text("Proceed")',
+  'button:has-text("I Agree")',
+  'button:has-text("Agree")',
+  'button:has-text("Confirm")',
   'a[aria-label*="next" i]',
   'span:has-text("Next")',
   '[data-qa*="next"]',
   '[data-test*="next"]',
+  'button[aria-label*="continue" i]',
 ];
 
 const SUBMIT_BUTTON_SELECTORS = [
@@ -170,19 +178,28 @@ const SUBMIT_BUTTON_SELECTORS = [
   'button:has-text("Submit")',
   'button:has-text("Apply")',
   'button:has-text("Send")',
+  'button:has-text("Send Application")',
   'button:has-text("Submit application")',
+  'button:has-text("Submit Application")',
+  'button:has-text("Finish")',
+  'button:has-text("Complete")',
+  'button:has-text("Done")',
   'input[type="submit"]',
   '[data-qa*="submit"]',
   '[data-test*="submit"]',
   'a:has-text("Submit application")',
+  'button[aria-label*="submit" i]',
 ];
 
 const REVIEW_BUTTON_SELECTORS = [
   'button:has-text("Review")',
   'button:has-text("Review your application")',
+  'button:has-text("Review Application")',
+  'button:has-text("Preview")',
   'a:has-text("Review")',
   '[data-qa*="review"]',
   '[data-test*="review"]',
+  'button[aria-label*="review" i]',
 ];
 
 const FILE_UPLOAD_SELECTORS = [
@@ -478,8 +495,11 @@ async function handleScreeningQuestions(
         continue;
       }
 
-      // Unknown question — generate AI suggestion and notify user
+      // Unknown question — check dedup, then generate AI suggestion and notify user
       if (options?.applicationId && options?.provider) {
+        if (await isNeverAsked(userId, questionText)) {
+          continue;
+        }
         const suggestedAnswer = await generateDynamicAnswer(
           userId,
           questionText,

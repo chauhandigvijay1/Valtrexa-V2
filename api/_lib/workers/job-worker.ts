@@ -13,11 +13,28 @@ export async function importJobsInline(payload: JobImportPayload) {
   const imported: any[] = [];
 
   for (const source of payload.sources ?? []) {
-    const provider = getProvider(String(source.source));
-    const config = {
+    const providerName = String(source.source);
+    const provider = getProvider(providerName);
+    const config: Record<string, any> = {
       ...source,
       headers: source.headers ?? {},
     };
+
+    if (!config.searchUrl) {
+      const { data: integration } = await supabaseAdmin
+        .from("integrations")
+        .select("config")
+        .eq("user_id", payload.userId)
+        .eq("provider", providerName)
+        .maybeSingle();
+      if (integration?.config) {
+        const cfg = integration.config as Record<string, string>;
+        config.searchUrl = cfg.search_url ?? "";
+        if (cfg.cookie || cfg.session_cookie) {
+          config.headers = { ...config.headers, cookie: cfg.cookie || cfg.session_cookie };
+        }
+      }
+    }
     const result = await provider.importJobs(config);
     for (const job of result.jobs) {
       const metadata = buildJobMetadata(job);

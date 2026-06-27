@@ -1,7 +1,7 @@
 import mammoth from "mammoth";
 import { callOpenRouterJson } from "./openrouter.js";
 
-type ResumeProject = {
+export type ResumeProject = {
   name: string | null;
   description: string | null;
   github_url: string | null;
@@ -706,7 +706,7 @@ function inferProjects(rawText: string, skills: string[]) {
   const section = getSection(rawText, PROJECT_SECTION_LABELS);
   if (!section) return [];
   const chunks = section
-    .split(/\n(?=[A-Z][^\n]{3,80}(?:\n| - |:))/)
+    .split(/\n(?=\d*\.?\s*[A-Z][^\n]{3,80}(?:\n| - |:))/)
     .map((chunk) => normalizeMultiline(chunk))
     .filter(Boolean);
 
@@ -806,7 +806,7 @@ function inferSummary(rawText: string) {
   return topLines[1] ?? null;
 }
 
-function heuristicResumeParse(rawText: string): ResumeStructuredData {
+export function heuristicResumeParse(rawText: string): ResumeStructuredData {
   const email = extractEmail(rawText);
   const phone = extractPhone(rawText);
   const name = extractName(rawText);
@@ -861,12 +861,15 @@ function heuristicResumeParse(rawText: string): ResumeStructuredData {
   };
 }
 
-function normalizeProjects(projects: unknown[], heuristics: ResumeStructuredData) {
+export function normalizeProjects(projects: unknown[], heuristics: ResumeStructuredData) {
   const heuristicByName = new Map(
     heuristics.projects
       .filter((project) => project.name)
       .map((project) => [project.name!.toLowerCase(), project]),
   );
+
+  const seenGithub = new Set<string>();
+  const seenLive = new Set<string>();
 
   return (projects ?? [])
     .filter((project) => project && typeof project === "object")
@@ -879,15 +882,34 @@ function normalizeProjects(projects: unknown[], heuristics: ResumeStructuredData
         item.summary as string,
         fallback?.description,
       );
+
+      let github_url = firstNonEmpty(
+        item.github_url as string,
+        item.github as string,
+        fallback?.github_url,
+      );
+      let live_url = firstNonEmpty(item.live_url as string, item.url as string, fallback?.live_url);
+
+      if (github_url && seenGithub.has(github_url.toLowerCase())) {
+        github_url =
+          fallback?.github_url && !seenGithub.has(fallback.github_url.toLowerCase())
+            ? fallback.github_url
+            : null;
+      }
+      if (live_url && seenLive.has(live_url.toLowerCase())) {
+        live_url =
+          fallback?.live_url && !seenLive.has(fallback.live_url.toLowerCase())
+            ? fallback.live_url
+            : null;
+      }
+      if (github_url) seenGithub.add(github_url.toLowerCase());
+      if (live_url) seenLive.add(live_url.toLowerCase());
+
       return {
         name: name ?? fallback?.name ?? "Project",
         description,
-        github_url: firstNonEmpty(
-          item.github_url as string,
-          item.github as string,
-          fallback?.github_url,
-        ),
-        live_url: firstNonEmpty(item.live_url as string, item.url as string, fallback?.live_url),
+        github_url,
+        live_url,
         tech_stack: uniqueStrings([
           ...(Array.isArray(item.tech_stack) ? (item.tech_stack as string[]) : []),
           ...(Array.isArray(item.technologies) ? (item.technologies as string[]) : []),
@@ -903,7 +925,7 @@ function normalizeProjects(projects: unknown[], heuristics: ResumeStructuredData
     .filter((project) => !!project.name);
 }
 
-function sanitizeParsedResume(
+export function sanitizeParsedResume(
   parsed: Partial<ResumeStructuredData>,
   rawText: string,
 ): ResumeStructuredData {
@@ -1021,6 +1043,8 @@ CRITICAL RULES:
 - For education, extract degree type, field of study, institution name, and dates separately
 - For experience, extract company name, job title, start/end dates, and key responsibilities
 - If a section cannot be parsed reliably, return null for that section rather than guessing
+- CRITICAL: Extract distinct github_url and live_url PER PROJECT. Never copy the same URL across multiple projects.
+- If a project has no URL, set it to null. Do NOT fabricate or reuse URLs from other projects.
 Use empty arrays for missing lists, null for missing scalars, and a confidence_score from 0 to 1.`,
         },
         {
