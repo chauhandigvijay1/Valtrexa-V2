@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "./supabase.js";
 import { sendTelegramMessage } from "./telegram.js";
 import { getChatIdForUser } from "./telegram-bindings.js";
+import { logger } from "./logger.js";
 
 export type NotificationCategory =
   | "application_approval"
@@ -44,11 +45,11 @@ export async function createNotification(input: NotificationInput) {
 
   if (error) {
     if (isSchemaCacheErr(error)) {
-      console.warn(
+      logger.warn(
         `[notifications] Schema cache stale — notification will be delayed. Run NOTIFY pgrst, 'reload schema' in SQL Editor.`,
       );
     } else {
-      console.error(`[notifications] Failed to create: ${error.message}`);
+      logger.error(`[notifications] Failed to create: ${error.message}`);
     }
     return null;
   }
@@ -70,7 +71,7 @@ export async function createNotification(input: NotificationInput) {
       await sendTelegramMessage(chatId, text);
     }
   } catch (e: any) {
-    console.error(`[notifications] Telegram mirror failed: ${e.message}`);
+    logger.error(`[notifications] Telegram mirror failed: ${e.message}`);
   }
 
   return data;

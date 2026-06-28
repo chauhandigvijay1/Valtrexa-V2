@@ -12,6 +12,7 @@
 import { Worker } from "bullmq";
 import IORedis from "ioredis";
 import { supabaseAdmin } from "./_lib/supabase.js";
+import { logger } from "./_lib/logger.js";
 
 const isRailway = !!(
   process.env.RAILWAY_SERVICE_NAME ||
@@ -117,13 +118,13 @@ const QUEUE_NAMES = [
 
 async function start(): Promise<void> {
   if (!isRailway) {
-    console.log("[worker] Not on Railway — skipping worker startup");
+    logger.info("[worker] Not on Railway — skipping worker startup");
     process.exit(0);
   }
 
-  console.log("[worker] Starting Railway worker...");
+  logger.info("[worker] Starting Railway worker...");
   const connection = await createRedisConnection();
-  console.log("[worker] Connected to Redis");
+  logger.info("[worker] Connected to Redis");
 
   const processors = await loadProcessors();
   const workers: Worker[] = [];
@@ -131,23 +132,23 @@ async function start(): Promise<void> {
   for (const name of QUEUE_NAMES) {
     const config = processors[name];
     if (!config) {
-      console.warn(`[worker] No processor for queue "${name}" — skipping`);
+      logger.warn(`[worker] No processor for queue "${name}" — skipping`);
       continue;
     }
 
     const worker = new Worker(
       name,
       async (job) => {
-        console.log(`[worker] Processing ${name}/${job.name} (id=${job.id})`);
+        logger.info(`[worker] Processing ${name}/${job.name} (id=${job.id})`);
         const start = Date.now();
         try {
           const result = await config.processor(job.data);
           const duration = Date.now() - start;
-          console.log(`[worker] Completed ${name}/${job.name} in ${duration}ms`);
+          logger.info(`[worker] Completed ${name}/${job.name} in ${duration}ms`);
           return result;
         } catch (err: any) {
           const duration = Date.now() - start;
-          console.error(`[worker] Failed ${name}/${job.name} after ${duration}ms:`, err?.message);
+          logger.error(`[worker] Failed ${name}/${job.name} after ${duration}ms:`, err?.message);
           throw err;
         }
       },
@@ -158,30 +159,38 @@ async function start(): Promise<void> {
     );
 
     worker.on("failed", (job, err) => {
-      console.error(`[worker] BullMQ failed ${name}/${job?.name}:`, err?.message);
+      logger.error(`[worker] BullMQ failed ${name}/${job?.name}:`, err?.message);
     });
 
     worker.on("error", (err) => {
-      console.error(`[worker] BullMQ error on ${name}:`, err?.message);
+      logger.error(`[worker] BullMQ error on ${name}:`, err?.message);
     });
 
     workers.push(worker);
-    console.log(`[worker] Listening on queue "${name}" (concurrency=${config.concurrency ?? 1})`);
+    logger.info(`[worker] Listening on queue "${name}" (concurrency=${config.concurrency ?? 1})`);
   }
 
-  console.log(`[worker] All ${workers.length} queues active. Waiting for jobs...`);
+  logger.info(`[worker] All ${workers.length} queues active. Waiting for jobs...`);
 
   let cycleTimer: ReturnType<typeof setInterval> | null = null;
   let cycleRunning = false;
 
   async function runScheduledCycle(): Promise<void> {
     if (cycleRunning) {
-      console.log("[worker] Previous cycle still running — skipping");
+      logger.info("[worker] Previous cycle still running — skipping");
       return;
     }
     cycleRunning = true;
     const startedAt = Date.now();
     try {
+      // Detect and clear stale workflows (running > 2 hours without update)
+      const staleThreshold = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
+      await supabaseAdmin
+        .from("workflow_state")
+        .update({ status: "stopped", error: "Auto-stopped: stale workflow (>2h without update)", updated_at: new Date().toISOString() })
+        .eq("status", "running")
+        .lt("updated_at", staleThreshold);
+
       const { data: activeUsers, error } = await supabaseAdmin
         .from("workflow_state")
         .select("user_id")
@@ -189,16 +198,16 @@ async function start(): Promise<void> {
         .eq("status", "running");
 
       if (error) {
-        console.error(`[worker] Failed to query active users: ${error.message}`);
+        logger.error(`[worker] Failed to query active users: ${error.message}`);
         return;
       }
 
       if (!activeUsers || activeUsers.length === 0) {
-        console.log("[worker] No active workflows found — skipping cycle");
+        logger.info("[worker] No active workflows found — skipping cycle");
         return;
       }
 
-      console.log(`[worker] Running cycle for ${activeUsers.length} active user(s)`);
+      logger.info(`[worker] Running cycle for ${activeUsers.length} active user(s)`);
       const { runCycle } = await import("./_lib/workflow-runner.js");
 
       for (const row of activeUsers) {
@@ -206,25 +215,25 @@ async function start(): Promise<void> {
         try {
           const result = await runCycle(row.user_id);
           const elapsed = Date.now() - startedAt;
-          console.log(`[worker] User ${row.user_id} cycle: ${result.status} (${elapsed}ms)`);
+          logger.info(`[worker] User ${row.user_id} cycle: ${result.status} (${elapsed}ms)`);
         } catch (err: any) {
-          console.error(`[worker] User ${row.user_id} cycle failed: ${err?.message}`);
+          logger.error(`[worker] User ${row.user_id} cycle failed: ${err?.message}`);
         }
       }
     } catch (err: any) {
-      console.error(`[worker] Scheduled cycle error: ${err?.message}`);
+      logger.error(`[worker] Scheduled cycle error: ${err?.message}`);
     } finally {
       cycleRunning = false;
-      console.log(`[worker] Cycle finished (${Date.now() - startedAt}ms)`);
+      logger.info(`[worker] Cycle finished (${Date.now() - startedAt}ms)`);
     }
   }
 
   setTimeout(() => runScheduledCycle(), 10_000);
   cycleTimer = setInterval(() => runScheduledCycle(), 30 * 60 * 1000);
-  console.log("[worker] Scheduled workflow cycle every 30 minutes");
+  logger.info("[worker] Scheduled workflow cycle every 30 minutes");
 
   const shutdown = async () => {
-    console.log("[worker] Shutting down...");
+    logger.info("[worker] Shutting down...");
     if (cycleTimer) clearInterval(cycleTimer);
     await Promise.all(workers.map((w) => w.close()));
     await connection.quit();
@@ -236,6 +245,6 @@ async function start(): Promise<void> {
 }
 
 start().catch((err) => {
-  console.error("[worker] Fatal error:", err);
+  logger.error("[worker] Fatal error:", err);
   process.exit(1);
 });

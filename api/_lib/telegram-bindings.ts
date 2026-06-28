@@ -177,8 +177,8 @@ Your AI Career Operating System is now connected.
 <b>Quick Start:</b>
 • /start — Show this menu
 • /status — Dashboard summary
-• /providers — Provider status
-• /workflow — Workflow controls
+• /provider_status — Provider status
+• /workflow_status — Workflow controls
 • /help — All commands
 
 <b>Next Steps:</b>

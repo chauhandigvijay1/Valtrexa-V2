@@ -51,7 +51,7 @@ All variables must be set in the Vercel project dashboard (Settings → Environm
 | --------------------- | -------- | -------------------------------------------- | -------------------------------------------------------------------------------------------- |
 | `GMAIL_CLIENT_ID`     | Optional | Google OAuth 2.0 Client ID                   | Google Cloud Console → APIs & Services → Credentials                                         |
 | `GMAIL_CLIENT_SECRET` | Optional | Google OAuth 2.0 Client Secret               | Google Cloud Console                                                                         |
-| `GMAIL_REFRESH_TOKEN` | Optional | OAuth refresh token for offline Gmail access | Via OAuth playbook or `scripts/get-refresh-token.cjs`                                        |
+| `GMAIL_REFRESH_TOKEN` | Optional | OAuth refresh token for offline Gmail access | Via Google OAuth playbook                                                                     |
 | `GMAIL_REDIRECT_URI`  | Optional | OAuth redirect URI                           | Must match Google Cloud Console (e.g. `https://valtrexa-v2.vercel.app/api/auth/gmail/callback`) |
 
 #### Redis / Queue (2)
@@ -519,11 +519,7 @@ The code checks `process.env.PLAYWRIGHT_HEADLESS` and falls back gracefully when
 
 ### 8.3 Get Refresh Token
 
-Use the script at `scripts/get-refresh-token.cjs`:
-
-```bash
-node scripts/get-refresh-token.cjs
-```
+Follow the Google OAuth playbook to generate a refresh token manually.
 
 Or follow the OAuth flow manually to obtain a refresh token.
 

@@ -1,4 +1,5 @@
 import { callOpenRouterJson, callOpenRouterText } from "./openrouter.js";
+import { logger } from "./logger.js";
 
 export type AiMessage = {
   role: "system" | "user" | "assistant";
@@ -224,7 +225,7 @@ export class GeminiProvider implements AiProvider {
       );
       return result.content.toLowerCase().includes("ok");
     } catch (err) {
-      console.warn("[AIProvider] healthCheck failed", err);
+      logger.warn("[AIProvider] healthCheck failed", err);
       return false;
     }
   }
@@ -390,7 +391,7 @@ export class GroqProvider implements AiProvider {
       );
       return result.content.toLowerCase().includes("ok");
     } catch (err) {
-      console.warn("[AIProvider] healthCheck failed", err);
+      logger.warn("[AIProvider] healthCheck failed", err);
       return false;
     }
   }
@@ -493,7 +494,7 @@ export class OpenRouterProvider implements AiProvider {
       );
       return result.content.toLowerCase().includes("ok");
     } catch (err) {
-      console.warn("[AIProvider] healthCheck failed", err);
+      logger.warn("[AIProvider] healthCheck failed", err);
       return false;
     }
   }

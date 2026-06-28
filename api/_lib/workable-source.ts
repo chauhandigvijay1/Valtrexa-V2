@@ -1,5 +1,6 @@
 import * as cheerio from "cheerio";
 import type { ImportedJob } from "./job-sources.js";
+import { logger } from "./logger.js";
 
 /**
  * A3 — Workable provider.
@@ -21,7 +22,7 @@ export async function importWorkable(boardUrl: string, apiKey?: string): Promise
       account = parsed.pathname.split("/").filter(Boolean)[0] ?? null;
     }
   } catch (err) {
-    console.warn("[WorkableSource] URL parsing failed", err);
+    logger.warn("[WorkableSource] URL parsing failed", err);
     account = boardUrl.split("/").filter(Boolean).pop() ?? null;
   }
 
@@ -56,7 +57,7 @@ export async function importWorkable(boardUrl: string, apiKey?: string): Promise
       }));
     }
   } catch (err) {
-    console.warn("[WorkableSource] SPI feed fetch failed, falling back to HTML scrape", err);
+    logger.warn("[WorkableSource] SPI feed fetch failed, falling back to HTML scrape", err);
   }
 
   // 3. Fall back to scraping the public board HTML.
@@ -89,7 +90,7 @@ export async function importWorkable(boardUrl: string, apiKey?: string): Promise
     });
     return jobs;
   } catch (err) {
-    console.warn("[WorkableSource] HTML scrape failed", err);
+    logger.warn("[WorkableSource] HTML scrape failed", err);
     return [];
   }
 }

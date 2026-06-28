@@ -1,3 +1,5 @@
+import { logger } from "./logger.js";
+
 const TELEGRAM_API_BASE = `https://api.telegram.org/bot`;
 
 const BOT_COMMANDS = [
@@ -28,12 +30,17 @@ const BOT_COMMANDS = [
   { command: "applications_today", description: "Today's application count" },
   { command: "recruiters_found", description: "Recruiters discovered" },
   { command: "outreach_status", description: "Outreach generation status" },
+  { command: "help", description: "Show all available commands" },
   { command: "matching_status", description: "Job matching results" },
   { command: "menu", description: "Main menu with inline buttons" },
   { command: "connect", description: "Connect your Telegram account to the web dashboard" },
   {
     command: "refresh_cookies",
     description: "Check/refresh provider cookies (usage: /refresh_cookies <provider> [new_cookie])",
+  },
+  {
+    command: "refresh-cookies",
+    description: "Check/refresh provider cookies (usage: /refresh-cookies <provider> [new_cookie])",
   },
 ];
 
@@ -61,13 +68,13 @@ export async function registerTelegramCommands(): Promise<{ ok: boolean; error?:
   try {
     const data = await callTelegramApi("setMyCommands", { commands: BOT_COMMANDS });
     if (data.ok) {
-      console.log(`[telegram] Registered ${BOT_COMMANDS.length} commands`);
+      logger.info(`[telegram] Registered ${BOT_COMMANDS.length} commands`);
     } else {
-      console.warn(`[telegram] Failed to register commands: ${data.description}`);
+      logger.warn(`[telegram] Failed to register commands: ${data.description}`);
     }
     return { ok: data.ok ?? false, error: data.description };
   } catch (err: any) {
-    console.warn(`[telegram] Command registration error: ${err.message}`);
+    logger.warn(`[telegram] Command registration error: ${err.message}`);
     return { ok: false, error: err.message };
   }
 }
@@ -76,12 +83,12 @@ export async function registerTelegramWebhook(): Promise<{ ok: boolean; error?: 
   try {
     const publicUrl = process.env.PUBLIC_URL?.trim();
     if (!publicUrl) {
-      console.warn("[telegram] PUBLIC_URL not set — skipping webhook registration");
+      logger.warn("[telegram] PUBLIC_URL not set — skipping webhook registration");
       return { ok: false, error: "PUBLIC_URL not configured" };
     }
 
     const webhookUrl = `${publicUrl.replace(/\/+$/, "")}/api/telegram/webhook`;
-    console.log(`[telegram] Registering webhook: ${webhookUrl}`);
+    logger.info(`[telegram] Registering webhook: ${webhookUrl}`);
 
     const secretToken = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
     const webhookPayload: Record<string, any> = { url: webhookUrl };
@@ -89,22 +96,22 @@ export async function registerTelegramWebhook(): Promise<{ ok: boolean; error?: 
 
     const data = await callTelegramApi("setWebhook", webhookPayload);
     if (data.ok) {
-      console.log(`[telegram] Webhook registered: ${webhookUrl}`);
+      logger.info(`[telegram] Webhook registered: ${webhookUrl}`);
     } else {
-      console.warn(`[telegram] Failed to register webhook: ${data.description}`);
+      logger.warn(`[telegram] Failed to register webhook: ${data.description}`);
     }
 
     // Verify registration
     const info = await callTelegramApi("getWebhookInfo");
     if (info.ok) {
-      console.log(
+      logger.info(
         `[telegram] Webhook status: url=${info.result.url}, pending=${info.result.pending_update_count || 0}`,
       );
     }
 
     return { ok: data.ok ?? false, error: data.description };
   } catch (err: any) {
-    console.warn(`[telegram] Webhook registration error: ${err.message}`);
+    logger.warn(`[telegram] Webhook registration error: ${err.message}`);
     return { ok: false, error: err.message };
   }
 }
@@ -124,11 +131,11 @@ export async function initTelegramBot(): Promise<void> {
     if (publicUrl) {
       await registerTelegramWebhook();
     } else {
-      console.log(
+      logger.info(
         "[telegram] PUBLIC_URL not set — webhook auto-registration skipped (local/dev mode)",
       );
     }
   } catch (err: any) {
-    console.warn(`[telegram] Initialization error: ${err.message}`);
+    logger.warn(`[telegram] Initialization error: ${err.message}`);
   }
 }

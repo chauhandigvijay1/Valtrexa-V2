@@ -2,6 +2,7 @@ import { supabaseAdmin } from "./supabase.js";
 import { emitWorkflowEvent } from "./workflow-events.js";
 import { resolveStorageState } from "./playwright-platform.js";
 import { isProviderEnabled } from "./provider-controls.js";
+import { logger } from "./logger.js";
 import type { BrowserProviderName } from "./playwright-platform.js";
 import {
   autoFillFromMemory,
@@ -296,7 +297,7 @@ async function uploadResume(page: any, resumeUrl?: string): Promise<boolean> {
     }
     return false;
   } catch (err) {
-    console.warn(`[playwright-apply] uploadResume: ${err}`);
+    logger.warn(`[playwright-apply] uploadResume: ${err}`);
     return false;
   }
 }
@@ -378,7 +379,7 @@ async function fillField(page: any, selectors: string[], value: string): Promise
         return true;
       }
     } catch (err) {
-      console.warn(`[playwright-apply] fillField: ${err}`);
+      logger.warn(`[playwright-apply] fillField: ${err}`);
       continue;
     }
   }
@@ -432,7 +433,7 @@ async function generateAnswerForField(page: any, label: string, context: string)
     ]);
     return (result as any).content?.trim() || "";
   } catch (err) {
-    console.warn(`[playwright-apply] generateAnswerForField: ${err}`);
+    logger.warn(`[playwright-apply] generateAnswerForField: ${err}`);
     return "";
   }
 }
@@ -486,7 +487,7 @@ async function handleScreeningQuestions(
             await radio
               .check()
               .catch((err: any) =>
-                console.warn(`[playwright-apply] handleScreeningQuestions radio check: ${err}`),
+                logger.warn(`[playwright-apply] handleScreeningQuestions radio check: ${err}`),
               );
             answered++;
             break;
@@ -530,7 +531,7 @@ async function handleScreeningQuestions(
               await radio
                 .check()
                 .catch((err: any) =>
-                  console.warn(`[playwright-apply] handleScreeningQuestions radio check: ${err}`),
+                  logger.warn(`[playwright-apply] handleScreeningQuestions radio check: ${err}`),
                 );
               answered++;
               break;
@@ -550,7 +551,7 @@ async function handleScreeningQuestions(
       }
     }
   } catch (err) {
-    console.warn(`[playwright-apply] handleScreeningQuestions block: ${err}`);
+    logger.warn(`[playwright-apply] handleScreeningQuestions block: ${err}`);
   }
   return answered;
 }
@@ -560,7 +561,7 @@ async function takeScreenshot(page: any, label: string): Promise<string | null> 
     const screenshot = await page.screenshot({ type: "png", fullPage: false });
     return Buffer.from(screenshot).toString("base64");
   } catch (err) {
-    console.warn(`[playwright-apply] takeScreenshot: ${err}`);
+    logger.warn(`[playwright-apply] takeScreenshot: ${err}`);
     return null;
   }
 }
@@ -569,7 +570,7 @@ async function captureHtmlSnapshot(page: any): Promise<string | null> {
   try {
     return await page.content();
   } catch (err) {
-    console.warn(`[playwright-apply] captureHtmlSnapshot: ${err}`);
+    logger.warn(`[playwright-apply] captureHtmlSnapshot: ${err}`);
     return null;
   }
 }
@@ -585,7 +586,7 @@ async function clickAnyMatching(page: any, selectors: string[]): Promise<boolean
         }
       }
     } catch (err) {
-      console.warn(`[playwright-apply] clickAnyMatching: ${err}`);
+      logger.warn(`[playwright-apply] clickAnyMatching: ${err}`);
       continue;
     }
   }
@@ -604,7 +605,7 @@ async function detectReviewPage(page: any): Promise<boolean> {
       );
     });
   } catch (err) {
-    console.warn(`[playwright-apply] detectReviewPage: ${err}`);
+    logger.warn(`[playwright-apply] detectReviewPage: ${err}`);
     return false;
   }
 }
@@ -643,7 +644,7 @@ async function detectConfirmation(page: any): Promise<boolean> {
       );
     });
   } catch (err) {
-    console.warn(`[playwright-apply] detectConfirmation: ${err}`);
+    logger.warn(`[playwright-apply] detectConfirmation: ${err}`);
     return false;
   }
 }
@@ -675,7 +676,7 @@ async function storeEvidence(input: {
       .single();
     return data?.id ?? null;
   } catch (err) {
-    console.warn(`[playwright-apply] storeEvidence: ${err}`);
+    logger.warn(`[playwright-apply] storeEvidence: ${err}`);
     return null;
   }
 }
@@ -827,7 +828,7 @@ async function runPlaywrightFlow(input: {
       await browser
         .close()
         .catch((err: any) =>
-          console.warn(`[playwright-apply] browser.close (runPlaywrightFlow): ${err}`),
+          logger.warn(`[playwright-apply] browser.close (runPlaywrightFlow): ${err}`),
         );
   }
 }
@@ -964,7 +965,7 @@ async function runPlaywrightSubmit(input: {
       await browser
         .close()
         .catch((err: any) =>
-          console.warn(`[playwright-apply] browser.close (runPlaywrightSubmit): ${err}`),
+          logger.warn(`[playwright-apply] browser.close (runPlaywrightSubmit): ${err}`),
         );
   }
 }
@@ -1709,7 +1710,7 @@ async function findFirstVisible(page: any, selectors: string[]): Promise<any> {
       const el = await page.$(selector);
       if (el && (await el.isVisible())) return el;
     } catch (err) {
-      console.warn(`[playwright-apply] findFirstVisible: ${err}`);
+      logger.warn(`[playwright-apply] findFirstVisible: ${err}`);
       continue;
     }
   }
@@ -1758,7 +1759,7 @@ export async function recordPlaywrightApplyResult(input: {
       .eq("user_id", input.userId);
     if (error) throw error;
   } catch (err: any) {
-    console.warn(
+    logger.warn(
       `[recordPlaywrightApplyResult] Full update failed (${err?.message}), trying safe columns...`,
     );
     try {
@@ -1768,9 +1769,9 @@ export async function recordPlaywrightApplyResult(input: {
         .eq("id", input.applicationId)
         .eq("user_id", input.userId);
       if (fallbackErr)
-        console.warn(`[recordPlaywrightApplyResult] Fallback also failed: ${fallbackErr.message}`);
+        logger.warn(`[recordPlaywrightApplyResult] Fallback also failed: ${fallbackErr.message}`);
     } catch (fallbackErr: any) {
-      console.warn(`[recordPlaywrightApplyResult] Fallback error: ${fallbackErr.message}`);
+      logger.warn(`[recordPlaywrightApplyResult] Fallback error: ${fallbackErr.message}`);
     }
   }
 
@@ -1783,7 +1784,7 @@ export async function recordPlaywrightApplyResult(input: {
       occurred_at: new Date().toISOString(),
     });
   } catch (e: any) {
-    console.warn(`[recordPlaywrightApplyResult] Event insert failed: ${e.message}`);
+    logger.warn(`[recordPlaywrightApplyResult] Event insert failed: ${e.message}`);
   }
 
   try {
@@ -1804,7 +1805,7 @@ export async function recordPlaywrightApplyResult(input: {
       },
     });
   } catch (e: any) {
-    console.warn(`[recordPlaywrightApplyResult] Event emission failed: ${e.message}`);
+    logger.warn(`[recordPlaywrightApplyResult] Event emission failed: ${e.message}`);
   }
 }
 

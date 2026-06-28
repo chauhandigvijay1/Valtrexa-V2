@@ -1,7 +1,8 @@
 import { supabaseAdmin } from "./supabase.js";
 import { emitWorkflowEvent } from "./workflow-events.js";
 import { applyWithPlaywright, recordPlaywrightApplyResult } from "./playwright-apply.js";
-import { submitApprovedApplication, resolvePrimaryResume } from "./apply-engine.js";
+import { logger } from "./logger.js";
+import { resolvePrimaryResume } from "./apply-engine.js";
 import {
   ProviderName,
   PROVIDERS,
@@ -20,7 +21,7 @@ import {
   pauseWorkflow,
   resumeWorkflow,
 } from "./workflow-state.js";
-import { sendAlert, alertProviderDisabled, alertProviderEnabled } from "./alerting.js";
+import { alertProviderDisabled, alertProviderEnabled } from "./alerting.js";
 import { getConfig } from "./workflow-config.js";
 import { handleMemoryCallback } from "./dynamic-profile-memory.js";
 import {
@@ -133,7 +134,7 @@ export async function answerCallbackQuery(callbackQueryId: string, text?: string
       body: JSON.stringify({ callback_query_id: callbackQueryId, text }),
     });
   } catch (err) {
-    console.warn("[Telegram] answerCallbackQuery failed", err);
+    logger.warn("[Telegram] answerCallbackQuery failed", err);
   }
 }
 
@@ -366,6 +367,7 @@ async function handleMenuCommand(chatId: number, userId: string): Promise<string
 }
 
 async function handleHelpCommand(chatId: number): Promise<string> {
+  try {
   const text = `<b>🤖 VALTREXA-V2 Commands</b>
 
 <b>General</b>
@@ -380,11 +382,17 @@ async function handleHelpCommand(chatId: number): Promise<string> {
 /approvals — Pending approvals
 /highvalue — High value companies
 /followups — Overdue follow-ups
+/interviews — Detected interviews
+/analytics — Analytics summary
 
 <b>Providers</b>
 /provider_status — Provider status
 /provider_enable — Enable provider
 /provider_disable — Disable provider
+/provider_pause — Pause provider
+/provider_resume — Resume provider
+/provider_history — Provider health log
+/refresh_cookies — Check or refresh cookies
 
 <b>Workflow</b>
 /workflow_start — Start automation
@@ -404,6 +412,9 @@ async function handleHelpCommand(chatId: number): Promise<string> {
 <b>Account</b>
 /connect — Link Telegram to web dashboard`;
   return text;
+  } catch (err: any) {
+    return `❌ Error loading help: ${escapeHtml(err.message)}`;
+  }
 }
 
 async function handleHealthCommand(chatId: number): Promise<string> {
@@ -605,6 +616,8 @@ async function handleProviderPauseCommand(
   const p = provider.toLowerCase() as ProviderName;
   if (!PROVIDERS.includes(p)) return `Unknown provider: ${provider}. Try: ${PROVIDERS.join(", ")}`;
   try {
+    const control = await getProviderControl(p, userId);
+    if (!control) return `Provider "${p}" not found. Enable it first via the web dashboard.`;
     await setProviderStatus(p, "paused", userId, "telegram");
     return `⏸️ Provider "${p}" has been paused.`;
   } catch (err: any) {
@@ -620,6 +633,8 @@ async function handleProviderResumeCommand(
   const p = provider.toLowerCase() as ProviderName;
   if (!PROVIDERS.includes(p)) return `Unknown provider: ${provider}. Try: ${PROVIDERS.join(", ")}`;
   try {
+    const control = await getProviderControl(p, userId);
+    if (!control) return `Provider "${p}" not found. Enable it first via the web dashboard.`;
     await setProviderStatus(p, "enabled", userId, "telegram");
     return `▶️ Provider "${p}" has been resumed.`;
   } catch (err: any) {
@@ -996,139 +1011,171 @@ export async function processTelegramUpdate(
   body: TelegramUpdate,
   userId: string,
 ): Promise<{ handled: boolean; response?: string }> {
-  if (body.message?.text) {
-    const chatId = body.message.chat.id;
-    const fromId = body.message.from?.id;
-    const firstName = body.message.from?.first_name;
-    const username = body.message.from?.username;
-    const { command, args } = parseCommand(body.message.text);
-    let responseText: string;
+  try {
+    if (body.message?.text) {
+      const chatId = body.message.chat.id;
+      const fromId = body.message.from?.id;
+      const firstName = body.message.from?.first_name;
+      const username = body.message.from?.username;
+      const { command, args } = parseCommand(body.message.text);
+      let responseText: string;
 
-    // Handle unauthenticated connect flow
-    if (command === "/connect" && args) {
-      responseText = await handleConnectCommand(chatId, args.trim(), fromId, username, firstName);
-      await sendTelegramMessage(chatId, responseText);
+      // Handle unauthenticated connect flow
+      if (command === "/connect") {
+        if (!args) {
+          responseText = "Usage: /connect <token>\n\nGenerate a token from Settings in the web dashboard, then send it here to link your account.";
+          await sendTelegramMessage(chatId, responseText);
+          return { handled: true, response: responseText };
+        }
+        responseText = await handleConnectCommand(chatId, args.trim(), fromId, username, firstName);
+        if (responseText) {
+          await sendTelegramMessage(chatId, responseText);
+        }
+        return { handled: true, response: responseText };
+      }
+
+      // Handle /start with deep-link token
+      if (command === "/start" && args && args.startsWith("connect_")) {
+        const token = args.replace("connect_", "").trim();
+        responseText = await handleConnectCommand(chatId, token, fromId, username, firstName);
+        if (responseText) {
+          await sendTelegramMessage(chatId, responseText);
+        }
+        return { handled: true, response: responseText };
+      }
+
+      // Binding check for all commands except unauthenticated ones
+      if (!userId && command !== "/health" && command !== "/start" && command !== "/help" && command !== "/menu") {
+        await sendTelegramMessage(chatId, "❌ Your Telegram account is not connected.\n\nUse /connect <token> to link your account, or generate a token from the web dashboard Settings page.");
+        return { handled: true };
+      }
+
+      switch (command) {
+        case "/health":
+        case "/start":
+          responseText = await handleHealthCommand(chatId);
+          break;
+        case "/menu":
+          responseText = await handleMenuCommand(chatId, userId);
+          break;
+        case "/help":
+          responseText = await handleHelpCommand(chatId);
+          break;
+        case "/status":
+          responseText = await handleStatusCommand(chatId, userId);
+          break;
+        case "/jobs":
+          responseText = await handleJobsCommand(chatId, userId);
+          break;
+        case "/applications":
+          responseText = await handleApplicationsCommand(chatId, userId);
+          break;
+        case "/recruiters":
+          responseText = await handleRecruitersCommand(chatId, userId);
+          break;
+        case "/interviews":
+          responseText = await handleInterviewsCommand(chatId, userId);
+          break;
+        case "/analytics":
+          responseText = await handleAnalyticsCommand(chatId, userId);
+          break;
+        case "/approvals":
+          responseText = await handleApprovalsCommand(chatId, userId);
+          break;
+        case "/highvalue":
+          responseText = await handleHighValueCommand(chatId, userId);
+          break;
+        case "/followups":
+          responseText = await handleFollowupsCommand(chatId, userId);
+          break;
+        case "/provider_status":
+          responseText = await handleProviderStatusCommand(chatId, userId);
+          break;
+        case "/provider_history":
+          responseText = await handleProviderHistoryCommand(chatId, userId, args.trim() || undefined);
+          break;
+        case "/provider_enable":
+          responseText = await handleProviderEnableCommand(chatId, args.trim(), userId);
+          break;
+        case "/provider_disable":
+          responseText = await handleProviderDisableCommand(chatId, args.trim(), userId);
+          break;
+        case "/provider_pause":
+          responseText = await handleProviderPauseCommand(chatId, args.trim(), userId);
+          break;
+        case "/provider_resume":
+          responseText = await handleProviderResumeCommand(chatId, args.trim(), userId);
+          break;
+        case "/refresh_cookies":
+        case "/refresh-cookies":
+          responseText = await handleRefreshCookiesCommand(chatId, userId, args.trim());
+          break;
+        case "/workflow_start":
+          responseText = await handleWorkflowStartCommand(chatId, userId);
+          break;
+        case "/workflow_stop":
+          responseText = await handleWorkflowStopCommand(chatId, userId);
+          break;
+        case "/workflow_pause":
+          responseText = await handleWorkflowPauseCommand(chatId, userId);
+          break;
+        case "/workflow_resume":
+          responseText = await handleWorkflowResumeCommand(chatId, userId);
+          break;
+        case "/workflow_status":
+          responseText = await handleWorkflowStatusCommand(chatId, userId);
+          break;
+        case "/queue_status":
+          responseText = await handleQueueStatusCommand(chatId, userId);
+          break;
+        case "/jobs_imported":
+          responseText = await handleJobsImportedCommand(chatId, userId);
+          break;
+        case "/applications_today":
+          responseText = await handleApplicationsTodayCommand(chatId, userId);
+          break;
+        case "/recruiters_found":
+          responseText = await handleRecruitersFoundCommand(chatId, userId);
+          break;
+        case "/outreach_status":
+          responseText = await handleOutreachStatusCommand(chatId, userId);
+          break;
+        case "/matching_status":
+          responseText = await handleMatchingStatusCommand(chatId, userId);
+          break;
+        default:
+          return { handled: false };
+      }
+
+      if (responseText) {
+        await sendTelegramMessage(chatId, responseText);
+      }
       return { handled: true, response: responseText };
     }
 
-    // Handle /start with deep-link token
-    if (command === "/start" && args && args.startsWith("connect_")) {
-      const token = args.replace("connect_", "").trim();
-      responseText = await handleConnectCommand(chatId, token, fromId, username, firstName);
-      await sendTelegramMessage(chatId, responseText);
-      return { handled: true, response: responseText };
-    }
-    switch (command) {
-      case "/health":
-      case "/start":
-        responseText = await handleHealthCommand(chatId);
-        break;
-      case "/menu":
-        responseText = await handleMenuCommand(chatId, userId);
-        break;
-      case "/help":
-        responseText = await handleHelpCommand(chatId);
-        break;
-      case "/status":
-        responseText = await handleStatusCommand(chatId, userId);
-        break;
-      case "/jobs":
-        responseText = await handleJobsCommand(chatId, userId);
-        break;
-      case "/applications":
-        responseText = await handleApplicationsCommand(chatId, userId);
-        break;
-      case "/recruiters":
-        responseText = await handleRecruitersCommand(chatId, userId);
-        break;
-      case "/interviews":
-        responseText = await handleInterviewsCommand(chatId, userId);
-        break;
-      case "/analytics":
-        responseText = await handleAnalyticsCommand(chatId, userId);
-        break;
-      case "/approvals":
-        responseText = await handleApprovalsCommand(chatId, userId);
-        break;
-      case "/highvalue":
-        responseText = await handleHighValueCommand(chatId, userId);
-        break;
-      case "/followups":
-        responseText = await handleFollowupsCommand(chatId, userId);
-        break;
-      case "/provider_status":
-        responseText = await handleProviderStatusCommand(chatId, userId);
-        break;
-      case "/provider_history":
-        responseText = await handleProviderHistoryCommand(chatId, userId, args.trim() || undefined);
-        break;
-      case "/provider_enable":
-        responseText = await handleProviderEnableCommand(chatId, args.trim(), userId);
-        break;
-      case "/provider_disable":
-        responseText = await handleProviderDisableCommand(chatId, args.trim(), userId);
-        break;
-      case "/provider_pause":
-        responseText = await handleProviderPauseCommand(chatId, args.trim(), userId);
-        break;
-      case "/provider_resume":
-        responseText = await handleProviderResumeCommand(chatId, args.trim(), userId);
-        break;
-      case "/refresh_cookies":
-      case "/refresh-cookies":
-        responseText = await handleRefreshCookiesCommand(chatId, userId, args.trim());
-        break;
-      case "/workflow_start":
-        responseText = await handleWorkflowStartCommand(chatId, userId);
-        break;
-      case "/workflow_stop":
-        responseText = await handleWorkflowStopCommand(chatId, userId);
-        break;
-      case "/workflow_pause":
-        responseText = await handleWorkflowPauseCommand(chatId, userId);
-        break;
-      case "/workflow_resume":
-        responseText = await handleWorkflowResumeCommand(chatId, userId);
-        break;
-      case "/workflow_status":
-        responseText = await handleWorkflowStatusCommand(chatId, userId);
-        break;
-      case "/queue_status":
-        responseText = await handleQueueStatusCommand(chatId, userId);
-        break;
-      case "/jobs_imported":
-        responseText = await handleJobsImportedCommand(chatId, userId);
-        break;
-      case "/applications_today":
-        responseText = await handleApplicationsTodayCommand(chatId, userId);
-        break;
-      case "/recruiters_found":
-        responseText = await handleRecruitersFoundCommand(chatId, userId);
-        break;
-      case "/outreach_status":
-        responseText = await handleOutreachStatusCommand(chatId, userId);
-        break;
-      case "/matching_status":
-        responseText = await handleMatchingStatusCommand(chatId, userId);
-        break;
-      default:
-        return { handled: false };
+    if (body.callback_query) {
+      const { id: cbId, data, from, message } = body.callback_query;
+      const chatId = message?.chat.id;
+      if (!userId) {
+        if (chatId) {
+          await answerCallbackQuery(cbId, "❌ Please connect your Telegram account first using /connect");
+        }
+        return { handled: true };
+      }
+      if (data && chatId) {
+        await handleCallbackQuery(cbId, data, chatId, userId, message?.message_id);
+      }
+      return { handled: true };
     }
 
-    await sendTelegramMessage(chatId, responseText);
-    return { handled: true, response: responseText };
+    return { handled: false };
+  } catch (err: any) {
+    logger.error("processTelegramUpdate unhandled error:", err?.message ?? err);
+    if (body?.message?.chat?.id) {
+      await sendTelegramMessage(body.message.chat.id, "❌ An unexpected error occurred. Please try again.");
+    }
+    return { handled: true, response: "Error" };
   }
-
-  if (body.callback_query) {
-    const { id: cbId, data, from, message } = body.callback_query;
-    const chatId = message?.chat.id;
-    if (data && chatId) {
-      await handleCallbackQuery(cbId, data, chatId, userId, message?.message_id);
-    }
-    return { handled: true };
-  }
-
-  return { handled: false };
 }
 
 async function handleCallbackQuery(
@@ -1267,6 +1314,7 @@ async function skipEntity(entityType: string, entityId: string, userId: string):
         .from("applications")
         .update({ status: "skipped", approval_status: "skipped" })
         .eq("id", entityId)
+        .eq("user_id", userId)
         .eq("user_id", userId);
       return "⏭️ Application skipped.";
     }
@@ -1296,7 +1344,8 @@ async function retryEntity(
     await supabaseAdmin
       .from("applications")
       .update({ approval_status: "approved", retry_count: (app.retry_count ?? 0) + 1 })
-      .eq("id", entityId);
+      .eq("id", entityId)
+      .eq("user_id", userId);
     return await approveEntity("application", entityId, userId, chatId, messageId);
   }
   return `🔄 Retrying ${entityType} ${entityId}`;
@@ -1343,7 +1392,8 @@ async function approveAllPending(userId: string): Promise<{ count: number; error
     const { error } = await supabaseAdmin
       .from("applications")
       .update({ approval_status: "approved", approval_responded_at: new Date().toISOString() })
-      .eq("id", p.id);
+      .eq("id", p.id)
+      .eq("user_id", userId);
     if (error) errors++;
   }
   return { count: pending.length, errors: errors > 0 ? `${errors} failed` : undefined };
@@ -1358,7 +1408,7 @@ async function rejectAllPending(userId: string): Promise<{ count: number }> {
     .is("approval_status", null);
   if (!pending?.length) return { count: 0 };
   const ids = pending.map((p) => p.id);
-  await supabaseAdmin.from("applications").update({ approval_status: "rejected" }).in("id", ids);
+  await supabaseAdmin.from("applications").update({ approval_status: "rejected" }).in("id", ids).eq("user_id", userId);
   return { count: ids.length };
 }
 
@@ -1384,7 +1434,8 @@ async function approveHighValueOnly(userId: string): Promise<{ count: number }> 
       await supabaseAdmin
         .from("applications")
         .update({ approval_status: "approved", approval_note: "high_value" })
-        .eq("id", app.id);
+        .eq("id", app.id)
+        .eq("user_id", userId);
       approved++;
     }
   }
@@ -1403,7 +1454,8 @@ async function rejectLowMatch(userId: string): Promise<{ count: number }> {
   await supabaseAdmin
     .from("applications")
     .update({ approval_status: "rejected", approval_note: "low_match" })
-    .in("job_id", jobIds);
+    .in("job_id", jobIds)
+    .eq("user_id", userId);
   return { count: jobIds.length };
 }
 
@@ -1418,7 +1470,8 @@ async function retryFailedItems(userId: string): Promise<{ count: number }> {
   await supabaseAdmin
     .from("applications")
     .update({ status: "pending", approval_status: null, retry_count: 0 })
-    .in("id", ids);
+    .in("id", ids)
+    .eq("user_id", userId);
   return { count: ids.length };
 }
 
@@ -1444,19 +1497,6 @@ async function approveEntity(
       const companyName = app.jobs?.company_name || "Unknown";
       const jobId = app.jobs?.id;
 
-      await supabaseAdmin
-        .from("applications")
-        .update({ approval_status: "approved", approval_responded_at: new Date().toISOString() })
-        .eq("id", entityId);
-
-      await emitWorkflowEvent({
-        userId,
-        eventType: "application_approved",
-        entityType: "applications",
-        entityId,
-        payload: { approvedAt: new Date().toISOString() },
-      });
-
       const [resume, brain] = await Promise.all([
         resolvePrimaryResume(userId),
         getCandidateBrain(userId),
@@ -1474,6 +1514,21 @@ async function approveEntity(
         headless: process.env.PLAYWRIGHT_HEADLESS !== "false",
         approvalMode: false,
       });
+
+      const approvedStatus = pwResult.status === "APPLIED" || pwResult.status === "PARTIAL" ? "approved" : "failed";
+      await supabaseAdmin
+        .from("applications")
+        .update({ approval_status: approvedStatus, approval_responded_at: new Date().toISOString() })
+        .eq("id", entityId);
+
+      await emitWorkflowEvent({
+        userId,
+        eventType: "application_approved",
+        entityType: "applications",
+        entityId,
+        payload: { approvedAt: new Date().toISOString(), applicationResult: pwResult.status },
+      });
+
       await recordPlaywrightApplyResult({
         userId,
         applicationId: entityId,
@@ -1554,16 +1609,45 @@ async function approveEntity(
           tracking_url: jobUrl,
           status: pwResult.status === "APPLIED" ? "submitted" : "failed",
         })
+        .eq("user_id", userId)
         .eq("id", entityId);
       return text;
     }
     case "outreach": {
-      const { error } = await supabaseAdmin
+      const { data: draft, error: fetchErr } = await supabaseAdmin
+        .from("outreach_drafts")
+        .select("*")
+        .eq("id", entityId)
+        .eq("user_id", userId)
+        .maybeSingle();
+      if (fetchErr || !draft) return "❌ Outreach draft not found.";
+
+      const { error: updateErr } = await supabaseAdmin
         .from("outreach_drafts")
         .update({ status: "approved" })
         .eq("id", entityId)
         .eq("user_id", userId);
-      return error ? `❌ Failed to approve: ${error.message}` : "✅ Outreach draft approved!";
+      if (updateErr) return `❌ Failed to approve: ${updateErr.message}`;
+
+      // Create outreach_messages record for the send pipeline
+      const { error: insertErr } = await supabaseAdmin
+        .from("outreach_messages")
+        .insert({
+          user_id: userId,
+          company_name: draft.company_name,
+          recipient_name: draft.recipient_name ?? "Unknown",
+          recipient_email: draft.recipient_email ?? "",
+          subject: draft.subject,
+          body: draft.body,
+          status: "pending",
+          source: "telegram_approval",
+        } as any);
+      if (insertErr) {
+        logger.error("Failed to create outreach_message from approved draft", { error: insertErr.message, userId, draftId: entityId });
+        return "✅ Draft approved, but send queue creation failed — please use /outreach to send manually.";
+      }
+
+      return "✅ Outreach draft approved and queued for sending!";
     }
     default:
       return `✅ ${entityType} ${entityId} approved.`;
@@ -1871,7 +1955,7 @@ export async function flushTelegramQueue(): Promise<number> {
 
   let sent = 0;
   for (const notification of pending) {
-    const chatId = (notification as any).chat_id || process.env.TELEGRAM_CHAT_ID;
+    const chatId = (notification as any).chat_id;
     if (!chatId) continue;
 
     const result = await sendTelegramMessage(chatId, (notification as any).message);

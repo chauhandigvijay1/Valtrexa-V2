@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase.js";
+import { logger } from "./logger.js";
 
 export type ProviderStatus = "enabled" | "disabled" | "paused" | "maintenance";
 export type ProviderName = "linkedin" | "indeed" | "naukri" | "wellfound" | "instahyre";
@@ -203,7 +204,7 @@ export async function logHealthEvent(event: ProviderHealthEvent, userId: string)
     details: event.details ?? {},
     user_id: userId,
   });
-  if (error) console.error("Failed to log health event:", error);
+  if (error) logger.error("Failed to log health event:", error);
 }
 
 export async function getHealthLog(

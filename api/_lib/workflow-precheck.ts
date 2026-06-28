@@ -138,12 +138,12 @@ async function checkCandidateBrainSynced(userId: string): Promise<PrecheckItem> 
 async function checkOnboardingCompleted(userId: string): Promise<PrecheckItem> {
   try {
     const { data, error } = await supabaseAdmin
-      .from("profiles")
-      .select("onboarding_completed")
-      .eq("id", userId)
+      .from("candidate_profiles")
+      .select("onboarding_completed_at")
+      .eq("user_id", userId)
       .maybeSingle();
     if (error) throw error;
-    if (!data?.onboarding_completed) {
+    if (!data?.onboarding_completed_at) {
       return {
         name: "onboarding_completed",
         status: "failed",

@@ -1,6 +1,7 @@
 import { supabaseAdmin } from "./supabase.js";
 import type { ResumeStructuredData } from "./resume-parser.js";
 import { isMissingSchemaError } from "./compat.js";
+import { logger } from "./logger.js";
 import { dedupeRoles, expandRoleVariants } from "./role-taxonomy.js";
 
 export type CandidateBrain = {
@@ -121,7 +122,7 @@ async function replaceUserRows(
       onConflict: `user_id,${conflictColumn}`,
       ignoreDuplicates: false,
     });
-    if (error) console.error(`[candidate-brain] upsert ${table} failed:`, error);
+    if (error) logger.error(`[candidate-brain] upsert ${table} failed:`, error);
   } else {
     await supabaseAdmin.from(table).delete().eq("user_id", userId);
     for (const row of rows) {
@@ -131,9 +132,9 @@ async function replaceUserRows(
           const { features, ...fallback } = row;
           const retry = await supabaseAdmin.from(table).insert({ ...fallback, user_id: userId });
           if (retry.error)
-            console.warn(`[candidate-brain] insert ${table} fallback failed:`, retry.error.message);
+            logger.warn(`[candidate-brain] insert ${table} fallback failed:`, retry.error.message);
         } else {
-          console.warn(`[candidate-brain] insert ${table} failed:`, insert.error.message);
+          logger.warn(`[candidate-brain] insert ${table} failed:`, insert.error.message);
         }
       }
     }

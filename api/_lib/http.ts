@@ -46,7 +46,7 @@ export function handleCorsPreflight(request: Request): Response | null {
   return new Response(null, {
     status: 204,
     headers: {
-      "access-control-allow-origin": corsOrigin(request) || "*",
+      "access-control-allow-origin": corsOrigin(request) || "",
       "access-control-allow-methods": "GET, POST, PUT, DELETE, PATCH, OPTIONS",
       "access-control-allow-headers":
         "Content-Type, Authorization, x-telegram-bot-api-secret-token",

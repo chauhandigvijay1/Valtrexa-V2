@@ -1,6 +1,6 @@
 # Cookie Guide
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-06-28
 
 ## Why Cookie-Based Auth?
 
@@ -15,8 +15,12 @@ Instead of storing passwords for job portals, VALTREXA-V2 stores **encrypted ses
 
 ```mermaid
 flowchart LR
-    U[User Browser] -->|1. Extract cookies| BE[Browser Extension]
-    BE -->|2. Paste JSON| D[Dashboard Cookie Form]
+    subgraph Manual
+        U1[User Browser DevTools] -->|Copy cookie JSON| D[Dashboard Cookie Form]
+    end
+    subgraph Automated
+        U2[refresh-cookies.ts] -->|Launch browser profile| U1
+    end
     D -->|3. Encrypt AES-256-GCM| CR[crypto-utils.ts]
     CR -->|4. Store| DB[(provider_cookies table)]
     PW[Playwright] -->|5. Read & decrypt| DB
@@ -55,39 +59,50 @@ Table: `provider_cookies` (scoped by `user_id`)
 | created_at | timestamptz | Creation timestamp |
 | updated_at | timestamptz | Last update timestamp |
 
-## Extraction Guide
+## Extraction
 
-### LinkedIn
+### Automated (Recommended)
 
+Run the refresh script on your local machine (requires [Playwright](https://playwright.dev/docs/cli)):
+
+```bash
+npx tsx scripts/refresh-cookies.ts --provider linkedin --user-id <your-uuid>
+```
+
+This launches your local Edge or Chrome with your logged-in browser profile, extracts all session cookies for the given provider, encrypts them with AES-256-GCM, and saves them to the `provider_cookies` table. It also resets `provider_controls.is_cookies_paused = false` so the workflow can proceed.
+
+Supported providers: `linkedin`, `indeed`, `naukri`, `wellfound`, `instahyre`
+
+### Manual (Fallback)
+
+If the automated script doesn't work (no local browser, headless server, WSL without GUI, etc.):
+
+#### LinkedIn
 1. Log into LinkedIn in your browser
 2. Open DevTools → Application → Cookies → `https://www.linkedin.com`
 3. Find `li_at` — copy its **value** (long base64 string)
 4. Also extract `JSESSIONID` (csrf token, starts with `"ajax:"`)
 5. Paste both into the Cookie Management dashboard
 
-### Indeed
-
+#### Indeed
 1. Log into Indeed
 2. Open DevTools → Application → Cookies → `https://www.indeed.com`
 3. Extract `CTK` (the main session cookie) and optionally `SESSIONID`
 4. Paste into dashboard
 
-### Naukri
-
+#### Naukri
 1. Log into Naukri
 2. DevTools → Application → Cookies → `https://www.naukri.com`
 3. Extract `NAUKRI_SESSION` or `ntoken`
 4. Paste into dashboard
 
-### Wellfound (AngelList)
-
+#### Wellfound (AngelList)
 1. Log into Wellfound
 2. DevTools → Application → Cookies → `https://wellfound.com`
 3. Extract any session cookies (varies)
 4. Paste into dashboard
 
-### Instahyre
-
+#### Instahyre
 1. Log into Instahyre
 2. DevTools → Application → Cookies → `https://www.instahyre.com`
 3. Extract session cookies

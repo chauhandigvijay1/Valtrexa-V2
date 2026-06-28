@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase.js";
+import { logger } from "./logger.js";
 
 const META_PREFIX = "__ccp_meta__:";
 
@@ -31,7 +32,7 @@ export function decodeMeta(text?: string | null) {
     const parsed = JSON.parse(text.slice(META_PREFIX.length));
     return isObject(parsed) ? parsed : {};
   } catch (err) {
-    console.warn("[Compat] decodeMeta JSON parse failed", err);
+    logger.warn("[Compat] decodeMeta JSON parse failed", err);
     return {};
   }
 }

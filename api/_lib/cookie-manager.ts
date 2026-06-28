@@ -208,27 +208,115 @@ export async function checkAllCookies(
   return results;
 }
 
+const PROVIDER_URLS: Record<string, string> = {
+  linkedin: "https://www.linkedin.com/feed/",
+  indeed: "https://www.indeed.com/",
+  naukri: "https://www.naukri.com/",
+  wellfound: "https://wellfound.com/",
+  instahyre: "https://www.instahyre.com/",
+};
+
+const PROVIDER_COOKIE_NAMES: Record<string, string[]> = {
+  linkedin: ["li_at", "JSESSIONID"],
+  indeed: ["CTK"],
+  naukri: ["nauk_sid", "ntoken"],
+  wellfound: ["_wellfound_session"],
+  instahyre: ["sessionid", "csrftoken"],
+};
+
 export async function refreshCookieViaPlaywright(
   userId: string,
   provider: string,
 ): Promise<{ ok: boolean; message: string }> {
-  const guide = await getProviderGuide(provider);
-  await createNotification({
-    userId,
-    category: "cookie_expiry",
-    title: `${provider}: Manual refresh required`,
-    message: guide,
-    severity: "info",
-    metadata: { provider },
-  });
-  return {
-    ok: true,
-    message: `ℹ️ Automated refresh not available from server for ${provider}.\n\n` +
-      `For one-click extraction from your local browser, run:\n` +
-      `npx tsx scripts/refresh-cookies.ts --provider ${provider} --user-id ${userId}\n\n` +
-      `Alternatively, follow these steps:\n${guide}\n\n` +
-      `Then paste the cookie in Settings > Cookies or use /cookie ${provider} <value> in Telegram.`,
-  };
+  if (process.env.VERCEL === "1") {
+    const guide = await getProviderGuide(provider);
+    await createNotification({
+      userId,
+      category: "cookie_expiry",
+      title: `${provider}: Manual refresh required`,
+      message: guide,
+      severity: "info",
+      metadata: { provider },
+    });
+    return {
+      ok: true,
+      message: `ℹ️ Serverless environment — can't launch browser.\n` +
+        `Run locally: npx tsx scripts/refresh-cookies.ts --provider ${provider} --user-id ${userId}\n` +
+        `Or paste cookie via /cookie ${provider} <value>`,
+    };
+  }
+
+  try {
+    const url = PROVIDER_URLS[provider];
+    if (!url) return { ok: false, message: `Unknown provider: ${provider}` };
+
+    const { getBrowserForProvider } = await import("./playwright-platform.js");
+    const { setCookie } = await import("./provider-cookies.js");
+    const { browser } = await getBrowserForProvider(provider as any, { headless: true });
+    const context = await browser.newContext();
+    const page = await context.newPage();
+
+    await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
+    await page.waitForLoadState("networkidle", { timeout: 15000 });
+    const currentUrl = page.url().toLowerCase();
+    const authenticated = !currentUrl.includes("login") && !currentUrl.includes("auth") && !currentUrl.includes("signin");
+
+    if (!authenticated) {
+      await page.close();
+      await context.close();
+      await browser.close();
+      return {
+        ok: false,
+        message: `❌ Not logged into ${provider} on the server's browser.\n` +
+          `Login once via the dashboard browser session, then retry.\n` +
+          `Or run locally: npx tsx scripts/refresh-cookies.ts --provider ${provider} --user-id ${userId}`,
+      };
+    }
+
+    const cookies = await context.cookies();
+    const relevantNames = PROVIDER_COOKIE_NAMES[provider] ?? [];
+    const relevant = cookies.filter((c: any) => relevantNames.includes(c.name));
+
+    if (relevant.length === 0) {
+      await page.close();
+      await context.close();
+      await browser.close();
+      const names = relevantNames.join(", ");
+      return {
+        ok: false,
+        message: `❌ Found ${cookies.length} cookies on ${provider} but none matched expected names (${names}).\n` +
+          `Try manual paste via /cookie ${provider} <value>`,
+      };
+    }
+
+    const cookieStr = relevant.map((c: any) => `${c.name}=${c.value}`).join("; ");
+    const saved = await setCookie(userId, provider, cookieStr);
+    await page.close();
+    await context.close();
+    await browser.close();
+
+    if (!saved.ok) return { ok: false, message: `❌ Failed to save cookies: ${saved.message}` };
+
+    const msg = `✅ Extracted ${relevant.length} cookie(s) from ${provider} and saved to database.`;
+    logger.info(`[cookie-manager] Server-side cookie refresh succeeded`, { userId, provider, count: relevant.length });
+
+    await createNotification({
+      userId,
+      category: "cookie_expiry",
+      title: `${provider}: Cookies refreshed via server browser`,
+      message: msg,
+      severity: "info",
+      metadata: { provider, count: relevant.length },
+    });
+
+    return { ok: true, message: msg };
+  } catch (err: any) {
+    logger.error(`[cookie-manager] refreshCookieViaPlaywright failed`, { userId, provider, error: err.message });
+    return {
+      ok: false,
+      message: `❌ Failed to refresh ${provider} cookie: ${err.message}`,
+    };
+  }
 }
 
 export async function deleteProviderCookie(

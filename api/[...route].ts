@@ -33,6 +33,7 @@ import {
   importLever,
   type ImportedJob,
 } from "./_lib/job-sources.js";
+import { buildJobMetadata } from "./_lib/workers/job-metadata.js";
 import { getProvider } from "./_lib/providers.js";
 import { callOpenRouterJson, callOpenRouterText } from "./_lib/openrouter.js";
 import {
@@ -49,7 +50,7 @@ import { logger } from "./_lib/logger.js";
 import { checkRateLimit, rateLimitKey } from "./_lib/rate-limiter.js";
 import { initSentry } from "./_lib/sentry.js";
 import { initTelegramBot } from "./_lib/telegram-init.js";
-import { runAutoMigration } from "./_lib/auto-migrate.js";
+
 import {
   checkProviderCookie,
   refreshProviderCookie,
@@ -60,18 +61,6 @@ import {
   getAllCookieStatuses,
   getLoginGuide,
 } from "./_lib/cookie-manager.js";
-
-function normalizeResumeWhitespace(value: string | null | undefined) {
-  return value?.replace(/\s+/g, " ").trim() ?? "";
-}
-
-function chooseText(...values: Array<string | null | undefined>) {
-  for (const value of values) {
-    const normalized = normalizeResumeWhitespace(value);
-    if (normalized) return normalized;
-  }
-  return null;
-}
 
 type SourceRequest =
   | { source: "greenhouse"; boardToken: string }
@@ -595,7 +584,7 @@ function decodeResearchIntelligence(value: unknown) {
   try {
     return asRecord(JSON.parse(value));
   } catch (err) {
-    console.warn("[...route] decodeResearchIntelligence JSON parse failed", err);
+    logger.warn("[...route] decodeResearchIntelligence JSON parse failed", err);
     return {};
   }
 }
@@ -734,7 +723,7 @@ async function resolveSourceJobs(source: SourceRequest): Promise<ImportedJob[]> 
   const provider = getProvider(source.source);
   const result = await provider.importJobs(source);
   if (result.status === "READY_FOR_CREDENTIALS") {
-    console.log(`Provider ${source.source} is READY_FOR_CREDENTIALS`);
+    logger.info(`Provider ${source.source} is READY_FOR_CREDENTIALS`);
   }
   return result.jobs;
 }
@@ -748,7 +737,7 @@ async function fetchWebsiteSummary(website?: string) {
       signal: AbortSignal.timeout(10000),
     });
   } catch (err) {
-    console.warn("[...route] fetchWebsiteSummary fetch failed", err);
+    logger.warn("[...route] fetchWebsiteSummary fetch failed", err);
     return { text: "", techStack: [] as string[], sourceUrls: [website] };
   }
   if (!response.ok) return { text: "", techStack: [] as string[], sourceUrls: [website] };
@@ -794,7 +783,7 @@ async function fetchNews(companyName: string) {
       signal: AbortSignal.timeout(10000),
     });
   } catch (err) {
-    console.warn("[...route] fetchNews fetch failed", err);
+    logger.warn("[...route] fetchNews fetch failed", err);
     return "";
   }
   if (!response.ok) return "";
@@ -831,9 +820,6 @@ function buildSummary(payload: {
   ].join("\n");
 }
 
-function providerForModel(model: string) {
-  return model.startsWith("local-fallback") ? "local-fallback" : "openrouter";
-}
 
 async function handleResumeProcess(request: Request) {
   if (request.method !== "POST") return methodNotAllowed(["POST"]);
@@ -850,7 +836,7 @@ async function handleResumeProcess(request: Request) {
     }
     const { error } = await clearPrimary;
     if (error) {
-      return json({ error: error.message }, { status: 400 });
+      return json({ error: safeErrorMessage(error) }, { status: 400 });
     }
   }
 
@@ -937,7 +923,7 @@ async function handleResumeProcess(request: Request) {
   });
 
   if (parseInsert.error) {
-    return json({ error: parseInsert.error.message }, { status: 400 });
+    return json({ error: safeErrorMessage(parseInsert.error) }, { status: 400 });
   }
 
   await syncResumeToBrain(user.id, parsed.data, rawText);
@@ -1153,7 +1139,7 @@ async function handleResumeTailor(request: Request) {
       });
 
     if (uploadTex.error) {
-      return json({ error: uploadTex.error.message }, { status: 400 });
+      return json({ error: safeErrorMessage(uploadTex.error) }, { status: 400 });
     }
 
     storagePath = texPath;
@@ -1184,14 +1170,14 @@ async function handleResumeTailor(request: Request) {
             pdfPageCount = textResult.pages.length;
             pdfVerified = true;
           } catch (parseErr) {
-            console.error("pdf-parse failed:", parseErr);
+            logger.error("pdf-parse failed:", parseErr);
           }
         }
       } else {
-        console.error("PDF Compilation failed", compileRes.status, await compileRes.text());
+        logger.error("PDF Compilation failed", compileRes.status, await compileRes.text());
       }
     } catch (e) {
-      console.error("PDF Compilation error", e);
+      logger.error("PDF Compilation error", e);
     }
   } else {
     // 3. LEGACY MARKDOWN WORKFLOW
@@ -1239,7 +1225,7 @@ async function handleResumeTailor(request: Request) {
       });
 
     if (uploadMd.error) {
-      return json({ error: uploadMd.error.message }, { status: 400 });
+      return json({ error: safeErrorMessage(uploadMd.error) }, { status: 400 });
     }
   }
 
@@ -1304,7 +1290,7 @@ async function handleResumeDetails(request: Request) {
     .order("version", { ascending: false });
 
   if (versionsResult.error) {
-    return json({ error: versionsResult.error.message }, { status: 400 });
+    return json({ error: safeErrorMessage(versionsResult.error) }, { status: 400 });
   }
 
   const versions = (versionsResult.data ?? []).map(normalizeResumeVersion);
@@ -1356,7 +1342,7 @@ async function handleResumeCenter(request: Request) {
     .eq("user_id", user.id)
     .order("updated_at", { ascending: false });
   if (resumesResult.error) {
-    return json({ error: resumesResult.error.message }, { status: 400 });
+    return json({ error: safeErrorMessage(resumesResult.error) }, { status: 400 });
   }
 
   const rows = [];
@@ -1430,7 +1416,7 @@ async function handleResumeParse(request: Request) {
   });
 
   if (parseInsert.error) {
-    return json({ error: parseInsert.error.message }, { status: 400 });
+    return json({ error: safeErrorMessage(parseInsert.error) }, { status: 400 });
   }
 
   await syncResumeToBrain(user.id, parsed.data, rawText);
@@ -1517,75 +1503,10 @@ async function handleResumeDelete(request: Request) {
     .select("id")
     .maybeSingle();
   if (deleteResult.error) {
-    return json({ error: deleteResult.error.message }, { status: 400 });
+    return json({ error: safeErrorMessage(deleteResult.error) }, { status: 400 });
   }
 
   return json({ deleted: true, resumeId: body.resumeId });
-}
-
-function inferWorkMode(location: string | null, description: string) {
-  const text = `${location ?? ""} ${description}`.toLowerCase();
-  if (text.includes("hybrid")) return "hybrid";
-  if (text.includes("remote")) return "remote";
-  if (text.includes("onsite") || text.includes("on-site")) return "onsite";
-  return null;
-}
-
-function inferExperienceLevel(title: string, description: string) {
-  const text = `${title} ${description}`.toLowerCase();
-  if (/intern|fresher|entry.level|entry-level|graduate|new grad/.test(text)) return "Fresher";
-  if (/0.?1 year|0-1 year|0 to 1 year/.test(text)) return "0-1 Years";
-  if (/1.?2 year|1-2 year|1 to 2 year/.test(text)) return "1-2 Years";
-  if (/2.?3 year|2-3 year|2 to 3 year/.test(text)) return "2-3 Years";
-  if (/3.?5 year|3-5 year|3 to 5 year|mid level/.test(text)) return "3-5 Years";
-  if (/5\+ year|senior|staff|principal|lead/.test(text)) return "5+ Years";
-  return null;
-}
-
-function inferSalaryBounds(text: string) {
-  const match = text.match(
-    /(?:\$|usd\s*)?(\d{2,3})(?:k)?\s*(?:-|to)\s*(?:\$|usd\s*)?(\d{2,3})(?:k)?/i,
-  );
-  if (!match) return { salaryMin: null, salaryMax: null };
-  const min = Number(match[1]);
-  const max = Number(match[2]);
-  const normalize = (value: number) => (value < 1000 ? value * 1000 : value);
-  return { salaryMin: normalize(min), salaryMax: normalize(max) };
-}
-
-function inferCompanySize(description: string) {
-  const text = description.toLowerCase();
-  if (/startup|seed|series a|series b|small team/.test(text)) return "startup";
-  if (/mid.?size|growing team|scale-up/.test(text)) return "mid";
-  if (/enterprise|fortune 500|global company|large team/.test(text)) return "enterprise";
-  return null;
-}
-
-function inferFreshnessBucket(postedAt: string | null) {
-  if (!postedAt) return null;
-  const posted = new Date(postedAt).getTime();
-  if (!Number.isFinite(posted)) return null;
-  const days = Math.floor((Date.now() - posted) / 86400000);
-  if (days <= 1) return "24h";
-  if (days <= 3) return "3d";
-  if (days <= 7) return "7d";
-  if (days <= 30) return "30d";
-  return "older";
-}
-
-function buildJobMetadata(job: ImportedJob) {
-  const description = chooseText(job.description, "") ?? "";
-  return {
-    normalized_roles: dedupeRoles(expandRoleVariants(job.title)),
-    experience_level: inferExperienceLevel(job.title, description),
-    work_mode: inferWorkMode(job.location, description),
-    company_size: inferCompanySize(description),
-    easy_apply:
-      /easy apply|quick apply|one click/i.test(description) ||
-      ["linkedin", "wellfound", "naukri"].includes(job.source),
-    freshness_bucket: inferFreshnessBucket(job.postedAt),
-    ...inferSalaryBounds(`${job.title}\n${description}`),
-  };
 }
 
 async function handleJobsImport(request: Request) {
@@ -1705,7 +1626,7 @@ async function handleJobsImport(request: Request) {
       },
     } as any);
     if (runInsert.error) {
-      return json({ error: runInsert.error.message }, { status: 400 });
+      return json({ error: safeErrorMessage(runInsert.error) }, { status: 400 });
     }
 
     await emitWorkflowEvent({
@@ -2135,7 +2056,7 @@ async function handleOutreachCampaign(request: Request) {
     .order("created_at", { ascending: false });
 
   if (availablePainPoints.error) {
-    return json({ error: availablePainPoints.error.message }, { status: 400 });
+    return json({ error: safeErrorMessage(availablePainPoints.error) }, { status: 400 });
   }
 
   if (!(availablePainPoints.data?.length ?? 0)) {
@@ -2147,7 +2068,7 @@ async function handleOutreachCampaign(request: Request) {
       .eq("company_name", body.companyName)
       .order("created_at", { ascending: false });
     if (availablePainPoints.error) {
-      return json({ error: availablePainPoints.error.message }, { status: 400 });
+      return json({ error: safeErrorMessage(availablePainPoints.error) }, { status: 400 });
     }
   }
 
@@ -2171,7 +2092,7 @@ async function handleOutreachCampaign(request: Request) {
     .eq("user_id", user.id)
     .order("updated_at", { ascending: false });
   if (allCampaigns.error) {
-    return json({ error: allCampaigns.error.message }, { status: 400 });
+    return json({ error: safeErrorMessage(allCampaigns.error) }, { status: 400 });
   }
 
   const existingCampaign =
@@ -2180,7 +2101,7 @@ async function handleOutreachCampaign(request: Request) {
         const parsed = campaign.template ? asRecord(JSON.parse(campaign.template)) : {};
         return asString(parsed.companyName) === body.companyName;
       } catch (err) {
-        console.warn("[...route] campaign template JSON parse failed", err);
+        logger.warn("[...route] campaign template JSON parse failed", err);
         return false;
       }
     }) ?? null;
@@ -2277,7 +2198,7 @@ async function handleOutreachCampaign(request: Request) {
     .eq("id", emailDraft.id)
     .eq("user_id", user.id);
   if (emailLink.error) {
-    return json({ error: emailLink.error.message }, { status: 400 });
+    return json({ error: safeErrorMessage(emailLink.error) }, { status: 400 });
   }
 
   const dmLink = await supabaseAdmin
@@ -2286,7 +2207,7 @@ async function handleOutreachCampaign(request: Request) {
     .eq("id", dmDraft.id)
     .eq("user_id", user.id);
   if (dmLink.error) {
-    return json({ error: dmLink.error.message }, { status: 400 });
+    return json({ error: safeErrorMessage(dmLink.error) }, { status: 400 });
   }
 
   const loomLink = await supabaseAdmin
@@ -2300,7 +2221,7 @@ async function handleOutreachCampaign(request: Request) {
     .eq("id", loomDraft.id)
     .eq("user_id", user.id);
   if (loomLink.error) {
-    return json({ error: loomLink.error.message }, { status: 400 });
+    return json({ error: safeErrorMessage(loomLink.error) }, { status: 400 });
   }
 
   const finalTemplate = {
@@ -2849,7 +2770,7 @@ async function handleApplicationPackage(request: Request) {
           .single();
         if (ansData) storedAnswers.push(ansData);
       } catch (err) {
-        console.warn("[...route] storing application answer failed (table may not exist)", err);
+        logger.warn("[...route] storing application answer failed (table may not exist)", err);
         storedAnswers.push(qa);
       }
     }
@@ -2873,7 +2794,7 @@ async function handleApplicationPackage(request: Request) {
 
     return json({ tier, qa: qaResult.data.qa, storedAnswers });
   } catch (e: any) {
-    return json({ error: e.message }, { status: 400 });
+    return json({ error: safeErrorMessage(e) }, { status: 400 });
   }
 }
 
@@ -2962,7 +2883,7 @@ async function handleInterviewPrep(request: Request) {
 
     return json({ success: true, topics: prepResult.data.topics });
   } catch (e: any) {
-    return json({ error: e.message }, { status: 400 });
+    return json({ error: safeErrorMessage(e) }, { status: 400 });
   }
 }
 
@@ -3231,7 +3152,7 @@ async function handleCompanyTarget(request: Request) {
       .ilike("name", companyName)
       .maybeSingle();
 
-    if (error) return json({ error: error.message }, { status: 400 });
+    if (error) return json({ error: safeErrorMessage(error) }, { status: 400 });
     return json(
       data ?? {
         name: companyName,
@@ -3280,7 +3201,7 @@ async function handleCompanyTarget(request: Request) {
       result = await supabaseAdmin.from("companies").insert(payload).select("*").single();
     }
 
-    if (result.error) return json({ error: result.error.message }, { status: 400 });
+    if (result.error) return json({ error: safeErrorMessage(result.error) }, { status: 400 });
     return json(result.data);
   }
 
@@ -3302,7 +3223,7 @@ async function handleFollowUps(request: Request) {
     if (applicationId) q = q.eq("application_id", applicationId);
     if (done !== null && done !== undefined) q = q.eq("done", done === "true");
     const { data, error } = await q;
-    if (error) return json({ error: error.message }, { status: 400 });
+    if (error) return json({ error: safeErrorMessage(error) }, { status: 400 });
     return json(data ?? []);
   }
 
@@ -3325,7 +3246,7 @@ async function handleFollowUps(request: Request) {
       })
       .select("*")
       .single();
-    if (error) return json({ error: error.message }, { status: 400 });
+    if (error) return json({ error: safeErrorMessage(error) }, { status: 400 });
     return json(data);
   }
 
@@ -3345,7 +3266,7 @@ async function handleFollowUps(request: Request) {
       .eq("user_id", user.id)
       .select("*")
       .single();
-    if (error) return json({ error: error.message }, { status: 400 });
+    if (error) return json({ error: safeErrorMessage(error) }, { status: 400 });
     return json(data);
   }
 
@@ -3358,7 +3279,7 @@ async function handleFollowUps(request: Request) {
       .delete()
       .eq("id", id)
       .eq("user_id", user.id);
-    if (error) return json({ error: error.message }, { status: 400 });
+    if (error) return json({ error: safeErrorMessage(error) }, { status: 400 });
     return json({ success: true });
   }
 
@@ -3533,7 +3454,7 @@ async function handleApplicationAnswers(request: Request) {
       }
       return json(data ?? []);
     } catch (err) {
-      console.error("[...route] fetching application answers failed", err);
+      logger.error("[...route] fetching application answers failed", err);
       return json([]);
     }
   }
@@ -3563,7 +3484,7 @@ async function handleApplicationAnswers(request: Request) {
           inserted.push(data);
         }
       } catch (err) {
-        console.warn("[...route] inserting application answer failed (table may not exist)", err);
+        logger.warn("[...route] inserting application answer failed (table may not exist)", err);
       }
     }
 
@@ -3583,7 +3504,7 @@ async function handleInterviewsWithPrep(request: Request) {
     .eq("user_id", user.id)
     .order("scheduled_at", { ascending: false });
 
-  if (error) return json({ error: error.message }, { status: 400 });
+  if (error) return json({ error: safeErrorMessage(error) }, { status: 400 });
 
   // Enrich with prep status
   const enriched = [];
@@ -3646,7 +3567,7 @@ async function handleFollowUpAutoCreate(request: Request) {
     .select("*")
     .single();
 
-  if (error) return json({ error: error.message }, { status: 400 });
+  if (error) return json({ error: safeErrorMessage(error) }, { status: 400 });
 
   await emitWorkflowEvent({
     userId: user.id,
@@ -3702,6 +3623,14 @@ async function handleTelegramWebhook(request: Request) {
   if (!userId) userId = process.env.TELEGRAM_USER_ID ?? "";
   const result = await processTelegramUpdate(body, userId);
   return json({ handled: result.handled });
+}
+
+async function handleTelegramBinding(request: Request) {
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  const user = await requireApiUser(request);
+  const { generateBindingToken } = await import("./_lib/telegram-bindings.js");
+  const result = await generateBindingToken(user.id);
+  return json(result);
 }
 
 // Phase A + B route handlers — see api/phase-handlers.ts
@@ -3869,6 +3798,8 @@ export async function routeRequest(request: Request) {
       return phase.handleEventBusHistory(request);
     case "telegram/webhook":
       return handleTelegramWebhook(request);
+    case "telegram/binding":
+      return handleTelegramBinding(request);
     // ── Phase P endpoints ──
     case "recruiters/discover-v3":
       return phase.handleRecruiterDiscoveryV3(request);
@@ -3933,7 +3864,7 @@ function isAdmin(user: { email?: string }): boolean {
   const adminEmails = (process.env.ADMIN_EMAILS ?? "")
     .split(",")
     .map((e) => e.trim().toLowerCase());
-  return adminEmails.length === 0 || adminEmails.includes((user.email ?? "").toLowerCase());
+  return adminEmails.length > 0 && adminEmails.includes((user.email ?? "").toLowerCase());
 }
 
 async function requireAdmin(request: Request) {
@@ -4164,7 +4095,7 @@ async function handleWorkflowCycle(request: Request) {
     const result = await runCycle(user.id);
     return json(result);
   } catch (err: any) {
-    return json({ error: err.message }, { status: 500 });
+    return json({ error: safeErrorMessage(err) }, { status: 500 });
   }
 }
 
@@ -4213,9 +4144,6 @@ export async function safeRouteRequest(request: Request) {
 
 // Initialize Sentry at module load time
 initSentry();
-
-// Run auto-migration if DATABASE_URL is available
-void runAutoMigration().catch((err) => console.error("[auto-migration] Failed:", err));
 
 // Initialize Telegram bot (commands + webhook if PUBLIC_URL set)
 initTelegramBot();

@@ -2,6 +2,7 @@ import { createClient } from "@supabase/supabase-js";
 import { getConfig } from "./workflow-config.js";
 import { computeMatchScore, MatchInputs } from "./match-engine.js";
 import { importJobsInline } from "./workers/job-worker.js";
+import { discoverRecruitersInline } from "./workers/recruiter-worker.js";
 import { getResumeForMatching, getCandidateBrain } from "./candidate-brain.js";
 import { startStage, completeStage, failStage } from "./workflow-timeline.js";
 import { createNotification } from "./notification-center.js";
@@ -95,6 +96,8 @@ async function phaseImportJobs(userId: string): Promise<PhaseResult> {
 
   logger.info("Starting job import phase", { providers, userId });
 
+  const { recordProviderSuccess, recordProviderFailure } = await import("./provider-controls.js");
+
   for (const providerName of providers) {
     try {
       await new Promise((r) => setTimeout(r, config.sleepSecondsBetweenProviders * 1000));
@@ -104,14 +107,16 @@ async function phaseImportJobs(userId: string): Promise<PhaseResult> {
       });
       count += result.importedCount;
       logger.info(`Imported ${result.importedCount} jobs from ${providerName}`);
+      await recordProviderSuccess(providerName as any, userId);
     } catch (e: any) {
       errors.push(`${providerName}: ${e.message}`);
       logger.warn(`Import failed for ${providerName}`, { error: e.message, userId });
+      await recordProviderFailure(providerName as any, e.message, userId);
     }
   }
 
   if (stageId) {
-    if (errors.length === count ? 0 : errors.length > 0) {
+    if (errors.length > 0) {
       await failStage(stageId, errors.join("; "));
     } else {
       await completeStage(stageId, `Imported ${count} jobs`);
@@ -295,16 +300,40 @@ async function phaseDiscoverRecruiters(userId: string): Promise<PhaseResult> {
       };
     }
 
-    if (stageId) await completeStage(stageId, `Queued ${matchedJobs.length} jobs for discovery`);
+    let discovered = 0;
+    for (const job of matchedJobs) {
+      try {
+        const result = await discoverRecruitersInline({
+          userId,
+          companyName: job.company_name,
+          roleTitle: job.title,
+        });
+        discovered += result.recruiters.length;
+
+        await supabase
+          .from("jobs")
+          .update({ recruiter_discovered_at: new Date().toISOString() })
+          .eq("id", job.id)
+          .eq("user_id", userId);
+      } catch (jobErr: any) {
+        errors.push(`Job ${job.id} (${job.company_name}): ${jobErr.message}`);
+      }
+    }
+
+    if (errors.length) {
+      if (stageId) await failStage(stageId, `Completed with ${errors.length} error(s)`);
+    } else {
+      if (stageId) await completeStage(stageId, `Discovered ${discovered} recruiters across ${matchedJobs.length} jobs`);
+    }
 
     return {
       phase: "discover_recruiters",
       startedAt: start,
       completedAt: new Date().toISOString(),
-      success: true,
-      count: matchedJobs.length,
-      errors: [],
-      details: { jobs_queued: matchedJobs.length },
+      success: errors.length === 0,
+      count: discovered,
+      errors,
+      details: { jobs_processed: matchedJobs.length, discovered },
     };
   } catch (e: any) {
     errors.push(e.message);
@@ -406,7 +435,7 @@ async function phaseHighValuePipeline(userId: string): Promise<PhaseResult> {
       for (const rec of pendingRecruiters) {
         try {
           // Create outreach_draft record (used by Telegram approval + sending pipeline)
-          const { error: outErr } = await supabase
+          const { data: draft, error: outErr } = await supabase
             .from("outreach_drafts")
             .insert({
               user_id: userId,
@@ -418,13 +447,21 @@ async function phaseHighValuePipeline(userId: string): Promise<PhaseResult> {
               kind: "hiring_manager_outreach",
               generated_context: { source: "high_value_pipeline", recruiter_role: rec.role },
             } as any)
+            .select()
             .maybeSingle();
           // Mark recruiter as discovered
-          if (!outErr) {
+          if (!outErr && draft) {
             await supabase
               .from("recruiters")
               .update({ status: "discovered" } as any)
               .eq("id", rec.id);
+            // Notify user via Telegram about the new outreach draft
+            try {
+              const { notifyOutreachDraft } = await import("./telegram.js");
+              await notifyOutreachDraft(userId, draft.id, rec.name ?? "Unknown", rec.company ?? "Unknown");
+            } catch (notifyErr: any) {
+              logger.warn("Failed to notify outreach draft via Telegram", { error: notifyErr.message, userId });
+            }
           }
         } catch (e: any) {
           errors.push(`outreach ${rec.name}: ${e.message}`);
@@ -614,20 +651,14 @@ async function phaseFollowups(userId: string): Promise<PhaseResult> {
   const stageId = (await startStage(userId, "followups", { cycleId: userId, label: "Followups" }))
     ?.id;
 
-  const threeDaysAgo = new Date(Date.now() - 3 * 86400000).toISOString();
   try {
-    const { count } = await supabase
-      .from("applications")
-      .select("id", { count: "exact", head: true })
-      .eq("user_id", userId)
-      .eq("status", "applied")
-      .lt("updated_at", threeDaysAgo)
-      .is("followup_sent_at", null);
+    const { processFollowupsInline } = await import("./workers/followup-worker.js");
+    const result = await processFollowupsInline({ userId, limit: 50 });
 
     if (stageId)
       await completeStage(
         stageId,
-        count ? `Found ${count} applications needing followup` : "No followups needed",
+        result.processed > 0 ? `Sent ${result.processed} followups` : "No followups needed",
       );
 
     return {
@@ -635,9 +666,9 @@ async function phaseFollowups(userId: string): Promise<PhaseResult> {
       startedAt: start,
       completedAt: new Date().toISOString(),
       success: true,
-      count: count ?? 0,
+      count: result.processed ?? 0,
       errors: [],
-      details: count ? { pending: count } : undefined,
+      details: result.processed ? { sent: result.processed } : undefined,
     };
   } catch (e: any) {
     errors.push(e.message);
@@ -656,6 +687,10 @@ async function phaseFollowups(userId: string): Promise<PhaseResult> {
 async function phaseHealthCheck(userId: string): Promise<PhaseResult> {
   const start = new Date().toISOString();
   const errors: string[] = [];
+
+  const stageId = (
+    await startStage(userId, "health_check", { cycleId: userId, label: "Health check" })
+  )?.id;
 
   try {
     const { data: controls } = await supabase
@@ -685,6 +720,16 @@ async function phaseHealthCheck(userId: string): Promise<PhaseResult> {
       });
     }
 
+    if (stageId) {
+      const failedProviders = failed.map((c) => c.provider).join(", ");
+      await completeStage(
+        stageId,
+        failedProviders
+          ? `${controls?.length ?? 0} providers checked, issues: ${failedProviders}`
+          : `${controls?.length ?? 0} providers healthy`,
+      );
+    }
+
     return {
       phase: "health_check",
       startedAt: start,
@@ -698,8 +743,50 @@ async function phaseHealthCheck(userId: string): Promise<PhaseResult> {
     };
   } catch (e: any) {
     errors.push(e.message);
+    if (stageId) await failStage(stageId, e.message);
     return {
       phase: "health_check",
+      startedAt: start,
+      completedAt: new Date().toISOString(),
+      success: false,
+      count: 0,
+      errors,
+    };
+  }
+}
+
+async function phaseAnalytics(userId: string): Promise<PhaseResult> {
+  const start = new Date().toISOString();
+  const errors: string[] = [];
+
+  const stageId = (
+    await startStage(userId, "analytics", { cycleId: userId, label: "Analytics" })
+  )?.id;
+
+  try {
+    const { runAnalyticsInline } = await import("./workers/analytics-worker.js");
+    const result = await runAnalyticsInline({ userId });
+
+    if (stageId)
+      await completeStage(
+        stageId,
+        `Applications: ${result.summary.applications}, Interviews: ${result.summary.interviews}`,
+      );
+
+    return {
+      phase: "analytics",
+      startedAt: start,
+      completedAt: new Date().toISOString(),
+      success: true,
+      count: result.summary.applications,
+      errors: [],
+      details: result.summary as any,
+    };
+  } catch (e: any) {
+    errors.push(e.message);
+    if (stageId) await failStage(stageId, e.message);
+    return {
+      phase: "analytics",
       startedAt: start,
       completedAt: new Date().toISOString(),
       success: false,
@@ -780,9 +867,9 @@ async function saveWorkflowState(
   }
 }
 
-export async function startWorkflow(userId: string): Promise<void> {
-  await saveWorkflowState(userId, { status: "running", cycleId: crypto.randomUUID() });
-  logger.info("Workflow started", { userId });
+export async function startWorkflow(userId: string, by?: string): Promise<any> {
+  const { startWorkflow: realStart } = await import("./workflow-state.js");
+  return realStart(userId, by);
 }
 
 export async function pauseWorkflow(userId: string): Promise<void> {
@@ -867,6 +954,7 @@ export async function runCycle(userId: string): Promise<CycleResult> {
     { name: "apply_pipeline", fn: phaseApplyPipeline },
     { name: "followups", fn: phaseFollowups },
     { name: "health_check", fn: phaseHealthCheck },
+    { name: "analytics", fn: phaseAnalytics },
   ];
 
   for (const { name, fn } of phaseList) {
@@ -918,12 +1006,13 @@ export async function runCycle(userId: string): Promise<CycleResult> {
         count: 0,
         errors: [e.message],
       });
-      // Save error checkpoint for recovery
+      // Save error checkpoint for recovery and halt subsequent phases
       await saveWorkflowState(userId, {
         status: "error",
         cycleId,
         error: `Phase ${name} failed: ${e.message}`,
       });
+      break;
     }
   }
 
@@ -958,10 +1047,7 @@ export async function runCycle(userId: string): Promise<CycleResult> {
     },
   });
 
-  // TODO: garbage-collect "saved" / "pending" applications when workflow
-  // ends incompletely — query applications with status "saved" that belong
-  // to this cycle and set their status to "failed" with reason
-  // "workflow_ended_incompletely".
+
 
   return result;
 }

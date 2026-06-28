@@ -1,5 +1,6 @@
 import mammoth from "mammoth";
 import { callOpenRouterJson } from "./openrouter.js";
+import { logger } from "./logger.js";
 
 export type ResumeProject = {
   name: string | null;
@@ -702,6 +703,11 @@ function inferProjectTech(projectText: string, knownSkills: string[]) {
   return uniqueStrings(knownSkills.filter((skill) => skillToRegex(skill).test(projectText)));
 }
 
+function extractLabelledUrl(text: string, labelPattern: RegExp): string | null {
+  const match = text.match(labelPattern);
+  return match ? match[1].replace(/[.,;)]+$/, "").trim() : null;
+}
+
 function inferProjects(rawText: string, skills: string[]) {
   const section = getSection(rawText, PROJECT_SECTION_LABELS);
   if (!section) return [];
@@ -710,19 +716,45 @@ function inferProjects(rawText: string, skills: string[]) {
     .map((chunk) => normalizeMultiline(chunk))
     .filter(Boolean);
 
+  const sectionUrls = Array.from(section.matchAll(/https?:\/\/[^\s)]+/gi)).map((m) => m[0]);
+
   return chunks.slice(0, 8).map((chunk) => {
     const lines = chunk.split("\n").filter(Boolean);
     const heading = lines[0]?.replace(/^[-*•]\s*/, "").trim() ?? "Project";
     const urls = Array.from(chunk.matchAll(/https?:\/\/[^\s)]+/gi)).map((match) => match[0]);
-    const github = urls.find((url) => /github\.com/i.test(url)) ?? null;
-    const live = urls.find((url) => !/github\.com/i.test(url)) ?? null;
+
+    let github_url: string | null = null;
+    let live_url: string | null = null;
+
+    const labelledGithub = extractLabelledUrl(chunk, /(?:github|repo|code|repository)\s*:?\s*(https?:\/\/[^\s)]+)/i);
+    const labelledLive = extractLabelledUrl(chunk, /(?:live|demo|url|website|site|link|deploy|production)\s*:?\s*(https?:\/\/[^\s)]+)/i);
+
+    if (labelledGithub) {
+      github_url = labelledGithub;
+    } else {
+      const githubUrls = urls.filter((u) => /github\.com\//i.test(u));
+      const profileUrls = githubUrls.filter((u) => {
+        const path = u.replace(/https?:\/\/github\.com\//, "").replace(/\/+$/, "").split("/");
+        return path.length <= 1 || (path.length === 2 && path[1].startsWith("?"));
+      });
+      const repoUrls = githubUrls.filter((u) => !profileUrls.includes(u));
+      github_url = repoUrls[0] ?? profileUrls[0] ?? null;
+    }
+
+    if (labelledLive) {
+      live_url = labelledLive;
+    } else {
+      const nonGithubUrls = urls.filter((u) => !/github\.com/i.test(u));
+      live_url = nonGithubUrls[0] ?? null;
+    }
+
     const features = splitBullets(lines.slice(1).join("\n")).slice(0, 6);
     const description = firstNonEmpty(features[0], lines.slice(1).join(" "));
     return {
       name: heading,
       description,
-      github_url: github,
-      live_url: live,
+      github_url,
+      live_url,
       tech_stack: inferProjectTech(chunk, skills),
       features,
       summary: description,
@@ -861,6 +893,13 @@ export function heuristicResumeParse(rawText: string): ResumeStructuredData {
   };
 }
 
+function isProfileUrl(url: string): boolean {
+  const match = url.match(/github\.com\/([^/]+)/);
+  if (!match) return false;
+  const pathAfterUser = url.replace(match[0], "").replace(/^\/+/, "");
+  return !pathAfterUser || pathAfterUser.startsWith("?") || pathAfterUser.startsWith("#");
+}
+
 export function normalizeProjects(projects: unknown[], heuristics: ResumeStructuredData) {
   const heuristicByName = new Map(
     heuristics.projects
@@ -868,7 +907,7 @@ export function normalizeProjects(projects: unknown[], heuristics: ResumeStructu
       .map((project) => [project.name!.toLowerCase(), project]),
   );
 
-  const seenGithub = new Set<string>();
+  const seenRepoUrls = new Set<string>();
   const seenLive = new Set<string>();
 
   return (projects ?? [])
@@ -890,20 +929,38 @@ export function normalizeProjects(projects: unknown[], heuristics: ResumeStructu
       );
       let live_url = firstNonEmpty(item.live_url as string, item.url as string, fallback?.live_url);
 
-      if (github_url && seenGithub.has(github_url.toLowerCase())) {
-        github_url =
-          fallback?.github_url && !seenGithub.has(fallback.github_url.toLowerCase())
-            ? fallback.github_url
-            : null;
+      if (github_url) {
+        const normalized = github_url.toLowerCase().replace(/\/+$/, "");
+        if (!isProfileUrl(github_url)) {
+          if (seenRepoUrls.has(normalized)) github_url = null;
+          else seenRepoUrls.add(normalized);
+        }
       }
-      if (live_url && seenLive.has(live_url.toLowerCase())) {
-        live_url =
-          fallback?.live_url && !seenLive.has(fallback.live_url.toLowerCase())
+
+      if (!github_url && fallback?.github_url && !isProfileUrl(fallback.github_url)) {
+        const fbNormalized = fallback.github_url.toLowerCase().replace(/\/+$/, "");
+        if (!seenRepoUrls.has(fbNormalized)) {
+          github_url = fallback.github_url;
+          seenRepoUrls.add(fbNormalized);
+        }
+      }
+
+      if (live_url) {
+        const liveNormalized = live_url.toLowerCase().replace(/\/+$/, "");
+        if (seenRepoUrls.has(liveNormalized)) {
+          live_url = null;
+        }
+      }
+
+      if (live_url) {
+        const normalizedLive = live_url.toLowerCase().replace(/\/+$/, "");
+        if (seenLive.has(normalizedLive)) {
+          live_url = fallback?.live_url && !seenLive.has(fallback.live_url.toLowerCase().replace(/\/+$/, ""))
             ? fallback.live_url
             : null;
+        }
+        if (live_url) seenLive.add(live_url.toLowerCase().replace(/\/+$/, ""));
       }
-      if (github_url) seenGithub.add(github_url.toLowerCase());
-      if (live_url) seenLive.add(live_url.toLowerCase());
 
       return {
         name: name ?? fallback?.name ?? "Project",
@@ -1062,7 +1119,7 @@ Use empty arrays for missing lists, null for missing scalars, and a confidence_s
       data: sanitizeParsedResume(result.data, rawText),
     };
   } catch (err: any) {
-    console.error("OpenRouter parse error:", err.message || err);
+    logger.error("OpenRouter parse error:", err.message || err);
     return {
       data: heuristicResumeParse(rawText),
       model: "local-heuristic-parser",

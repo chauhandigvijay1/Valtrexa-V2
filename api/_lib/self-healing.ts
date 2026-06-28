@@ -1,4 +1,5 @@
 import { Page, ElementHandle } from "playwright";
+import { logger } from "./logger.js";
 import {
   ProviderName,
   getProviderControl,
@@ -107,7 +108,7 @@ export async function findElementByAriaLabel(
     const el = await page.$(`[aria-label="${label}"], [aria-label*="${label}"]`);
     return el as ElementHandle<HTMLElement> | null;
   } catch (err) {
-    console.warn("[SelfHealing] findElementByAriaLabel failed", err);
+    logger.warn("[SelfHealing] findElementByAriaLabel failed", err);
     return null;
   }
 }
@@ -155,7 +156,7 @@ export async function findElementFuzzy(
 
     return bestMatch;
   } catch (err) {
-    console.warn("[SelfHealing] findElementFuzzy failed", err);
+    logger.warn("[SelfHealing] findElementFuzzy failed", err);
     return null;
   }
 }
@@ -305,7 +306,7 @@ export async function autoHeal(
             return { healed: true, action: "Provider recovered after delay" };
           }
         } catch (err) {
-          console.warn("[SelfHealing] provider recovery check failed", err);
+          logger.warn("[SelfHealing] provider recovery check failed", err);
         }
         return { healed: false, action: "Provider still unavailable" };
       }

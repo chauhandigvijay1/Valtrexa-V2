@@ -1,4 +1,5 @@
 import { sendTelegramMessage } from "./telegram.js";
+import { logger } from "./logger.js";
 import {
   ProviderName,
   ProviderControl,
@@ -83,7 +84,7 @@ export async function sendAlert(event: AlertEvent): Promise<boolean> {
     const result = await sendTelegramMessage(chatId, text);
     return result.ok;
   } catch (err) {
-    console.error("Failed to send alert:", err);
+    logger.error("Failed to send alert:", err);
     return false;
   }
 }
@@ -247,6 +248,6 @@ export async function sendDailyHealthSummary(userId: string): Promise<void> {
     text += "\n<i>Use /provider-status for live status</i>";
     await sendTelegramMessage(chatId, text);
   } catch (err) {
-    console.error("Failed to send daily summary:", err);
+    logger.error("Failed to send daily summary:", err);
   }
 }

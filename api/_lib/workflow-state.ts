@@ -28,6 +28,7 @@ export async function getWorkflowState(userId: string): Promise<WorkflowState | 
 
 export async function startWorkflow(userId: string, by?: string): Promise<WorkflowState> {
   const now = new Date().toISOString();
+  // Try to update from stopped first
   const { data, error } = await api()
     .update({
       status: "running",
@@ -45,25 +46,47 @@ export async function startWorkflow(userId: string, by?: string): Promise<Workfl
     .select()
     .maybeSingle();
   if (error) throw error;
-  if (!data) {
-    // Might already be running/paused, try updating from paused too
-    const { data: d2, error: e2 } = await api()
-      .update({
-        status: "running",
-        resumed_at: now,
-        paused_at: null,
-        error: null,
-        updated_at: now,
-      })
-      .eq("user_id", userId)
-      .eq("status", "paused")
-      .select()
-      .maybeSingle();
-    if (e2) throw e2;
-    if (!d2) throw new Error("Workflow is already running");
-    return d2;
-  }
-  return data;
+  if (data) return data;
+
+  // Try to update from paused
+  const { data: d2, error: e2 } = await api()
+    .update({
+      status: "running",
+      resumed_at: now,
+      paused_at: null,
+      error: null,
+      updated_at: now,
+    })
+    .eq("user_id", userId)
+    .eq("status", "paused")
+    .select()
+    .maybeSingle();
+  if (e2) throw e2;
+  if (d2) return d2;
+
+  // If already running, return it
+  const { data: running } = await api()
+    .select("status")
+    .eq("user_id", userId)
+    .eq("status", "running")
+    .maybeSingle();
+  if (running) throw new Error("Workflow is already running");
+
+  // No existing row — create one
+  const { data: created, error: e3 } = await api()
+    .insert({
+      user_id: userId,
+      status: "running",
+      started_at: now,
+      resumed_at: now,
+      started_by: by ?? null,
+      updated_at: now,
+    })
+    .select()
+    .maybeSingle();
+  if (e3) throw e3;
+  if (!created) throw new Error("Failed to create workflow state");
+  return created;
 }
 
 export async function stopWorkflow(userId: string, by?: string): Promise<WorkflowState> {

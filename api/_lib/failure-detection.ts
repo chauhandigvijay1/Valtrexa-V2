@@ -1,5 +1,6 @@
 import { Page } from "playwright";
 import { ProviderName, recordProviderFailure, logHealthEvent } from "./provider-controls.js";
+import { logger } from "./logger.js";
 
 // ─── Failure Patterns ─────────────────────────────────────
 
@@ -163,7 +164,7 @@ export async function detectFailures(
           const resp = await page.request.get(url, { timeout: 10000 });
           if (resp.status() >= 500) return true;
         } catch (err) {
-          console.warn("[FailureDetection] provider request check failed", err);
+          logger.warn("[FailureDetection] provider request check failed", err);
           return true;
         }
         return false;

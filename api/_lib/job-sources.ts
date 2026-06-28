@@ -1,4 +1,5 @@
 import * as cheerio from "cheerio";
+import { logger } from "./logger.js";
 
 export type ImportedJob = {
   externalId: string;
@@ -93,7 +94,7 @@ export async function importAshby(boardUrl: string): Promise<ImportedJob[]> {
       }
     }
   } catch (err: any) {
-    console.error("Ashby Depot API failed:", err.message);
+    logger.error("Ashby Depot API failed:", err.message);
   }
 
   try {

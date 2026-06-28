@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase.js";
+import { logger } from "./logger.js";
 
 export type WorkflowStage = {
   id: string;
@@ -40,12 +41,12 @@ export async function startStage(
 
   if (error) {
     if (isSchemaCacheErr(error)) {
-      console.warn(
+      logger.warn(
         `[workflow-timeline] Schema cache stale — can't start stage ${stage}. Run NOTIFY pgrst, 'reload schema' in SQL Editor.`,
       );
       return null;
     }
-    console.error(`[workflow-timeline] Failed to start stage ${stage}:`, error.message);
+    logger.error(`[workflow-timeline] Failed to start stage ${stage}:`, error.message);
     return null;
   }
   return data as WorkflowStage;
@@ -57,7 +58,7 @@ export async function updateStageProgress(stageId: string, progress: number, mes
   if (message !== undefined) update.message = message;
   const { error } = await supabaseAdmin.from("workflow_timeline").update(update).eq("id", stageId);
   if (error && !isSchemaCacheErr(error))
-    console.error(`[workflow-timeline] updateStageProgress error:`, error.message);
+    logger.error(`[workflow-timeline] updateStageProgress error:`, error.message);
 }
 
 export async function completeStage(
@@ -74,7 +75,7 @@ export async function completeStage(
   if (metadata !== undefined) update.metadata = metadata;
   const { error } = await supabaseAdmin.from("workflow_timeline").update(update).eq("id", stageId);
   if (error && !isSchemaCacheErr(error))
-    console.error(`[workflow-timeline] completeStage error:`, error.message);
+    logger.error(`[workflow-timeline] completeStage error:`, error.message);
 }
 
 export async function failStage(stageId: string, errorMsg: string) {
@@ -84,7 +85,7 @@ export async function failStage(stageId: string, errorMsg: string) {
     .update({ status: "failed", message: errorMsg, completed_at: new Date().toISOString() })
     .eq("id", stageId);
   if (error && !isSchemaCacheErr(error))
-    console.error(`[workflow-timeline] failStage error:`, error.message);
+    logger.error(`[workflow-timeline] failStage error:`, error.message);
 }
 
 export async function getTimeline(userId: string, limit = 50) {
@@ -95,7 +96,7 @@ export async function getTimeline(userId: string, limit = 50) {
     .order("started_at", { ascending: false })
     .limit(limit);
   if (error && !isSchemaCacheErr(error))
-    console.error(`[workflow-timeline] getTimeline error:`, error.message);
+    logger.error(`[workflow-timeline] getTimeline error:`, error.message);
   return (data ?? []) as WorkflowStage[];
 }
 
@@ -109,7 +110,7 @@ export async function getLatestStage(userId: string, stage: string) {
     .limit(1)
     .maybeSingle();
   if (error && !isSchemaCacheErr(error))
-    console.error(`[workflow-timeline] getLatestStage error:`, error.message);
+    logger.error(`[workflow-timeline] getLatestStage error:`, error.message);
   return data as WorkflowStage | null;
 }
 
@@ -123,7 +124,7 @@ export async function getRunningStage(userId: string) {
     .limit(1)
     .maybeSingle();
   if (error && !isSchemaCacheErr(error))
-    console.error(`[workflow-timeline] getRunningStage error:`, error.message);
+    logger.error(`[workflow-timeline] getRunningStage error:`, error.message);
   return data as WorkflowStage | null;
 }
 
@@ -138,5 +139,5 @@ export async function cancelRunningStages(userId: string) {
     .eq("user_id", userId)
     .eq("status", "running");
   if (error && !isSchemaCacheErr(error))
-    console.error(`[workflow-timeline] cancelRunningStages error:`, error.message);
+    logger.error(`[workflow-timeline] cancelRunningStages error:`, error.message);
 }

@@ -1,6 +1,6 @@
 # Environment Variables Reference
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-06-28
 
 ## Supabase
 
@@ -58,7 +58,7 @@
 | `WORKFLOW_INTERVAL_MINUTES` | ❌ | Time between workflow cycles in minutes (default: `60`) |
 | `MATCH_THRESHOLD` | ❌ | Minimum match score to trigger apply (0–100, default: `70`) |
 | `MAX_APPLICATIONS_PER_CYCLE` | ❌ | Max applications per pipeline run (default: `10`) |
-| `APPROVAL_MODE` | ❌ | Require approval before applying (`true`/`false`, default: `true`) |
+| `ENABLE_TELEGRAM_APPROVALS` | ❌ | Require Telegram approval before applying (`true`/`false`, default: `true`) |
 
 To run the dedicated background worker (e.g. on Railway): `npm run worker`
 

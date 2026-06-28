@@ -1,4 +1,5 @@
 import { supabaseAdmin } from "./supabase.js";
+import { logger } from "./logger.js";
 
 export type EmailConfidence = "VERIFIED" | "LIKELY" | "UNKNOWN";
 
@@ -29,7 +30,7 @@ function extractDomain(url: string): string | null {
     const u = new URL(url.startsWith("http") ? url : `https://${url}`);
     return u.hostname.replace(/^www\./, "");
   } catch (err) {
-    console.warn("[EmailDiscovery] extractDomain failed", err);
+    logger.warn("[EmailDiscovery] extractDomain failed", err);
     return null;
   }
 }
@@ -60,7 +61,7 @@ export async function verifyEmailMX(email: string): Promise<{ valid: boolean; re
     const valid = records.length > 0;
     return { valid, records };
   } catch (err) {
-    console.warn("[EmailDiscovery] checkEmailMX DNS lookup failed", err);
+    logger.warn("[EmailDiscovery] checkEmailMX DNS lookup failed", err);
     return { valid: false, records: [] };
   }
 }
@@ -81,7 +82,7 @@ export async function extractEmailsFromPage(url: string): Promise<string[]> {
       return domain && !/example\.com|test\.com|domain\.com/i.test(domain);
     });
   } catch (err) {
-    console.warn("[EmailDiscovery] extractEmailsFromPage fetch failed", err);
+    logger.warn("[EmailDiscovery] extractEmailsFromPage fetch failed", err);
     return [];
   }
 }

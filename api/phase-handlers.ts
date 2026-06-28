@@ -6,7 +6,8 @@
  */
 
 import { requireApiUser } from "./_lib/auth.js";
-import { json, methodNotAllowed, readJson } from "./_lib/http.js";
+import { json, methodNotAllowed, readJson, safeErrorMessage } from "./_lib/http.js";
+import { logger } from "./_lib/logger.js";
 import { computeMatchScore } from "./_lib/match-engine.js";
 import { computeStrategicValue, computeStrategicValueWithAI } from "./_lib/high-value-engine.js";
 import { discoverContactsViaAI, discoverContactsV3 } from "./_lib/recruiter-discovery.js";
@@ -267,7 +268,7 @@ function safeParse(value: string): Record<string, unknown> {
     const parsed = JSON.parse(value);
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch (err) {
-    console.warn("[PhaseHandlers] safeParse JSON parse failed", err);
+    logger.warn("[PhaseHandlers] safeParse JSON parse failed", err);
     return {};
   }
 }
@@ -303,7 +304,7 @@ export async function handleRecruiterDiscoveryV2(request: Request) {
     });
     if (!contacts.length) contacts = [];
   } catch (err) {
-    console.warn("[PhaseHandlers] handleRecruiterDiscoveryV2 AI discovery failed", err);
+    logger.warn("[PhaseHandlers] handleRecruiterDiscoveryV2 AI discovery failed", err);
     contacts = [];
   }
 
@@ -385,7 +386,7 @@ export async function handleApply(request: Request) {
     } as any)
     .select("*")
     .single();
-  if (appInsert.error) return json({ error: appInsert.error.message }, { status: 400 });
+  if (appInsert.error) { logger.warn("[phase] app insert failed", appInsert.error); return json({ error: "Insert failed" }, { status: 400 }); }
   const applicationId = appInsert.data.id;
 
   await buildApplicationPackage({
@@ -590,7 +591,7 @@ export async function handleInboxList(request: Request) {
     .limit(100);
   if (classification) q = q.eq("classification", classification);
   const { data, error } = await q;
-  if (error) return json({ error: error.message }, { status: 400 });
+  if (error) return json({ error: safeErrorMessage(error) }, { status: 400 });
   return json(data ?? []);
 }
 
@@ -1022,6 +1023,6 @@ export async function handleApprovalStatus(request: Request) {
     .eq("approval_status", status)
     .order("created_at", { ascending: false })
     .limit(50);
-  if (error) return json({ error: error.message }, { status: 400 });
+  if (error) return json({ error: safeErrorMessage(error) }, { status: 400 });
   return json({ approvals: data ?? [] });
 }

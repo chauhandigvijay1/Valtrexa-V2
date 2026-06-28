@@ -1,6 +1,6 @@
 # Architecture
 
-> **Last Updated:** 2026-06-26
+> **Last Updated:** 2026-06-28
 
 ## System Diagram
 
@@ -61,14 +61,18 @@ flowchart TB
 ```mermaid
 sequenceDiagram
     participant U as User
+    participant S as refresh-cookies.ts
     participant CM as Cookie Manager
     participant CR as crypto-utils
     participant DB as Supabase
     participant PW as Playwright
 
-    U->>CM: Extract cookies (browser extension)
-    CM->>CR: Encrypt (AES-256-GCM)
-    CR->>DB: Store in provider_cookies
+    U->>S: Run npx tsx scripts/refresh-cookies.ts
+    S->>Browser: Launch with logged-in profile
+    Browser->>S: Extract session cookies
+    S->>CR: Encrypt (AES-256-GCM)
+    S->>DB: Store in provider_cookies
+    Note over U,DB: Or: manually paste cookies via dashboard
     PW->>DB: Read encrypted cookie
     PW->>CR: Decrypt
     PW->>Provider: Authenticate session

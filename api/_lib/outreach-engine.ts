@@ -9,7 +9,7 @@
 import { supabaseAdmin } from "./supabase.js";
 import { callOpenRouterJson } from "./openrouter.js";
 import { emitWorkflowEvent } from "./workflow-events.js";
-import { getLatestResumeParseCompat } from "./compat.js";
+import { getCandidateBrain } from "./candidate-brain.js";
 export type OutreachKind =
   "cold_email" | "linkedin_message" | "hiring_manager_outreach" | "founder_outreach";
 
@@ -31,8 +31,8 @@ export async function generateOutreachDraft(input: {
   resumeId: string;
   painPointIds?: string[];
 }): Promise<{ id: string; subject: string; body: string; kind: OutreachKind }> {
-  const [resumeParse, painPoints, recruiter] = await Promise.all([
-    getLatestResumeParseCompat(input.userId, input.resumeId),
+  const [brain, painPoints, recruiter] = await Promise.all([
+    getCandidateBrain(input.userId),
     input.painPointIds?.length
       ? supabaseAdmin
           .from("painpoints")
@@ -55,14 +55,15 @@ export async function generateOutreachDraft(input: {
       : Promise.resolve({ data: null, error: null }),
   ]);
 
-  if (!resumeParse) throw new Error("Resume parse not found. Upload and parse a resume first.");
+  const parsedData = brain?.profile?.parsed_resume as Record<string, unknown> | undefined;
+  if (!parsedData) throw new Error("Candidate brain not found. Upload and parse a resume first.");
 
   const systemPrompt = buildSystemPrompt(input.kind);
   const userPayload = {
     kind: input.kind,
     companyName: input.companyName,
     recruiter: recruiter.data,
-    resume: resumeParse.parsed_data,
+    resume: parsedData,
     painPoints: painPoints.data ?? [],
   };
 
