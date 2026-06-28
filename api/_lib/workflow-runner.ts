@@ -30,7 +30,7 @@ export interface CycleResult {
   cycleId: string;
   startedAt: string;
   completedAt: string;
-  status: "completed" | "paused" | "stopped" | "failed";
+  status: "completed" | "paused" | "stopped" | "failed" | "skipped";
   phases: PhaseResult[];
   error?: string;
 }
@@ -227,7 +227,8 @@ async function phaseMatchJobs(userId: string): Promise<PhaseResult> {
           match_salary_score: breakdown.salaryScore,
           processed_at: new Date().toISOString(),
         } as any)
-        .eq("id", job.id);
+        .eq("id", job.id)
+        .eq("user_id", userId);
 
       if (breakdown.matched) matchedCount++;
     }
@@ -454,7 +455,8 @@ async function phaseHighValuePipeline(userId: string): Promise<PhaseResult> {
             await supabase
               .from("recruiters")
               .update({ status: "discovered" } as any)
-              .eq("id", rec.id);
+              .eq("id", rec.id)
+              .eq("user_id", userId);
             // Notify user via Telegram about the new outreach draft
             try {
               const { notifyOutreachDraft } = await import("./telegram.js");
@@ -842,13 +844,8 @@ export async function validatePrerequisites(userId: string): Promise<{
 async function saveWorkflowState(
   userId: string,
   state: { status: string; cycleId?: string; error?: string },
+  expectedStatus?: string,
 ): Promise<void> {
-  const { data: existing } = await supabase
-    .from("workflow_state")
-    .select("id")
-    .eq("user_id", userId)
-    .maybeSingle();
-
   const payload = {
     user_id: userId,
     status: state.status,
@@ -857,13 +854,40 @@ async function saveWorkflowState(
     updated_at: new Date().toISOString(),
   };
 
-  if (existing) {
-    await supabase
+  if (expectedStatus) {
+    // Atomic conditional update — only transition if current status matches expectedStatus
+    const { data: existing } = await supabase
       .from("workflow_state")
-      .update(payload as any)
-      .eq("user_id", userId);
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (existing) {
+      const upd: any = supabase
+        .from("workflow_state")
+        .update(payload as any)
+        .eq("user_id", userId)
+        .eq("status", expectedStatus);
+      const { error } = await upd;
+      if (error) throw error;
+    } else if (state.status === expectedStatus) {
+      await supabase.from("workflow_state").insert(payload as any);
+    }
   } else {
-    await supabase.from("workflow_state").insert(payload as any);
+    const { data: existing } = await supabase
+      .from("workflow_state")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (existing) {
+      await supabase
+        .from("workflow_state")
+        .update(payload as any)
+        .eq("user_id", userId);
+    } else {
+      await supabase.from("workflow_state").insert(payload as any);
+    }
   }
 }
 
@@ -911,8 +935,32 @@ export async function runCycle(userId: string): Promise<CycleResult> {
     };
   }
 
-  // Workflow recovery: if state is running but we're restarting, mark it as running again
-  await saveWorkflowState(userId, { status: "running", cycleId });
+  // Atomic transition: only proceed if state allows running (stopped/paused already returned early)
+  // The update conditions on current status to prevent concurrent duplicate execution
+  const { data: wsRow } = await supabase
+    .from("workflow_state")
+    .update({
+      status: "running",
+      cycle_id: cycleId,
+      error: null,
+      updated_at: new Date().toISOString(),
+    } as any)
+    .eq("user_id", userId)
+    .in("status", ["running", "failed"])
+    .select("id")
+    .maybeSingle();
+
+  if (!wsRow) {
+    logger.warn("Could not acquire workflow lock — concurrent runCycle already in progress", { userId });
+    return {
+      cycleId,
+      startedAt,
+      completedAt: new Date().toISOString(),
+      status: "skipped",
+      phases: [],
+      error: "Concurrent cycle detected — skipped",
+    };
+  }
 
   const precheck = await runWorkflowPrecheck(userId);
   if (!precheck.passed) {

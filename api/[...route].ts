@@ -3942,11 +3942,14 @@ async function handleAdminProviders(request: Request) {
     const body = await readJson<{
       provider: string;
       action: "enable" | "disable" | "pause" | "resume";
+      userId?: string;
     }>(request);
-    await supabaseAdmin
+    const updateQuery = supabaseAdmin
       .from("provider_controls")
       .update({ status: body.action })
       .eq("provider", body.provider);
+    if (body.userId) updateQuery.eq("user_id", body.userId);
+    await updateQuery;
     return json({ ok: true });
   }
   const { data } = await supabaseAdmin.from("provider_controls").select("*").order("provider");

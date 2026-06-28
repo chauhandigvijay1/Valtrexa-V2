@@ -175,11 +175,40 @@ async function start(): Promise<void> {
   let cycleTimer: ReturnType<typeof setInterval> | null = null;
   let cycleRunning = false;
 
+  /** Distributed lock key — prevents duplicate cycle execution across Railway replicas */
+  const CYCLE_LOCK_KEY = "lock:workflow:cycle";
+  const CYCLE_LOCK_TTL = 30 * 60; // 30 minutes
+
+  async function acquireCycleLock(): Promise<boolean> {
+    try {
+      const result = await (connection as any).call("SET", CYCLE_LOCK_KEY, "1", "NX", "EX", CYCLE_LOCK_TTL);
+      return result === "OK";
+    } catch (err) {
+      logger.warn("[worker] Failed to acquire distributed lock — proceeding anyway", err);
+      return true; // Fall through if Redis is flaky
+    }
+  }
+
+  async function releaseCycleLock(): Promise<void> {
+    try {
+      await connection.del(CYCLE_LOCK_KEY);
+    } catch {
+      // Best-effort release
+    }
+  }
+
   async function runScheduledCycle(): Promise<void> {
     if (cycleRunning) {
       logger.info("[worker] Previous cycle still running — skipping");
       return;
     }
+
+    const acquired = await acquireCycleLock();
+    if (!acquired) {
+      logger.info("[worker] Another replica holds the cycle lock — skipping");
+      return;
+    }
+
     cycleRunning = true;
     const startedAt = Date.now();
     try {
@@ -224,6 +253,7 @@ async function start(): Promise<void> {
       logger.error(`[worker] Scheduled cycle error: ${err?.message}`);
     } finally {
       cycleRunning = false;
+      await releaseCycleLock();
       logger.info(`[worker] Cycle finished (${Date.now() - startedAt}ms)`);
     }
   }

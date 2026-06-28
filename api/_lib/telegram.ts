@@ -1519,7 +1519,8 @@ async function approveEntity(
       await supabaseAdmin
         .from("applications")
         .update({ approval_status: approvedStatus, approval_responded_at: new Date().toISOString() })
-        .eq("id", entityId);
+        .eq("id", entityId)
+        .eq("user_id", userId);
 
       await emitWorkflowEvent({
         userId,
@@ -1802,7 +1803,8 @@ export async function notifyApplicationForApproval(
     await supabaseAdmin
       .from("applications")
       .update({ approval_telegram_message_id: result.messageId })
-      .eq("id", applicationId);
+      .eq("id", applicationId)
+      .eq("user_id", userId);
   }
 
   return { ok: result.ok };
@@ -1968,7 +1970,8 @@ export async function flushTelegramQueue(): Promise<number> {
         sent_at: result.ok ? new Date().toISOString() : null,
         error: result.ok ? null : result.error,
       } as any)
-      .eq("id", (notification as any).id);
+      .eq("id", (notification as any).id)
+      .eq("user_id", (notification as any).user_id ?? "");
 
     if (result.ok) sent++;
   }

@@ -305,93 +305,13 @@ function IntegrationCard({ provider }: { provider: Provider }) {
                     <Input
                       type={field.type === "password" ? "password" : "text"}
                       value={config[field.name] ?? ""}
-                      onChange={(event) => {
-                        setConfig({ ...config, [field.name]: event.target.value });
-                        if (isCookieField) {
-                          setValidateResults({});
-}
-
-function TelegramBindingCard() {
-  const [token, setToken] = useState<string | null>(null);
-  const [deepLink, setDeepLink] = useState<string | null>(null);
-  const [expiresAt, setExpiresAt] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const generateToken = async () => {
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions
-        ?.invoke?.("telegram/binding", { method: "POST" });
-      // Fallback: direct fetch
-      const res = await fetch("/api/telegram/binding", { method: "POST" });
-      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to generate token");
-      const result = await res.json();
-      setToken(result.token);
-      setDeepLink(result.deepLink);
-      setExpiresAt(result.expiresAt);
-    } catch (err: any) {
-      toast.error(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const copyToken = () => {
-    if (token) {
-      navigator.clipboard.writeText(token);
-      toast.success("Token copied to clipboard");
-    }
-  };
-
-  return (
-    <Card className="p-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2">
-          <MessageCircle className="h-5 w-5 text-blue-500" />
-          <h3 className="font-semibold">Telegram Connection</h3>
-        </div>
-        <Badge variant={token ? "default" : "secondary"}>
-          {token ? "Token Generated" : "Not Connected"}
-        </Badge>
-      </div>
-      <p className="text-sm text-muted-foreground mb-3">
-        Generate a one-time token, then send it to the Telegram bot via <code>/connect &lt;token&gt;</code>
-      </p>
-      {token ? (
-        <div className="space-y-2">
-          <div className="flex items-center gap-2">
-            <Input readOnly value={token} className="font-mono text-xs" />
-            <Button size="sm" onClick={copyToken}>Copy</Button>
-          </div>
-          {deepLink && (
-            <a
-              href={deepLink}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-blue-600 hover:underline inline-block"
-            >
-              Open Telegram Deep Link
-            </a>
-          )}
-          {expiresAt && (
-            <p className="text-xs text-muted-foreground">
-              Expires at {new Date(expiresAt).toLocaleTimeString()}
-            </p>
-          )}
-          <Button size="sm" variant="outline" onClick={() => { setToken(null); setDeepLink(null); setExpiresAt(null); }}>
-            Generate New Token
-          </Button>
-        </div>
-      ) : (
-        <Button onClick={generateToken} disabled={loading}>
-          {loading ? "Generating..." : "Generate Connection Token"}
-        </Button>
-      )}
-    </Card>
-  );
-}
-                      }}
-                      placeholder={field.type === "password" ? "••••••••" : ""}
+                       onChange={(event) => {
+                         setConfig({ ...config, [field.name]: event.target.value });
+                         if (isCookieField) {
+                           setValidateResults({});
+                         }
+                       }}
+                       placeholder={field.type === "password" ? "••••••••" : ""}
                       className="flex-1"
                     />
                     {isCookieField && config[field.name]?.trim() && (
@@ -474,6 +394,83 @@ function TelegramBindingCard() {
             </Button>
           </div>
         </>
+      )}
+    </Card>
+  );
+}
+
+function TelegramBindingCard() {
+  const [token, setToken] = useState<string | null>(null);
+  const [deepLink, setDeepLink] = useState<string | null>(null);
+  const [expiresAt, setExpiresAt] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const generateToken = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/telegram/binding", { method: "POST" });
+      if (!res.ok) throw new Error((await res.json()).error ?? "Failed to generate token");
+      const result = await res.json();
+      setToken(result.token);
+      setDeepLink(result.deepLink);
+      setExpiresAt(result.expiresAt);
+    } catch (err: any) {
+      toast.error(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const copyToken = () => {
+    if (token) {
+      navigator.clipboard.writeText(token);
+      toast.success("Token copied to clipboard");
+    }
+  };
+
+  return (
+    <Card className="p-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <MessageCircle className="h-5 w-5 text-blue-500" />
+          <h3 className="font-semibold">Telegram Connection</h3>
+        </div>
+        <Badge variant={token ? "default" : "secondary"}>
+          {token ? "Token Generated" : "Not Connected"}
+        </Badge>
+      </div>
+      <p className="text-sm text-muted-foreground mb-3">
+        Generate a one-time token, then send it to the Telegram bot via <code>/connect &lt;token&gt;</code>
+      </p>
+      {token ? (
+        <div className="space-y-2">
+          <div className="flex items-center gap-2">
+            <Input readOnly value={token} className="font-mono text-xs" />
+            <Button size="sm" onClick={copyToken}>Copy</Button>
+          </div>
+          {deepLink && (
+            <a
+              href={deepLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-sm text-blue-600 hover:underline inline-block"
+            >
+              Open Telegram Deep Link
+            </a>
+          )}
+          {expiresAt && (
+            <p className="text-xs text-muted-foreground">
+              Expires at {new Date(expiresAt).toLocaleTimeString()}
+            </p>
+          )}
+          <Button size="sm" variant="outline" onClick={() => { setToken(null); setDeepLink(null); setExpiresAt(null); }}>
+            Generate New Token
+          </Button>
+        </div>
+      ) : (
+        <Button onClick={generateToken} disabled={loading}>
+          {loading ? "Generating..." : "Generate Connection Token"}
+        </Button>
       )}
     </Card>
   );
