@@ -36,7 +36,10 @@ type Prep = {
   completed: boolean | null;
 };
 
-export const Route = createFileRoute("/_authenticated/interview-prep")({ component: PrepPage });
+export const Route = createFileRoute("/_authenticated/interview-prep")({
+  component: PrepPage,
+  head: () => ({ meta: [{ title: "Interview Prep — VALTREXA-V2" }] }),
+});
 
 function PrepPage() {
   const [search, setSearch] = useState("");

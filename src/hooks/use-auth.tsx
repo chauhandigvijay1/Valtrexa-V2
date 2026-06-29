@@ -47,6 +47,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         loading,
         signOut: async () => {
+          const token = (await supabase.auth.getSession()).data.session?.access_token;
+          if (token) {
+            fetch("/api/auth/log-event", {
+              method: "POST",
+              headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ event: "user_logged_out" }),
+            }).catch(() => {});
+          }
           await supabase.auth.signOut();
         },
       }}

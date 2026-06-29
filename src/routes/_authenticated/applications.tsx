@@ -96,6 +96,7 @@ const tierColor: Record<string, string> = {
 
 export const Route = createFileRoute("/_authenticated/applications")({
   component: ApplicationsPage,
+  head: () => ({ meta: [{ title: "Applications — VALTREXA-V2" }] }),
 });
 
 function ApplicationsPage() {

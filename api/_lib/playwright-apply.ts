@@ -1,7 +1,10 @@
 import { supabaseAdmin } from "./supabase.js";
 import { emitWorkflowEvent } from "./workflow-events.js";
-import { resolveStorageState } from "./playwright-platform.js";
+import { resolveStorageState, saveCapturedStorageState } from "./playwright-platform.js";
 import { isProviderEnabled } from "./provider-controls.js";
+import { writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { logger } from "./logger.js";
 import type { BrowserProviderName } from "./playwright-platform.js";
 import {
@@ -25,7 +28,12 @@ type PlatformHandlerInput = {
 };
 
 export type ApplyFlowStatus =
-  "APPLIED" | "PARTIAL" | "REQUIRES_APPROVAL" | "FAILED" | "MANUAL_APPLY_REQUIRED";
+  | "APPLIED"
+  | "PARTIAL"
+  | "REQUIRES_APPROVAL"
+  | "FAILED"
+  | "MANUAL_APPLY_REQUIRED"
+  | "AWAITING_ANSWER";
 
 export type ApplyFlowResult = {
   status: ApplyFlowStatus;
@@ -285,13 +293,44 @@ async function detectFormComplexity(page: any): Promise<FormComplexity> {
   };
 }
 
+async function downloadResumeToTemp(resumeId: string): Promise<string | null> {
+  const { data: version } = await supabaseAdmin
+    .from("resume_versions")
+    .select("file_url")
+    .eq("resume_id", resumeId)
+    .order("version", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (!version?.file_url) return null;
+  const fileUrl = version.file_url.startsWith("http")
+    ? version.file_url
+    : `${process.env.SUPABASE_URL}/storage/v1/object/public/resumes/${version.file_url}`;
+  try {
+    const resp = await fetch(fileUrl);
+    if (!resp.ok) return null;
+    const buf = Buffer.from(await resp.arrayBuffer());
+    const ext = fileUrl.split(".").pop()?.split("?")[0] ?? "pdf";
+    const tmpPath = join(tmpdir(), `resume_upload_${resumeId}_${Date.now()}.${ext}`);
+    await writeFile(tmpPath, buf);
+    return tmpPath;
+  } catch {
+    return null;
+  }
+}
+
 async function uploadResume(page: any, resumeUrl?: string): Promise<boolean> {
+  // resumeUrl is actually a resume ID (UUID) from the resumes table
   if (!resumeUrl) return false;
+  const filePath = await downloadResumeToTemp(resumeUrl);
+  if (!filePath) {
+    logger.warn("[playwright-apply] uploadResume: could not resolve resume file");
+    return false;
+  }
   try {
     for (const selector of FILE_UPLOAD_SELECTORS) {
       const input = await page.$(selector);
       if (input) {
-        await input.setInputFiles(resumeUrl);
+        await input.setInputFiles(filePath);
         return true;
       }
     }
@@ -440,6 +479,7 @@ async function generateAnswerForField(page: any, label: string, context: string)
 
 async function handleScreeningQuestions(
   page: any,
+  context: any,
   candidateData: Record<string, any>,
   userId?: string,
   options?: {
@@ -448,10 +488,10 @@ async function handleScreeningQuestions(
     companyName?: string;
     jobTitle?: string;
   },
-): Promise<number> {
+): Promise<{ answered: number; paused: boolean; pausedPageUrl?: string }> {
   let answered = 0;
   try {
-    if (!userId) return 0;
+    if (!userId) return { answered: 0, paused: false };
     const groups = await page.$$('fieldset, div[role="radiogroup"]');
     for (const group of groups) {
       const questionText = await group.evaluate((el: any) => {
@@ -539,6 +579,38 @@ async function handleScreeningQuestions(
           }
         }
 
+        // Save browser context state before pausing
+        const pausedPageUrl = page.url();
+        if (context && options.provider) {
+          try {
+            const storageState = await context.storageState();
+            await saveCapturedStorageState(userId, options.provider as any, storageState);
+          } catch (stateErr) {
+            logger.warn(
+              `[playwright-apply] Failed to save storage state before pause: ${stateErr}`,
+            );
+          }
+        }
+
+        // Save paused state to application record
+        await supabaseAdmin
+          .from("applications")
+          .update({
+            status: "awaiting_answer",
+            saved_page_url: pausedPageUrl,
+            saved_context_provider: options.provider,
+          } as any)
+          .eq("id", options.applicationId)
+          .eq("user_id", userId);
+
+        let screenshotUrl: string | undefined;
+        try {
+          screenshotUrl =
+            (await takeScreenshot(page, `unknown_q_${options.applicationId}`)) ?? undefined;
+        } catch {
+          /* non-fatal */
+        }
+
         await notifyUnknownQuestion(
           userId,
           questionText,
@@ -547,13 +619,16 @@ async function handleScreeningQuestions(
           options.provider,
           options.companyName || "Unknown",
           options.jobTitle || "Unknown",
+          screenshotUrl ?? undefined,
         );
+
+        return { answered, paused: true, pausedPageUrl };
       }
     }
   } catch (err) {
     logger.warn(`[playwright-apply] handleScreeningQuestions block: ${err}`);
   }
-  return answered;
+  return { answered, paused: false };
 }
 
 async function takeScreenshot(page: any, label: string): Promise<string | null> {
@@ -695,6 +770,86 @@ export async function applyWithPlaywright(input: {
   return retry(() => runPlaywrightFlow(input), 3, 2000);
 }
 
+export async function resumePlaywrightApply(input: {
+  userId: string;
+  applicationId: string;
+  provider: BrowserProviderName;
+  headless?: boolean;
+}): Promise<ApplyFlowResult> {
+  let browser: any = null;
+  try {
+    const { data: app } = await supabaseAdmin
+      .from("applications")
+      .select("saved_page_url, saved_context_provider, job_id")
+      .eq("id", input.applicationId)
+      .eq("user_id", input.userId)
+      .single();
+    if (!app?.saved_page_url) {
+      return { status: "FAILED", error: "No saved page URL — cannot resume" };
+    }
+    const { chromium } = await import("playwright");
+    browser = await chromium.launch({ headless: input.headless ?? true });
+    const { storageState } = await resolveStorageState(input.userId, input.provider);
+    const context = await browser.newContext({ storageState });
+    const page = await context.newPage();
+
+    await page.goto(app.saved_page_url, { waitUntil: "domcontentloaded", timeout: 20000 });
+    await page.waitForTimeout(3000);
+
+    const alreadyApplied = await detectConfirmation(page);
+    if (alreadyApplied) {
+      await supabaseAdmin
+        .from("applications")
+        .update({ status: "applied", saved_page_url: null, saved_context_provider: null })
+        .eq("id", input.applicationId)
+        .eq("user_id", input.userId);
+      return { status: "APPLIED", trackingUrl: app.saved_page_url };
+    }
+
+    const { paused } = await handleScreeningQuestions(page, context, {}, input.userId, {
+      applicationId: input.applicationId,
+      provider: input.provider,
+      companyName: "",
+      jobTitle: "",
+    });
+    if (paused) {
+      return { status: "AWAITING_ANSWER", trackingUrl: app.saved_page_url };
+    }
+
+    const isReview = await detectReviewPage(page);
+    if (isReview || (await clickAnyMatching(page, SUBMIT_BUTTON_SELECTORS))) {
+      await page.waitForTimeout(3000);
+      const confirmed = await detectConfirmation(page);
+      if (confirmed) {
+        await supabaseAdmin
+          .from("applications")
+          .update({ status: "applied", saved_page_url: null, saved_context_provider: null })
+          .eq("id", input.applicationId)
+          .eq("user_id", input.userId);
+        return { status: "APPLIED", trackingUrl: app.saved_page_url };
+      }
+      return {
+        status: "PARTIAL",
+        error: "Submit clicked but no confirmation",
+        trackingUrl: app.saved_page_url,
+      };
+    }
+
+    return {
+      status: "PARTIAL",
+      error: "Could not find submit button on resume",
+      trackingUrl: app.saved_page_url,
+    };
+  } catch (err: any) {
+    return { status: "FAILED", error: `Resume error: ${err.message}` };
+  } finally {
+    if (browser)
+      await browser
+        .close()
+        .catch((err: any) => logger.warn(`[playwright-apply] browser.close (resume): ${err}`));
+  }
+}
+
 async function runPlaywrightFlow(input: {
   userId: string;
   applicationId: string;
@@ -706,6 +861,22 @@ async function runPlaywrightFlow(input: {
   headless?: boolean;
   approvalMode?: boolean;
 }): Promise<ApplyFlowResult> {
+  // Check if this is a paused application with saved context
+  const { data: appCheck } = await supabaseAdmin
+    .from("applications")
+    .select("saved_page_url, saved_context_provider")
+    .eq("id", input.applicationId)
+    .eq("user_id", input.userId)
+    .maybeSingle();
+  if (appCheck?.saved_page_url) {
+    return resumePlaywrightApply({
+      userId: input.userId,
+      applicationId: input.applicationId,
+      provider: (appCheck.saved_context_provider ?? input.provider) as BrowserProviderName,
+      headless: input.headless,
+    });
+  }
+
   let browser: any = null;
   const evidenceIds: string[] = [];
   const submittedFields = 0;
@@ -1021,13 +1192,28 @@ async function applyLinkedIn(
     aiGeneratedAnswers = { ...aiGeneratedAnswers, ...fillResult.aiGenerated };
 
     if (input.candidateData) {
-      const answered = await handleScreeningQuestions(page, input.candidateData, input.userId, {
-        applicationId: input.applicationId,
-        provider: "linkedin",
-        companyName: input.candidateData?.company_name,
-        jobTitle: input.candidateData?.role_title,
-      });
-      submittedFields += answered;
+      const sqResult = await handleScreeningQuestions(
+        page,
+        page.context(),
+        input.candidateData,
+        input.userId,
+        {
+          applicationId: input.applicationId,
+          provider: "linkedin",
+          companyName: input.candidateData?.company_name,
+          jobTitle: input.candidateData?.role_title,
+        },
+      );
+      submittedFields += sqResult.answered;
+      if (sqResult.paused) {
+        return {
+          status: "AWAITING_ANSWER",
+          submittedFields,
+          totalFields,
+          trackingUrl: sqResult.pausedPageUrl,
+          aiGeneratedAnswers,
+        };
+      }
     }
 
     const screenshot1 = await takeScreenshot(page, "form-filled");
@@ -1061,8 +1247,9 @@ async function applyLinkedIn(
       aiGeneratedAnswers = { ...aiGeneratedAnswers, ...moreFill.aiGenerated };
 
       if (input.candidateData) {
-        const moreAnswered = await handleScreeningQuestions(
+        const sqResult = await handleScreeningQuestions(
           page,
+          page.context(),
           input.candidateData,
           input.userId,
           {
@@ -1072,7 +1259,16 @@ async function applyLinkedIn(
             jobTitle: input.candidateData?.role_title,
           },
         );
-        submittedFields += moreAnswered;
+        submittedFields += sqResult.answered;
+        if (sqResult.paused) {
+          return {
+            status: "AWAITING_ANSWER",
+            submittedFields,
+            totalFields,
+            trackingUrl: sqResult.pausedPageUrl,
+            aiGeneratedAnswers,
+          };
+        }
       }
 
       const stepScreen = await takeScreenshot(page, `step-${step}`);
@@ -1220,13 +1416,28 @@ async function applyIndeed(
     aiGeneratedAnswers = fillResult.aiGenerated;
 
     if (input.candidateData) {
-      const answered = await handleScreeningQuestions(page, input.candidateData, input.userId, {
-        applicationId: input.applicationId,
-        provider: "indeed",
-        companyName: input.candidateData?.company_name,
-        jobTitle: input.candidateData?.role_title,
-      });
-      submittedFields += answered;
+      const sqResult = await handleScreeningQuestions(
+        page,
+        page.context(),
+        input.candidateData,
+        input.userId,
+        {
+          applicationId: input.applicationId,
+          provider: "indeed",
+          companyName: input.candidateData?.company_name,
+          jobTitle: input.candidateData?.role_title,
+        },
+      );
+      submittedFields += sqResult.answered;
+      if (sqResult.paused) {
+        return {
+          status: "AWAITING_ANSWER",
+          submittedFields,
+          totalFields,
+          trackingUrl: sqResult.pausedPageUrl,
+          aiGeneratedAnswers,
+        };
+      }
     }
 
     const screenshot1 = await takeScreenshot(page, "indeed-form-filled");
@@ -1259,8 +1470,9 @@ async function applyIndeed(
       aiGeneratedAnswers = { ...aiGeneratedAnswers, ...moreFill.aiGenerated };
 
       if (input.candidateData) {
-        const moreAnswered = await handleScreeningQuestions(
+        const sqResult = await handleScreeningQuestions(
           page,
+          page.context(),
           input.candidateData,
           input.userId,
           {
@@ -1270,7 +1482,16 @@ async function applyIndeed(
             jobTitle: input.candidateData?.role_title,
           },
         );
-        submittedFields += moreAnswered;
+        submittedFields += sqResult.answered;
+        if (sqResult.paused) {
+          return {
+            status: "AWAITING_ANSWER",
+            submittedFields,
+            totalFields,
+            trackingUrl: sqResult.pausedPageUrl,
+            aiGeneratedAnswers,
+          };
+        }
       }
     }
 
@@ -1377,13 +1598,28 @@ async function applyNaukri(
     aiGeneratedAnswers = fillResult.aiGenerated;
 
     if (input.candidateData) {
-      const answered = await handleScreeningQuestions(page, input.candidateData, input.userId, {
-        applicationId: input.applicationId,
-        provider: "naukri",
-        companyName: input.candidateData?.company_name,
-        jobTitle: input.candidateData?.role_title,
-      });
-      submittedFields += answered;
+      const sqResult = await handleScreeningQuestions(
+        page,
+        page.context(),
+        input.candidateData,
+        input.userId,
+        {
+          applicationId: input.applicationId,
+          provider: "naukri",
+          companyName: input.candidateData?.company_name,
+          jobTitle: input.candidateData?.role_title,
+        },
+      );
+      submittedFields += sqResult.answered;
+      if (sqResult.paused) {
+        return {
+          status: "AWAITING_ANSWER",
+          submittedFields,
+          totalFields,
+          trackingUrl: sqResult.pausedPageUrl,
+          aiGeneratedAnswers,
+        };
+      }
     }
 
     if (input.approvalMode !== undefined ? input.approvalMode : false) {
@@ -1515,13 +1751,28 @@ async function applyWellfound(
     aiGeneratedAnswers = fillResult.aiGenerated;
 
     if (input.candidateData) {
-      const answered = await handleScreeningQuestions(page, input.candidateData, input.userId, {
-        applicationId: input.applicationId,
-        provider: "wellfound",
-        companyName: input.candidateData?.company_name,
-        jobTitle: input.candidateData?.role_title,
-      });
-      submittedFields += answered;
+      const sqResult = await handleScreeningQuestions(
+        page,
+        page.context(),
+        input.candidateData,
+        input.userId,
+        {
+          applicationId: input.applicationId,
+          provider: "wellfound",
+          companyName: input.candidateData?.company_name,
+          jobTitle: input.candidateData?.role_title,
+        },
+      );
+      submittedFields += sqResult.answered;
+      if (sqResult.paused) {
+        return {
+          status: "AWAITING_ANSWER",
+          submittedFields,
+          totalFields,
+          trackingUrl: sqResult.pausedPageUrl,
+          aiGeneratedAnswers,
+        };
+      }
     }
 
     if (input.approvalMode !== undefined ? input.approvalMode : false) {
@@ -1638,13 +1889,28 @@ async function applyInstahyre(
     aiGeneratedAnswers = fillResult.aiGenerated;
 
     if (input.candidateData) {
-      const answered = await handleScreeningQuestions(page, input.candidateData, input.userId, {
-        applicationId: input.applicationId,
-        provider: "instahyre",
-        companyName: input.candidateData?.company_name,
-        jobTitle: input.candidateData?.role_title,
-      });
-      submittedFields += answered;
+      const sqResult = await handleScreeningQuestions(
+        page,
+        page.context(),
+        input.candidateData,
+        input.userId,
+        {
+          applicationId: input.applicationId,
+          provider: "instahyre",
+          companyName: input.candidateData?.company_name,
+          jobTitle: input.candidateData?.role_title,
+        },
+      );
+      submittedFields += sqResult.answered;
+      if (sqResult.paused) {
+        return {
+          status: "AWAITING_ANSWER",
+          submittedFields,
+          totalFields,
+          trackingUrl: sqResult.pausedPageUrl,
+          aiGeneratedAnswers,
+        };
+      }
     }
 
     if (input.approvalMode !== undefined ? input.approvalMode : false) {
@@ -1729,6 +1995,7 @@ export async function recordPlaywrightApplyResult(input: {
     REQUIRES_APPROVAL: "saved",
     FAILED: "saved",
     MANUAL_APPLY_REQUIRED: "saved",
+    AWAITING_ANSWER: "awaiting_answer",
   };
   const newStatus = statusMap[input.result.status] || "saved";
   const isSuccess = input.result.status === "APPLIED";

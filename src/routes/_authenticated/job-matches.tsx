@@ -36,7 +36,10 @@ type Match = {
   recommended_resume_id: string | null;
 };
 
-export const Route = createFileRoute("/_authenticated/job-matches")({ component: JobMatchesPage });
+export const Route = createFileRoute("/_authenticated/job-matches")({
+  component: JobMatchesPage,
+  head: () => ({ meta: [{ title: "Job Matches — VALTREXA-V2" }] }),
+});
 
 function csv(s: string) {
   return s

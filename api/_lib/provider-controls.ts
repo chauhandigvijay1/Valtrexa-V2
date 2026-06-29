@@ -91,42 +91,47 @@ export async function isProviderAvailable(
 
 // ─── Mutations ────────────────────────────────────────────
 
+function eventTypeForStatus(status: ProviderStatus): ProviderHealthEvent["event_type"] {
+  return status === "disabled"
+    ? "disabled"
+    : status === "paused"
+      ? "paused"
+      : status === "maintenance"
+        ? "maintenance"
+        : "enabled";
+}
+
 export async function setProviderStatus(
   provider: ProviderName,
   status: ProviderStatus,
   userId: string,
   by?: string,
 ): Promise<ProviderControl> {
-  const updates: Record<string, any> = { status, updated_at: new Date().toISOString() };
+  const payload: Record<string, any> = {
+    user_id: userId,
+    provider,
+    status,
+  };
   if (status === "disabled") {
-    updates.disabled_by = by ?? "manual";
-    updates.disabled_at = new Date().toISOString();
-    updates.auto_disabled = false;
+    payload.disabled_by = by ?? "manual";
+    payload.disabled_at = new Date().toISOString();
+    payload.auto_disabled = false;
   }
   if (status === "enabled") {
-    updates.disabled_by = null;
-    updates.disabled_at = null;
-    updates.auto_disabled = false;
-    updates.consecutive_failures = 0;
+    payload.disabled_by = null;
+    payload.disabled_at = null;
+    payload.auto_disabled = false;
+    payload.consecutive_failures = 0;
   }
   const { data, error } = await api()
-    .update(updates)
-    .eq("user_id", userId)
-    .eq("provider", provider)
+    .upsert(payload, { onConflict: "user_id,provider" })
     .select()
     .single();
   if (error) throw error;
   await logHealthEvent(
     {
       provider,
-      event_type:
-        status === "disabled"
-          ? "disabled"
-          : status === "paused"
-            ? "paused"
-            : status === "maintenance"
-              ? "maintenance"
-              : "enabled",
+      event_type: eventTypeForStatus(status),
       severity: status === "disabled" ? "critical" : "info",
       message: `Provider ${provider} ${status}${by ? ` by ${by}` : ""}`,
       details: { action: status, actor: by },
@@ -137,14 +142,15 @@ export async function setProviderStatus(
 }
 
 export async function recordProviderSuccess(provider: ProviderName, userId: string): Promise<void> {
-  const { error } = await api()
-    .update({
+  const { error } = await api().upsert(
+    {
+      user_id: userId,
+      provider,
       consecutive_failures: 0,
       last_success_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("user_id", userId)
-    .eq("provider", provider);
+    },
+    { onConflict: "user_id,provider" },
+  );
   if (error) throw error;
 }
 
@@ -154,8 +160,17 @@ export async function recordProviderFailure(
   userId: string,
   autoDisableThreshold = 3,
 ): Promise<void> {
-  const control = await getProviderControl(provider, userId);
-  if (!control) return;
+  let control = await getProviderControl(provider, userId);
+  if (!control) {
+    const { error: insertErr } = await api().insert({
+      user_id: userId,
+      provider,
+      status: "enabled",
+    });
+    if (insertErr) throw insertErr;
+    control = await getProviderControl(provider, userId);
+    if (!control) return;
+  }
 
   const consecutive = (control.consecutive_failures ?? 0) + 1;
   const updates: Record<string, any> = {

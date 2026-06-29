@@ -106,7 +106,10 @@ const PROVIDERS: Provider[] = [
   },
 ];
 
-export const Route = createFileRoute("/_authenticated/settings")({ component: SettingsPage });
+export const Route = createFileRoute("/_authenticated/settings")({
+  component: SettingsPage,
+  head: () => ({ meta: [{ title: "Settings — VALTREXA-V2" }] }),
+});
 
 function SettingsPage() {
   const { user } = useAuth();
@@ -118,7 +121,8 @@ function SettingsPage() {
       />
       <Card className="p-4">
         <p className="text-sm text-muted-foreground">
-          Your User ID: <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{user?.id}</code>
+          Your User ID:{" "}
+          <code className="font-mono text-xs bg-muted px-1.5 py-0.5 rounded">{user?.id}</code>
         </p>
       </Card>
       <TelegramBindingCard />
@@ -305,13 +309,13 @@ function IntegrationCard({ provider }: { provider: Provider }) {
                     <Input
                       type={field.type === "password" ? "password" : "text"}
                       value={config[field.name] ?? ""}
-                       onChange={(event) => {
-                         setConfig({ ...config, [field.name]: event.target.value });
-                         if (isCookieField) {
-                           setValidateResults({});
-                         }
-                       }}
-                       placeholder={field.type === "password" ? "••••••••" : ""}
+                      onChange={(event) => {
+                        setConfig({ ...config, [field.name]: event.target.value });
+                        if (isCookieField) {
+                          setValidateResults({});
+                        }
+                      }}
+                      placeholder={field.type === "password" ? "••••••••" : ""}
                       className="flex-1"
                     />
                     {isCookieField && config[field.name]?.trim() && (
@@ -440,13 +444,16 @@ function TelegramBindingCard() {
         </Badge>
       </div>
       <p className="text-sm text-muted-foreground mb-3">
-        Generate a one-time token, then send it to the Telegram bot via <code>/connect &lt;token&gt;</code>
+        Generate a one-time token, then send it to the Telegram bot via{" "}
+        <code>/connect &lt;token&gt;</code>
       </p>
       {token ? (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
             <Input readOnly value={token} className="font-mono text-xs" />
-            <Button size="sm" onClick={copyToken}>Copy</Button>
+            <Button size="sm" onClick={copyToken}>
+              Copy
+            </Button>
           </div>
           {deepLink && (
             <a
@@ -463,7 +470,15 @@ function TelegramBindingCard() {
               Expires at {new Date(expiresAt).toLocaleTimeString()}
             </p>
           )}
-          <Button size="sm" variant="outline" onClick={() => { setToken(null); setDeepLink(null); setExpiresAt(null); }}>
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setToken(null);
+              setDeepLink(null);
+              setExpiresAt(null);
+            }}
+          >
             Generate New Token
           </Button>
         </div>

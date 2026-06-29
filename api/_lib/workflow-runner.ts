@@ -6,6 +6,7 @@ import { discoverRecruitersInline } from "./workers/recruiter-worker.js";
 import { getResumeForMatching, getCandidateBrain } from "./candidate-brain.js";
 import { startStage, completeStage, failStage } from "./workflow-timeline.js";
 import { createNotification } from "./notification-center.js";
+import { emitWorkflowEvent } from "./workflow-events.js";
 import { logger } from "./logger.js";
 import { checkProviderCookie } from "./cookie-manager.js";
 import { runWorkflowPrecheck } from "./workflow-precheck.js";
@@ -81,13 +82,13 @@ async function getEnabledProviders(userId: string): Promise<string[]> {
   return data.filter((p) => p.status === "enabled").map((p) => p.provider);
 }
 
-async function phaseImportJobs(userId: string): Promise<PhaseResult> {
+async function phaseImportJobs(userId: string, cycleId?: string): Promise<PhaseResult> {
   const start = new Date().toISOString();
   const errors: string[] = [];
   let count = 0;
 
   const stageId = (
-    await startStage(userId, "import_jobs", { cycleId: userId, label: "Importing jobs" })
+    await startStage(userId, "import_jobs", { cycleId: cycleId ?? userId, label: "Importing jobs" })
   )?.id;
 
   const enabled = await getEnabledProviders(userId);
@@ -117,9 +118,9 @@ async function phaseImportJobs(userId: string): Promise<PhaseResult> {
 
   if (stageId) {
     if (errors.length > 0) {
-      await failStage(stageId, errors.join("; "));
+      await failStage(stageId, errors.join("; "), userId);
     } else {
-      await completeStage(stageId, `Imported ${count} jobs`);
+      await completeStage(stageId, `Imported ${count} jobs`, undefined, userId);
     }
   }
 
@@ -143,17 +144,17 @@ async function phaseImportJobs(userId: string): Promise<PhaseResult> {
   };
 }
 
-async function phaseMatchJobs(userId: string): Promise<PhaseResult> {
+async function phaseMatchJobs(userId: string, cycleId?: string): Promise<PhaseResult> {
   const start = new Date().toISOString();
   const errors: string[] = [];
 
   const stageId = (
-    await startStage(userId, "match_jobs", { cycleId: userId, label: "Matching jobs" })
+    await startStage(userId, "match_jobs", { cycleId: cycleId ?? userId, label: "Matching jobs" })
   )?.id;
 
   const profile = await getResumeForMatching(userId);
   if (!profile) {
-    if (stageId) await failStage(stageId, "No profile found");
+    if (stageId) await failStage(stageId, "No profile found", userId);
     return {
       phase: "match_jobs",
       startedAt: start,
@@ -179,7 +180,7 @@ async function phaseMatchJobs(userId: string): Promise<PhaseResult> {
       .limit(50);
 
     if (!jobs || jobs.length === 0) {
-      if (stageId) await completeStage(stageId, "No new jobs to match");
+      if (stageId) await completeStage(stageId, "No new jobs to match", undefined, userId);
       return {
         phase: "match_jobs",
         startedAt: start,
@@ -235,7 +236,13 @@ async function phaseMatchJobs(userId: string): Promise<PhaseResult> {
 
     logger.info(`Matched ${matchedCount}/${jobs.length} jobs`, { userId });
 
-    if (stageId) await completeStage(stageId, `Matched ${matchedCount}/${jobs.length} jobs`);
+    if (stageId)
+      await completeStage(
+        stageId,
+        `Matched ${matchedCount}/${jobs.length} jobs`,
+        undefined,
+        userId,
+      );
 
     if (matchedCount > 0) {
       await createNotification({
@@ -257,7 +264,7 @@ async function phaseMatchJobs(userId: string): Promise<PhaseResult> {
     };
   } catch (e: any) {
     errors.push(e.message);
-    if (stageId) await failStage(stageId, e.message);
+    if (stageId) await failStage(stageId, e.message, userId);
     return {
       phase: "match_jobs",
       startedAt: start,
@@ -269,13 +276,13 @@ async function phaseMatchJobs(userId: string): Promise<PhaseResult> {
   }
 }
 
-async function phaseDiscoverRecruiters(userId: string): Promise<PhaseResult> {
+async function phaseDiscoverRecruiters(userId: string, cycleId?: string): Promise<PhaseResult> {
   const start = new Date().toISOString();
   const errors: string[] = [];
 
   const stageId = (
     await startStage(userId, "discover_recruiters", {
-      cycleId: userId,
+      cycleId: cycleId ?? userId,
       label: "Discovering recruiters",
     })
   )?.id;
@@ -290,7 +297,8 @@ async function phaseDiscoverRecruiters(userId: string): Promise<PhaseResult> {
       .limit(20);
 
     if (!matchedJobs || matchedJobs.length === 0) {
-      if (stageId) await completeStage(stageId, "No jobs needing recruiter discovery");
+      if (stageId)
+        await completeStage(stageId, "No jobs needing recruiter discovery", undefined, userId);
       return {
         phase: "discover_recruiters",
         startedAt: start,
@@ -322,9 +330,15 @@ async function phaseDiscoverRecruiters(userId: string): Promise<PhaseResult> {
     }
 
     if (errors.length) {
-      if (stageId) await failStage(stageId, `Completed with ${errors.length} error(s)`);
+      if (stageId) await failStage(stageId, `Completed with ${errors.length} error(s)`, userId);
     } else {
-      if (stageId) await completeStage(stageId, `Discovered ${discovered} recruiters across ${matchedJobs.length} jobs`);
+      if (stageId)
+        await completeStage(
+          stageId,
+          `Discovered ${discovered} recruiters across ${matchedJobs.length} jobs`,
+          undefined,
+          userId,
+        );
     }
 
     return {
@@ -338,7 +352,7 @@ async function phaseDiscoverRecruiters(userId: string): Promise<PhaseResult> {
     };
   } catch (e: any) {
     errors.push(e.message);
-    if (stageId) await failStage(stageId, e.message);
+    if (stageId) await failStage(stageId, e.message, userId);
     return {
       phase: "discover_recruiters",
       startedAt: start,
@@ -351,13 +365,13 @@ async function phaseDiscoverRecruiters(userId: string): Promise<PhaseResult> {
 }
 
 /** High-value orchestration: recruiter discovery → research → outreach → approval */
-async function phaseHighValuePipeline(userId: string): Promise<PhaseResult> {
+async function phaseHighValuePipeline(userId: string, cycleId?: string): Promise<PhaseResult> {
   const start = new Date().toISOString();
   const errors: string[] = [];
   const details: Record<string, any> = {};
   const stageId = (
     await startStage(userId, "high_value_pipeline", {
-      cycleId: userId,
+      cycleId: cycleId ?? userId,
       label: "High value intelligence",
     })
   )?.id;
@@ -374,7 +388,8 @@ async function phaseHighValuePipeline(userId: string): Promise<PhaseResult> {
     details.total_matched = matchedJobs?.length ?? 0;
 
     if (!matchedJobs || matchedJobs.length === 0) {
-      if (stageId) await completeStage(stageId, "No matched jobs for HV pipeline");
+      if (stageId)
+        await completeStage(stageId, "No matched jobs for HV pipeline", undefined, userId);
       return {
         phase: "high_value_pipeline",
         startedAt: start,
@@ -410,7 +425,13 @@ async function phaseHighValuePipeline(userId: string): Promise<PhaseResult> {
           continue;
         }
 
-        // Placeholder creation removed — violates "never create fake data" constraint
+        // Attempt real recruiter discovery for this company (second pass)
+        const discoveryResult = await discoverRecruitersInline({
+          userId,
+          companyName: companyTitle,
+          roleTitle: jobs[0].title,
+        });
+        recruitersFound += discoveryResult.recruiters.length;
 
         // Mark jobs as processed by HV pipeline
         await supabase
@@ -463,9 +484,17 @@ async function phaseHighValuePipeline(userId: string): Promise<PhaseResult> {
             // Notify user via Telegram about the new outreach draft
             try {
               const { notifyOutreachDraft } = await import("./telegram.js");
-              await notifyOutreachDraft(userId, draft.id, rec.name ?? "Unknown", rec.company ?? "Unknown");
+              await notifyOutreachDraft(
+                userId,
+                draft.id,
+                rec.name ?? "Unknown",
+                rec.company ?? "Unknown",
+              );
             } catch (notifyErr: any) {
-              logger.warn("Failed to notify outreach draft via Telegram", { error: notifyErr.message, userId });
+              logger.warn("Failed to notify outreach draft via Telegram", {
+                error: notifyErr.message,
+                userId,
+              });
             }
           }
         } catch (e: any) {
@@ -487,6 +516,8 @@ async function phaseHighValuePipeline(userId: string): Promise<PhaseResult> {
       await completeStage(
         stageId,
         `${companyMap.size} companies, ${recruitersFound} recruiters, ${details.outreach_drafts} drafts, ${details.pending_approvals} pending approvals`,
+        undefined,
+        userId,
       );
     }
 
@@ -501,7 +532,7 @@ async function phaseHighValuePipeline(userId: string): Promise<PhaseResult> {
     };
   } catch (e: any) {
     errors.push(e.message);
-    if (stageId) await failStage(stageId, e.message);
+    if (stageId) await failStage(stageId, e.message, userId);
     return {
       phase: "high_value_pipeline",
       startedAt: start,
@@ -570,17 +601,29 @@ async function createApplicationsForMatchedJobs(
       continue;
     }
     created++;
+    emitWorkflowEvent({
+      userId,
+      eventType: "application_created",
+      entityType: "application",
+      entityId: null,
+      payload: {
+        job_id: job.id,
+        company: job.company_name,
+        role: job.title,
+        provider,
+      },
+    }).catch(() => {});
   }
   return { created, skipped };
 }
 
-async function phaseApplyPipeline(userId: string): Promise<PhaseResult> {
+async function phaseApplyPipeline(userId: string, cycleId?: string): Promise<PhaseResult> {
   const start = new Date().toISOString();
   const errors: string[] = [];
 
   const stageId = (
     await startStage(userId, "apply_pipeline", {
-      cycleId: userId,
+      cycleId: cycleId ?? userId,
       label: "Creating & processing applications",
     })
   )?.id;
@@ -623,7 +666,7 @@ async function phaseApplyPipeline(userId: string): Promise<PhaseResult> {
 
     if (stageId) {
       const msg = `Created ${created} apps, submitted ${submitted}/${pendingCount} pending`;
-      await completeStage(stageId, msg);
+      await completeStage(stageId, msg, undefined, userId);
     }
 
     return {
@@ -637,7 +680,7 @@ async function phaseApplyPipeline(userId: string): Promise<PhaseResult> {
     };
   } catch (e: any) {
     errors.push(e.message);
-    if (stageId) await failStage(stageId, e.message);
+    if (stageId) await failStage(stageId, e.message, userId);
     return {
       phase: "apply_pipeline",
       startedAt: start,
@@ -649,12 +692,13 @@ async function phaseApplyPipeline(userId: string): Promise<PhaseResult> {
   }
 }
 
-async function phaseFollowups(userId: string): Promise<PhaseResult> {
+async function phaseFollowups(userId: string, cycleId?: string): Promise<PhaseResult> {
   const start = new Date().toISOString();
   const errors: string[] = [];
 
-  const stageId = (await startStage(userId, "followups", { cycleId: userId, label: "Followups" }))
-    ?.id;
+  const stageId = (
+    await startStage(userId, "followups", { cycleId: cycleId ?? userId, label: "Followups" })
+  )?.id;
 
   try {
     const { processFollowupsInline } = await import("./workers/followup-worker.js");
@@ -664,6 +708,8 @@ async function phaseFollowups(userId: string): Promise<PhaseResult> {
       await completeStage(
         stageId,
         result.processed > 0 ? `Sent ${result.processed} followups` : "No followups needed",
+        undefined,
+        userId,
       );
 
     return {
@@ -677,7 +723,7 @@ async function phaseFollowups(userId: string): Promise<PhaseResult> {
     };
   } catch (e: any) {
     errors.push(e.message);
-    if (stageId) await failStage(stageId, e.message);
+    if (stageId) await failStage(stageId, e.message, userId);
     return {
       phase: "followups",
       startedAt: start,
@@ -689,12 +735,12 @@ async function phaseFollowups(userId: string): Promise<PhaseResult> {
   }
 }
 
-async function phaseHealthCheck(userId: string): Promise<PhaseResult> {
+async function phaseHealthCheck(userId: string, cycleId?: string): Promise<PhaseResult> {
   const start = new Date().toISOString();
   const errors: string[] = [];
 
   const stageId = (
-    await startStage(userId, "health_check", { cycleId: userId, label: "Health check" })
+    await startStage(userId, "health_check", { cycleId: cycleId ?? userId, label: "Health check" })
   )?.id;
 
   try {
@@ -732,6 +778,8 @@ async function phaseHealthCheck(userId: string): Promise<PhaseResult> {
         failedProviders
           ? `${controls?.length ?? 0} providers checked, issues: ${failedProviders}`
           : `${controls?.length ?? 0} providers healthy`,
+        undefined,
+        userId,
       );
     }
 
@@ -748,7 +796,7 @@ async function phaseHealthCheck(userId: string): Promise<PhaseResult> {
     };
   } catch (e: any) {
     errors.push(e.message);
-    if (stageId) await failStage(stageId, e.message);
+    if (stageId) await failStage(stageId, e.message, userId);
     return {
       phase: "health_check",
       startedAt: start,
@@ -760,12 +808,12 @@ async function phaseHealthCheck(userId: string): Promise<PhaseResult> {
   }
 }
 
-async function phaseAnalytics(userId: string): Promise<PhaseResult> {
+async function phaseAnalytics(userId: string, cycleId?: string): Promise<PhaseResult> {
   const start = new Date().toISOString();
   const errors: string[] = [];
 
   const stageId = (
-    await startStage(userId, "analytics", { cycleId: userId, label: "Analytics" })
+    await startStage(userId, "analytics", { cycleId: cycleId ?? userId, label: "Analytics" })
   )?.id;
 
   try {
@@ -776,6 +824,8 @@ async function phaseAnalytics(userId: string): Promise<PhaseResult> {
       await completeStage(
         stageId,
         `Applications: ${result.summary.applications}, Interviews: ${result.summary.interviews}`,
+        undefined,
+        userId,
       );
 
     return {
@@ -789,7 +839,7 @@ async function phaseAnalytics(userId: string): Promise<PhaseResult> {
     };
   } catch (e: any) {
     errors.push(e.message);
-    if (stageId) await failStage(stageId, e.message);
+    if (stageId) await failStage(stageId, e.message, userId);
     return {
       phase: "analytics",
       startedAt: start,
@@ -806,7 +856,8 @@ export async function validatePrerequisites(userId: string): Promise<{
   blockers: string[];
 }> {
   const blockers: string[] = [];
-  const { PROVIDERS, getProviderControl, setProviderStatus } = await import("./provider-controls.js");
+  const { PROVIDERS, getProviderControl, setProviderStatus } =
+    await import("./provider-controls.js");
 
   const enabledProviders = await getEnabledProviders(userId);
   for (const provider of enabledProviders) {
@@ -907,6 +958,21 @@ export async function pauseWorkflow(userId: string): Promise<void> {
   logger.info("Workflow paused", { userId });
 }
 
+export async function resumeWorkflow(userId: string, by?: string): Promise<any> {
+  const { resumeWorkflow: realResume } = await import("./workflow-state.js");
+  return realResume(userId, by);
+}
+
+export async function recoverWorkflow(userId: string): Promise<any> {
+  const state = await getWorkflowState(userId);
+  if (state.status !== "error") {
+    throw new Error("Workflow is not in error state");
+  }
+  await saveWorkflowState(userId, { status: "stopped", error: undefined });
+  logger.info("Workflow recovered from error", { userId });
+  return getWorkflowState(userId);
+}
+
 export async function stopWorkflow(userId: string): Promise<void> {
   await saveWorkflowState(userId, { status: "stopped" });
   const { cancelRunningStages } = await import("./workflow-timeline.js");
@@ -954,7 +1020,9 @@ export async function runCycle(userId: string): Promise<CycleResult> {
     .maybeSingle();
 
   if (!wsRow) {
-    logger.warn("Could not acquire workflow lock — concurrent runCycle already in progress", { userId });
+    logger.warn("Could not acquire workflow lock — concurrent runCycle already in progress", {
+      userId,
+    });
     return {
       cycleId,
       startedAt,
@@ -1040,7 +1108,7 @@ export async function runCycle(userId: string): Promise<CycleResult> {
     }
 
     try {
-      const result = await fn(userId);
+      const result = await fn(userId, cycleId);
       phases.push(result);
       logger.info(`Phase ${name} completed`, {
         count: result.count,
@@ -1097,8 +1165,6 @@ export async function runCycle(userId: string): Promise<CycleResult> {
       phases: phases.map((p) => ({ phase: p.phase, success: p.success, count: p.count })),
     },
   });
-
-
 
   return result;
 }

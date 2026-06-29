@@ -46,7 +46,10 @@ type CompanyResearch = {
   summary: string | null;
 };
 
-export const Route = createFileRoute("/_authenticated/painpoints")({ component: PainPointsPage });
+export const Route = createFileRoute("/_authenticated/painpoints")({
+  component: PainPointsPage,
+  head: () => ({ meta: [{ title: "Pain Points — VALTREXA-V2" }] }),
+});
 
 function PainPointsPage() {
   const qc = useQueryClient();

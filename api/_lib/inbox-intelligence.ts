@@ -13,6 +13,7 @@
 import { google } from "googleapis";
 import { supabaseAdmin } from "./supabase.js";
 import { emitWorkflowEvent } from "./workflow-events.js";
+import { logger } from "./logger.js";
 
 export type InboxClassification =
   "interview" | "assessment" | "offer" | "rejection" | "recruiter_reply" | "other";
@@ -153,7 +154,10 @@ function getGmailClient() {
   const oauth2 = new google.auth.OAuth2(
     clientId,
     clientSecret,
-    process.env.GMAIL_REDIRECT_URI ?? (() => { throw new Error("GMAIL_REDIRECT_URI environment variable is required for Gmail OAuth"); })(),
+    process.env.GMAIL_REDIRECT_URI ??
+      (() => {
+        throw new Error("GMAIL_REDIRECT_URI environment variable is required for Gmail OAuth");
+      })(),
   );
   oauth2.setCredentials({ refresh_token: refreshToken });
   return google.gmail({ version: "v1", auth: oauth2 });
@@ -185,102 +189,122 @@ export async function syncInboxForUser(
   const classified: ClassifiedMessage[] = [];
 
   for (const id of messageIds) {
-    // Skip already-processed messages.
-    const existing = await supabaseAdmin
-      .from("inbox_messages")
-      .select("id")
-      .eq("user_id", userId)
-      .eq("message_id", id)
-      .maybeSingle();
-    if (existing.data?.id) continue;
-
-    const msg = await gmail.users.messages.get({ userId: "me", id, format: "full" });
-    const headers = (msg.data.payload?.headers ?? []) as Array<{ name?: string; value?: string }>;
-    const subject = headers.find((h) => h.name?.toLowerCase() === "subject")?.value ?? "";
-    const from = headers.find((h) => h.name?.toLowerCase() === "from")?.value ?? "";
-    const to = headers.find((h) => h.name?.toLowerCase() === "to")?.value ?? "";
-    const body = decodePayload(msg.data.payload).slice(0, 8000);
-    const snippet = (msg.data.snippet ?? "").slice(0, 500);
-    const receivedAt = msg.data.internalDate
-      ? new Date(Number(msg.data.internalDate)).toISOString()
-      : null;
-
-    const { classification, confidence, reason } = classifyMessage({
-      subject,
-      body,
-      fromAddress: from,
-    });
-    const companyName = extractCompany(subject, body, from);
-
-    const record: ClassifiedMessage = {
-      messageId: id,
-      threadId: msg.data.threadId ? String(msg.data.threadId) : null,
-      fromAddress: from,
-      toAddress: to,
-      subject,
-      snippet,
-      body,
-      classification,
-      confidence,
-      classificationReason: reason,
-      companyName,
-      receivedAt,
-    };
-    classified.push(record);
-
-    // Link to application/recruiter when possible.
-    let applicationId: string | null = null;
-    let recruiterId: string | null = null;
-    if (companyName) {
-      const appMatch = await supabaseAdmin
-        .from("applications")
+    // Isolate per-message processing: one failure should not abort remaining messages.
+    try {
+      const existing = await supabaseAdmin
+        .from("inbox_messages")
         .select("id")
         .eq("user_id", userId)
-        .ilike("company_name", `%${companyName}%`)
-        .order("created_at", { ascending: false })
-        .limit(1)
+        .eq("message_id", id)
         .maybeSingle();
-      applicationId = appMatch.data?.id ?? null;
-      const recMatch = await supabaseAdmin
-        .from("recruiters")
-        .select("id")
-        .eq("user_id", userId)
-        .ilike("company", `%${companyName}%`)
-        .limit(1)
-        .maybeSingle();
-      recruiterId = recMatch.data?.id ?? null;
+      if (existing.data?.id) continue;
+
+      const msg = await gmail.users.messages.get({ userId: "me", id, format: "full" });
+      const headers = (msg.data.payload?.headers ?? []) as Array<{ name?: string; value?: string }>;
+      const subject = headers.find((h) => h.name?.toLowerCase() === "subject")?.value ?? "";
+      const from = headers.find((h) => h.name?.toLowerCase() === "from")?.value ?? "";
+      const to = headers.find((h) => h.name?.toLowerCase() === "to")?.value ?? "";
+      const body = decodePayload(msg.data.payload).slice(0, 8000);
+      const snippet = (msg.data.snippet ?? "").slice(0, 500);
+      const receivedAt = msg.data.internalDate
+        ? new Date(Number(msg.data.internalDate)).toISOString()
+        : null;
+
+      const { classification, confidence, reason } = classifyMessage({
+        subject,
+        body,
+        fromAddress: from,
+      });
+      const companyName = extractCompany(subject, body, from);
+
+      const record: ClassifiedMessage = {
+        messageId: id,
+        threadId: msg.data.threadId ? String(msg.data.threadId) : null,
+        fromAddress: from,
+        toAddress: to,
+        subject,
+        snippet,
+        body,
+        classification,
+        confidence,
+        classificationReason: reason,
+        companyName,
+        receivedAt,
+      };
+      classified.push(record);
+
+      // Link to application/recruiter when possible.
+      let applicationId: string | null = null;
+      let recruiterId: string | null = null;
+      if (companyName) {
+        const appMatch = await supabaseAdmin
+          .from("applications")
+          .select("id")
+          .eq("user_id", userId)
+          .ilike("company_name", `%${companyName}%`)
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        applicationId = appMatch.data?.id ?? null;
+        const recMatch = await supabaseAdmin
+          .from("recruiters")
+          .select("id")
+          .eq("user_id", userId)
+          .ilike("company", `%${companyName}%`)
+          .limit(1)
+          .maybeSingle();
+        recruiterId = recMatch.data?.id ?? null;
+      }
+
+      const messagePayload = {
+        user_id: userId,
+        message_id: id,
+        thread_id: record.threadId,
+        from_address: from,
+        to_address: to,
+        subject,
+        snippet,
+        body,
+        classification,
+        confidence,
+        classification_reason: reason,
+        company_name: companyName,
+        application_id: applicationId,
+        recruiter_id: recruiterId,
+        received_at: receivedAt,
+        processed_at: new Date().toISOString(),
+      } as const;
+
+      await supabaseAdmin.from("inbox_messages").insert(messagePayload as any);
+
+      await supabaseAdmin
+        .from("gmail_messages")
+        .insert({ ...messagePayload, updated_at: new Date().toISOString() } as any);
+
+      if (confidence >= 0.7) {
+        await autoCreateDownstream(
+          userId,
+          classification,
+          companyName,
+          applicationId,
+          subject,
+          body,
+        );
+      }
+
+      await emitWorkflowEvent({
+        userId,
+        eventType: `inbox_${classification}`,
+        entityType: "inbox_messages",
+        payload: { messageId: id, subject, companyName, applicationId },
+      });
+    } catch (msgErr: any) {
+      logger.warn("[inbox-intelligence] Failed to process message", {
+        messageId: id,
+        userId,
+        error: msgErr.message,
+      });
     }
-
-    await supabaseAdmin.from("inbox_messages").insert({
-      user_id: userId,
-      message_id: id,
-      thread_id: record.threadId,
-      from_address: from,
-      to_address: to,
-      subject,
-      snippet,
-      body,
-      classification,
-      confidence,
-      classification_reason: reason,
-      company_name: companyName,
-      application_id: applicationId,
-      recruiter_id: recruiterId,
-      received_at: receivedAt,
-      processed_at: new Date().toISOString(),
-    } as any);
-
-    // Auto-create downstream records for high-confidence classifications.
-    if (confidence >= 0.7) {
-      await autoCreateDownstream(userId, classification, companyName, applicationId, subject, body);
-    }
-
-    await emitWorkflowEvent({
-      userId,
-      eventType: `inbox_${classification}`,
-      entityType: "inbox_messages",
-      payload: { messageId: id, subject, companyName, applicationId },
-    });
   }
 
   return { synced: classified.length, classified };

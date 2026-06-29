@@ -235,7 +235,11 @@ export async function handleStrategicValue(request: Request) {
   } as any;
 
   if (companyRowData.id) {
-    await supabaseAdmin.from("companies").update(payload).eq("id", companyRowData.id).eq("user_id", user.id);
+    await supabaseAdmin
+      .from("companies")
+      .update(payload)
+      .eq("id", companyRowData.id)
+      .eq("user_id", user.id);
   } else {
     await supabaseAdmin.from("companies").insert(payload);
   }
@@ -387,7 +391,10 @@ export async function handleApply(request: Request) {
     } as any)
     .select("*")
     .single();
-  if (appInsert.error) { logger.warn("[phase] app insert failed", appInsert.error); return json({ error: "Insert failed" }, { status: 400 }); }
+  if (appInsert.error) {
+    logger.warn("[phase] app insert failed", appInsert.error);
+    return json({ error: "Insert failed" }, { status: 400 });
+  }
   const applicationId = appInsert.data.id;
 
   await buildApplicationPackage({
@@ -958,7 +965,11 @@ export async function handleHighValueV3(request: Request) {
   } as any;
 
   if (companyRowData.id) {
-    await supabaseAdmin.from("companies").update(payload).eq("id", companyRowData.id).eq("user_id", user.id);
+    await supabaseAdmin
+      .from("companies")
+      .update(payload)
+      .eq("id", companyRowData.id)
+      .eq("user_id", user.id);
   } else {
     await supabaseAdmin.from("companies").insert(payload);
   }

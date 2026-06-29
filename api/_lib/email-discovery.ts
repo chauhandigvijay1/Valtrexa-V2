@@ -190,7 +190,11 @@ export async function storeEmailVerification(input: {
   };
 
   if (existing.data?.id) {
-    await supabaseAdmin.from("email_verifications").update(payload).eq("id", existing.data.id);
+    await supabaseAdmin
+      .from("email_verifications")
+      .update(payload)
+      .eq("id", existing.data.id)
+      .eq("user_id", input.userId);
     return { id: existing.data.id, confidence: input.confidence };
   }
 
@@ -250,7 +254,8 @@ export async function verifyAndStoreEmailsForRecruiters(
                 email: pattern,
                 email_verified: verification.confidence === "VERIFIED",
               })
-              .eq("id", recruiter.id);
+              .eq("id", recruiter.id)
+              .eq("user_id", userId);
 
             if (verification.confidence === "VERIFIED") break;
           }
@@ -282,7 +287,8 @@ export async function verifyAndStoreEmailsForRecruiters(
       .update({
         email_verified: verification.confidence === "VERIFIED",
       })
-      .eq("id", recruiter.id);
+      .eq("id", recruiter.id)
+      .eq("user_id", userId);
   }
 
   return results;

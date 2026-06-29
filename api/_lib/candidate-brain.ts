@@ -247,7 +247,8 @@ export async function syncResumeToBrain(
     await supabaseAdmin
       .from("candidate_profiles")
       .update(profilePayload)
-      .eq("id", brain.profile.id);
+      .eq("id", brain.profile.id)
+      .eq("user_id", userId);
   } else {
     await supabaseAdmin.from("candidate_profiles").insert(profilePayload as any);
   }

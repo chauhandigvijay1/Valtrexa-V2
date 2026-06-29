@@ -146,3 +146,38 @@ export async function isWorkflowActive(userId: string): Promise<boolean> {
   const state = await getWorkflowState(userId);
   return state?.status === "running";
 }
+
+export async function setErrorWorkflow(userId: string, error: string): Promise<WorkflowState> {
+  const now = new Date().toISOString();
+  const { data, error: err } = await api()
+    .update({
+      status: "error",
+      error,
+      updated_at: now,
+    })
+    .eq("user_id", userId)
+    .in("status", ["running", "paused", "failed"])
+    .select()
+    .maybeSingle();
+  if (err) throw err;
+  if (!data) throw new Error("Could not set workflow to error state");
+  return data;
+}
+
+export async function recoverFromError(userId: string): Promise<WorkflowState> {
+  const now = new Date().toISOString();
+  const { data, error: err } = await api()
+    .update({
+      status: "stopped",
+      error: null,
+      stopped_at: now,
+      updated_at: now,
+    })
+    .eq("user_id", userId)
+    .eq("status", "error")
+    .select()
+    .maybeSingle();
+  if (err) throw err;
+  if (!data) throw new Error("Workflow is not in error state");
+  return data;
+}

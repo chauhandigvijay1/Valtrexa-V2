@@ -17,5 +17,12 @@ export async function requireApiUser(request: Request): Promise<ApiUser> {
     throw new Response(JSON.stringify({ error: "Invalid bearer token." }), { status: 401 });
   }
 
+  // Gate: require email verification for non-OAuth users
+  if (data.user.app_metadata?.provider === "email" && !data.user.email_confirmed_at) {
+    throw new Response(JSON.stringify({ error: "Email not confirmed. Please check your inbox." }), {
+      status: 403,
+    });
+  }
+
   return { id: data.user.id, email: data.user.email };
 }

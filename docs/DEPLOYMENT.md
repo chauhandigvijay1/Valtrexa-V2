@@ -1,205 +1,119 @@
-# Deployment Guide
+# Deployment Guide — VALTREXA-V2
 
-> **Last Updated:** 2026-06-26
+> **Version:** v1.0.0 | **Last updated:** 2026-06-29  
+> **Production URL:** https://valtrexa-v2.vercel.app
 
-## Prerequisites
-
-- [Vercel](https://vercel.com) account
-- [Supabase](https://supabase.com) project (PostgreSQL database)
-- [@BotFather](https://t.me/botfather) Telegram bot token
-- [OpenRouter](https://openrouter.ai) API key
-- Google OAuth credentials (optional, for Gmail sync)
-- Upstash Redis (optional, for BullMQ queues)
-
-## Deployment Architecture
-
-```mermaid
-flowchart TB
-    V[Vercel\nEdge Functions + Serverless] --> S[(Supabase PostgreSQL)]
-    V --> R[(Upstash Redis)]
-    V -.-> PW[Playwright\nBrowser Automation]
-    TB[Telegram Bot\nWebhook] --> V
-    V --> OR[OpenRouter AI Gateway]
-    V --> GQ[Groq API]
-```
-
-## Step 1: Supabase Setup
-
-### Create Project
-
-1. Go to [supabase.com](https://supabase.com) → New project
-2. Note your project URL and API keys (anon, service_role)
-3. Enable Auth → configure email/password or Google OAuth
-
-### Run Migrations
-
-```bash
-# Option A: Supabase CLI
-supabase link --project-ref <project-ref>
-supabase db push
-
-# Option B: Manual SQL
-# Open Supabase SQL Editor → paste contents of supabase/current_schema.sql
-```
-
-### Configure Auth (Google OAuth)
-
-1. Supabase Dashboard → Authentication → Providers → Google
-2. Set up OAuth consent screen in Google Cloud Console
-3. Add redirect URI: `https://<project>.supabase.co/auth/v1/callback`
-4. Copy Client ID and Client Secret to Supabase
-
-## Step 2: Vercel Deployment
-
-### Connect Repository
-
-1. Go to [vercel.com](https://vercel.com) → Add New Project
-2. Import your GitHub repository
-3. Framework preset: **Other** (TanStack Start uses Vite/Nitro)
-
-### Environment Variables
-
-Add all variables from [ENVIRONMENT.md](ENVIRONMENT.md). Required minimum:
-
-```env
-SUPABASE_URL=https://xxx.supabase.co
-SUPABASE_ANON_KEY=eyJ...
-SUPABASE_SERVICE_ROLE_KEY=eyJ...
-SESSION_SECRET=<min 32 chars>
-TELEGRAM_BOT_TOKEN=123456:ABC...
-TELEGRAM_BOT_USERNAME=valtrexa_bot
-OPENROUTER_API_KEY=sk-or-...
-```
-
-### Build & Deploy
-
-```bash
-# Build Command (vercel.json)
-npm.cmd run build
-
-# Output Directory
-dist/client
-
-# Install Command
-npm.cmd install
-```
-
-The `vercel.json` configuration:
-
-```json
-{
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist/client",
-  "installCommand": "npm install",
-  "framework": null
-}
-```
-
-> **Note:** The build script in `package.json` also runs `node scripts/prepare-vercel-ssr.mjs` after Vite build, which generates the SSR server bundle at `api/_dist/server.js`.
-
-## Step 3: Telegram Bot Setup
-
-1. Talk to [@BotFather](https://t.me/botfather)
-2. Create bot → get token
-3. Set bot commands (auto-registered by `telegram-init.ts`):
+## Architecture
 
 ```
-start - Initialize bot
-link - Link Telegram to your account
-status - System status
-pause - Pause workflow
-resume - Resume workflow
-providers - List provider status
-check - Validate cookies
-jobs - Recent job matches
-apply - Trigger apply cycle
-analytics - Application statistics
-broadcast - (admin) Send broadcast
-inspect - (admin) View user details
+┌──────────────┐     ┌──────────────────┐     ┌─────────────────┐
+│  Vercel      │────▶│  Supabase        │     │  Railway        │
+│  (SSR + API) │     │  (DB + Auth)     │     │  (Worker)       │
+│              │     │                  │     │                 │
+│  - Frontend  │     │  - PostgreSQL    │     │  - BullMQ       │
+│  - API routes│     │  - Auth (Supabase)│     │  - Playwright   │
+│  - SSR       │     │  - Storage       │     │  - Redis        │
+└──────┬───────┘     └──────────────────┘     └────────┬────────┘
+       │                                              │
+       │              ┌──────────────────┐             │
+       └──────────────│  External APIs   │─────────────┘
+                      │                  │
+                      │  - Telegram API  │
+                      │  - Gmail API     │
+                      │  - OpenRouter AI │
+                      │  - Job Boards    │
+                      └──────────────────┘
 ```
 
-4. Bot auto-registers webhook at `/api/telegram/webhook` on startup
+## Step 1: Supabase (Database + Auth)
 
-## Step 4: Redis (Optional)
+1. **Create project** at [supabase.com](https://supabase.com)
+2. **Run migrations**: Run all 28 migrations from `supabase/migrations/` **in order**:
+   ```bash
+   npx supabase migration up --include-all --db-url "postgresql://postgres:<password>@<project>.supabase.co:5432/postgres"
+   ```
+   Or use SQL Editor to run each `.sql` file sequentially.
+3. **After all migrations**: `NOTIFY pgrst, 'reload schema';`
+4. **Verify all migrations applied**:
+   ```sql
+   SELECT * FROM supabase_migrations.schema_migrations ORDER BY version;
+   ```
+5. **Configure Auth**:
+   - Settings → URL Configuration
+   - **Site URL**: `https://valtrexa-v2.vercel.app`
+   - **Redirect URLs**: `https://valtrexa-v2.vercel.app/auth/callback`
+6. **Enable Google OAuth**:
+   - Authentication → Providers → Google
+   - Enter Client ID + Secret from Google Cloud Console
 
-For BullMQ background queues, set up Upstash Redis:
+## Step 2: Google Cloud Console
 
-1. Create database at [upstash.com](https://upstash.com)
-2. Add env vars:
+1. Create project → Enable **Gmail API**
+2. APIs & Services → Credentials → Create OAuth 2.0 Client ID
+3. **Application type**: Desktop app
+4. **Authorized JavaScript origins**: `https://valtrexa-v2.vercel.app`
+5. **Authorized redirect URIs**:
+   - `https://valtrexa-v2.vercel.app/auth/callback`
+   - `https://<project>.supabase.co/auth/v1/callback`
+6. Copy `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET`
+7. Obtain refresh token via offline OAuth flow
 
-```env
-REDIS_URL=rediss://default:password@host:port
-# or
-REDIS_TOKEN=xxxxxxxx
-```
+## Step 3: Vercel Deployment
 
-If `REDIS_URL` is not set, the system falls back to inline execution (no background queues).
+1. Push code to GitHub
+2. Import repository in Vercel
+3. **Build Command**: `npm.cmd run build`
+4. **Output Directory**: `dist/client`
+5. Set all environment variables from [ENVIRONMENT.md](./ENVIRONMENT.md)
+6. Deploy
 
-## Step 5: Playwright in Production
+**vercel.json** handles:
 
-Playwright requires browser binaries. Vercel serverless functions have limited support:
+- API route rewrites → `api/[...route].ts`
+- SSR rewrites → Nitro server handler
+- Static asset serving
 
-### Option A: Remote Browser
+## Step 4: Telegram Bot
 
-Set `PLAYWRIGHT_WS_ENDPOINT` to a browserless service:
+1. Message [@BotFather](https://t.me/BotFather)
+2. Create bot: `/newbot` → name it `ValtrexaV2Bot`
+3. Set `TELEGRAM_BOT_TOKEN` in Vercel
+4. Set `TELEGRAM_WEBHOOK_SECRET` (random string)
+5. Set `PUBLIC_URL=https://valtrexa-v2.vercel.app`
+6. The bot registers its webhook automatically on first request
 
-```env
-PLAYWRIGHT_WS_ENDPOINT=wss://chrome.browserless.io/ws
-```
+**Webhook endpoint:** `https://valtrexa-v2.vercel.app/api/telegram/webhook`
 
-### Option B: Vercel with Chromium
+## Step 5: Redis + Queue (Optional for Worker)
 
-Vercel includes Chromium in the execution environment by default for serverless functions. Playwright will auto-detect it.
+If using the background worker (Railway or standalone):
 
-## Post-Deployment Verification
+1. Provision Redis (Upstash, Railway Redis, or self-hosted)
+2. Set `REDIS_URL` in Railway environment
+3. Deploy worker: `railway up` with start command `npm.cmd run worker`
 
-```mermaid
-flowchart LR
-    A[Deploy] --> B{Health Check}
-    B --> C[/api/health returns 200]
-    B --> D[Telegram /status works]
-    B --> E[Supabase queries succeed]
-    B --> F[Auth flow works]
-    C & D & E & F --> G[✅ System Ready]
-```
+## Step 6: Post-Deployment Verification
 
-### Health Check URLs
+| Check                  | What to Verify                                      |
+| ---------------------- | --------------------------------------------------- |
+| ✅ Health check        | Visit `https://valtrexa-v2.vercel.app`              |
+| ✅ Signup flow         | Create account → confirm email → land on onboarding |
+| ✅ Login flow          | Login with email/password → dashboard               |
+| ✅ Google OAuth        | Login with Google → callback → dashboard            |
+| ✅ Resume upload       | Upload PDF → verify in profile                      |
+| ✅ Cookie management   | Add LinkedIn cookie → validate → check status       |
+| ✅ Telegram connection | `/start` → bind account → `/status`                 |
+| ✅ AI generation       | Verify OpenRouter key is working                    |
+| ✅ Gmail sync          | Trigger inbox sync → check classified messages      |
 
-| Endpoint | Expected |
-|---|---|
-| `https://valtrexa-v2.vercel.app/` | 200 (dashboard) |
-| `https://valtrexa-v2.vercel.app/api/health` | 200 (health) |
-| `https://valtrexa-v2.vercel.app/api/telegram/webhook` | Accepts POST from Telegram |
+## Rollback Procedure
 
-### Verify
+1. Vercel: Go to Deployment → three dots → **Promote to Production** (previous version)
+2. Database: Run the **inverse** of the last migration
+3. Notify users of the rollback and estimated fix time
 
-1. Visit the dashboard → should load with login
-2. Create account → should redirect to onboarding
-3. Run `/start` on Telegram → bot should respond
-4. Run `/status` → should show workflow status
-5. Check provider controls → should list providers
+## Backup Procedure
 
-## Production Checklist
-
-- [ ] All required env vars configured in Vercel
-- [ ] Supabase migrations applied
-- [ ] Telegram bot responds to `/start`
-- [ ] Google OAuth configured (if using)
-- [ ] Redis configured (optional)
-- [ ] Playwright browser endpoint configured
-- [ ] Sentry DSN set (optional but recommended)
-- [ ] Custom domain configured (optional)
-- [ ] Rate limiting considered for Telegram webhook
-- [ ] Database backups configured (Supabase Pro)
-
-## Troubleshooting
-
-| Problem | Likely Cause | Fix |
-|---|---|---|
-| Build fails | Missing dependencies | Check install/build commands in vercel.json |
-| 404 on API routes | Nitro output not configured | Ensure `dist/client` is set as output |
-| Telegram bot silent | Webhook misconfigured | Check bot token, hit `/api/telegram/webhook` |
-| Database errors | Migrations not applied | Run `supabase db push` or paste SQL |
-| Auth fails | Wrong Supabase keys | Verify anon/service_role keys |
-| 500 on Playwright | Browser not available | Set `PLAYWRIGHT_WS_ENDPOINT` or use Vercel Chromium |
-| Rate limited | Too many requests | Adjust `WORKFLOW_INTERVAL_MINUTES` |
+- **Database**: Use Supabase daily backups (Pro plan+)
+- **Encryption keys**: Store `COOKIE_ENCRYPTION_KEY` and `SESSION_SECRET` in a password manager
+- **OAuth tokens**: Re-obtain `GMAIL_REFRESH_TOKEN` if lost

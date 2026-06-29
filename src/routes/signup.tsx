@@ -27,10 +27,23 @@ function SignupPage() {
     }
   }, [loading, user, nav]);
 
+  const emitEvent = (event: string) => {
+    supabase.auth.getSession().then(({ data: sData }) => {
+      const token = sData.session?.access_token;
+      if (token) {
+        fetch("/api/auth/log-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ event }),
+        }).catch(() => {});
+      }
+    });
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -44,8 +57,20 @@ function SignupPage() {
       return;
     }
 
-    toast.success("Account created. Check your inbox if email confirmation is enabled.");
-    nav({ to: "/onboarding" });
+    // Create profile record immediately
+    if (data.session?.user) {
+      const token = data.session.access_token;
+      await fetch("/api/auth/create-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ name }),
+      }).catch(() => {});
+      emitEvent("user_signed_up");
+      nav({ to: "/onboarding", replace: true });
+    } else {
+      // Email confirmation required — redirect to confirm page
+      nav({ to: "/auth/confirm-email", replace: true });
+    }
   };
 
   return (

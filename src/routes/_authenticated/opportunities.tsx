@@ -91,6 +91,7 @@ type SourceType = "greenhouse" | "lever" | "ashby" | "linkedin" | "naukri" | "we
 
 export const Route = createFileRoute("/_authenticated/opportunities")({
   component: OpportunitiesPage,
+  head: () => ({ meta: [{ title: "Opportunities — VALTREXA-V2" }] }),
 });
 
 function OpportunitiesPage() {

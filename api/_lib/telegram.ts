@@ -138,16 +138,14 @@ export async function answerCallbackQuery(callbackQueryId: string, text?: string
   }
 }
 
-async function resolveDefaultChatId(userId?: string): Promise<string> {
-  if (userId) {
-    const { data } = await supabaseAdmin
-      .from("telegram_bindings")
-      .select("chat_id")
-      .eq("user_id", userId)
-      .maybeSingle();
-    if (data?.chat_id) return String(data.chat_id);
-  }
-  return process.env.TELEGRAM_CHAT_ID?.trim() ?? "";
+async function resolveDefaultChatId(userId: string): Promise<string> {
+  const { data } = await supabaseAdmin
+    .from("telegram_bindings")
+    .select("chat_id")
+    .eq("user_id", userId)
+    .maybeSingle();
+  if (data?.chat_id) return String(data.chat_id);
+  return "";
 }
 
 async function queryRecentJobs(userId: string, limit = 5) {
@@ -368,7 +366,7 @@ async function handleMenuCommand(chatId: number, userId: string): Promise<string
 
 async function handleHelpCommand(chatId: number): Promise<string> {
   try {
-  const text = `<b>🤖 VALTREXA-V2 Commands</b>
+    const text = `<b>🤖 VALTREXA-V2 Commands</b>
 
 <b>General</b>
 /health — System health
@@ -411,7 +409,7 @@ async function handleHelpCommand(chatId: number): Promise<string> {
 
 <b>Account</b>
 /connect — Link Telegram to web dashboard`;
-  return text;
+    return text;
   } catch (err: any) {
     return `❌ Error loading help: ${escapeHtml(err.message)}`;
   }
@@ -1023,7 +1021,8 @@ export async function processTelegramUpdate(
       // Handle unauthenticated connect flow
       if (command === "/connect") {
         if (!args) {
-          responseText = "Usage: /connect <token>\n\nGenerate a token from Settings in the web dashboard, then send it here to link your account.";
+          responseText =
+            "Usage: /connect <token>\n\nGenerate a token from Settings in the web dashboard, then send it here to link your account.";
           await sendTelegramMessage(chatId, responseText);
           return { handled: true, response: responseText };
         }
@@ -1045,16 +1044,50 @@ export async function processTelegramUpdate(
       }
 
       // Binding check for all commands except unauthenticated ones
-      if (!userId && command !== "/health" && command !== "/start" && command !== "/help" && command !== "/menu") {
-        await sendTelegramMessage(chatId, "❌ Your Telegram account is not connected.\n\nUse /connect <token> to link your account, or generate a token from the web dashboard Settings page.");
+      if (
+        !userId &&
+        command !== "/health" &&
+        command !== "/start" &&
+        command !== "/help" &&
+        command !== "/menu"
+      ) {
+        await sendTelegramMessage(
+          chatId,
+          "❌ Your Telegram account is not connected.\n\nUse /connect <token> to link your account, or generate a token from the web dashboard Settings page.",
+        );
         return { handled: true };
+      }
+
+      // Handle free-text reply to UQE "edit" callback — anything that is not a slash command
+      if (userId && !command.startsWith("/")) {
+        const { handleEditReply } = await import("./dynamic-profile-memory.js");
+        const editResult = await handleEditReply(userId, body.message.text);
+        if (editResult.handled) {
+          await sendTelegramMessage(chatId, editResult.text);
+          return { handled: true };
+        }
+        return { handled: false };
       }
 
       switch (command) {
         case "/health":
-        case "/start":
           responseText = await handleHealthCommand(chatId);
           break;
+        case "/start": {
+          if (userId) {
+            responseText = await handleHealthCommand(chatId);
+          } else {
+            responseText =
+              `<b>👋 Welcome to VALTREXA-V2</b>\n\n` +
+              `Your AI-native career operating system. Automate your job search from resume to offer.\n\n` +
+              `To get started:\n` +
+              `1. Log in at your web dashboard\n` +
+              `2. Go to Settings → Telegram to generate a connect token\n` +
+              `3. Use /connect &lt;token&gt; to link your account\n\n` +
+              `Or use /menu to browse available commands.`;
+          }
+          break;
+        }
         case "/menu":
           responseText = await handleMenuCommand(chatId, userId);
           break;
@@ -1092,7 +1125,11 @@ export async function processTelegramUpdate(
           responseText = await handleProviderStatusCommand(chatId, userId);
           break;
         case "/provider_history":
-          responseText = await handleProviderHistoryCommand(chatId, userId, args.trim() || undefined);
+          responseText = await handleProviderHistoryCommand(
+            chatId,
+            userId,
+            args.trim() || undefined,
+          );
           break;
         case "/provider_enable":
           responseText = await handleProviderEnableCommand(chatId, args.trim(), userId);
@@ -1158,7 +1195,10 @@ export async function processTelegramUpdate(
       const chatId = message?.chat.id;
       if (!userId) {
         if (chatId) {
-          await answerCallbackQuery(cbId, "❌ Please connect your Telegram account first using /connect");
+          await answerCallbackQuery(
+            cbId,
+            "❌ Please connect your Telegram account first using /connect",
+          );
         }
         return { handled: true };
       }
@@ -1172,7 +1212,10 @@ export async function processTelegramUpdate(
   } catch (err: any) {
     logger.error("processTelegramUpdate unhandled error:", err?.message ?? err);
     if (body?.message?.chat?.id) {
-      await sendTelegramMessage(body.message.chat.id, "❌ An unexpected error occurred. Please try again.");
+      await sendTelegramMessage(
+        body.message.chat.id,
+        "❌ An unexpected error occurred. Please try again.",
+      );
     }
     return { handled: true, response: "Error" };
   }
@@ -1407,7 +1450,11 @@ async function rejectAllPending(userId: string): Promise<{ count: number }> {
     .is("approval_status", null);
   if (!pending?.length) return { count: 0 };
   const ids = pending.map((p) => p.id);
-  await supabaseAdmin.from("applications").update({ approval_status: "rejected" }).in("id", ids).eq("user_id", userId);
+  await supabaseAdmin
+    .from("applications")
+    .update({ approval_status: "rejected" })
+    .in("id", ids)
+    .eq("user_id", userId);
   return { count: ids.length };
 }
 
@@ -1514,10 +1561,14 @@ async function approveEntity(
         approvalMode: false,
       });
 
-      const approvedStatus = pwResult.status === "APPLIED" || pwResult.status === "PARTIAL" ? "approved" : "failed";
+      const approvedStatus =
+        pwResult.status === "APPLIED" || pwResult.status === "PARTIAL" ? "approved" : "failed";
       await supabaseAdmin
         .from("applications")
-        .update({ approval_status: approvedStatus, approval_responded_at: new Date().toISOString() })
+        .update({
+          approval_status: approvedStatus,
+          approval_responded_at: new Date().toISOString(),
+        })
         .eq("id", entityId)
         .eq("user_id", userId);
 
@@ -1630,20 +1681,22 @@ async function approveEntity(
       if (updateErr) return `❌ Failed to approve: ${updateErr.message}`;
 
       // Create outreach_messages record for the send pipeline
-      const { error: insertErr } = await supabaseAdmin
-        .from("outreach_messages")
-        .insert({
-          user_id: userId,
-          company_name: draft.company_name,
-          recipient_name: draft.recipient_name ?? "Unknown",
-          recipient_email: draft.recipient_email ?? "",
-          subject: draft.subject,
-          body: draft.body,
-          status: "pending",
-          source: "telegram_approval",
-        } as any);
+      const { error: insertErr } = await supabaseAdmin.from("outreach_messages").insert({
+        user_id: userId,
+        company_name: draft.company_name,
+        recipient_name: draft.recipient_name ?? "Unknown",
+        recipient_email: draft.recipient_email ?? "",
+        subject: draft.subject,
+        body: draft.body,
+        status: "pending",
+        source: "telegram_approval",
+      } as any);
       if (insertErr) {
-        logger.error("Failed to create outreach_message from approved draft", { error: insertErr.message, userId, draftId: entityId });
+        logger.error("Failed to create outreach_message from approved draft", {
+          error: insertErr.message,
+          userId,
+          draftId: entityId,
+        });
         return "✅ Draft approved, but send queue creation failed — please use /outreach to send manually.";
       }
 

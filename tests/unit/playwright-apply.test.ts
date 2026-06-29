@@ -29,6 +29,7 @@ describe("P1 — Playwright Auto Apply", () => {
     expect(mod.continuePlaywrightSubmit).toBeDefined();
     expect(mod.recordPlaywrightApplyResult).toBeDefined();
     expect(mod.getApplyEvidence).toBeDefined();
+    expect(mod.resumePlaywrightApply).toBeDefined();
   });
 
   it(

@@ -71,7 +71,10 @@ type ResumeCenterRow = {
 
 type GenerationMode = "analyze" | "tailor";
 
-export const Route = createFileRoute("/_authenticated/resumes")({ component: ResumesPage });
+export const Route = createFileRoute("/_authenticated/resumes")({
+  component: ResumesPage,
+  head: () => ({ meta: [{ title: "Resumes — VALTREXA-V2" }] }),
+});
 
 function ResumesPage() {
   const { user } = useAuth();

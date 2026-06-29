@@ -726,15 +726,24 @@ function inferProjects(rawText: string, skills: string[]) {
     let github_url: string | null = null;
     let live_url: string | null = null;
 
-    const labelledGithub = extractLabelledUrl(chunk, /(?:github|repo|code|repository)\s*:?\s*(https?:\/\/[^\s)]+)/i);
-    const labelledLive = extractLabelledUrl(chunk, /(?:live|demo|url|website|site|link|deploy|production)\s*:?\s*(https?:\/\/[^\s)]+)/i);
+    const labelledGithub = extractLabelledUrl(
+      chunk,
+      /(?:github|repo|code|repository)\s*:?\s*(https?:\/\/[^\s)]+)/i,
+    );
+    const labelledLive = extractLabelledUrl(
+      chunk,
+      /(?:live|demo|url|website|site|link|deploy|production)\s*:?\s*(https?:\/\/[^\s)]+)/i,
+    );
 
     if (labelledGithub) {
       github_url = labelledGithub;
     } else {
       const githubUrls = urls.filter((u) => /github\.com\//i.test(u));
       const profileUrls = githubUrls.filter((u) => {
-        const path = u.replace(/https?:\/\/github\.com\//, "").replace(/\/+$/, "").split("/");
+        const path = u
+          .replace(/https?:\/\/github\.com\//, "")
+          .replace(/\/+$/, "")
+          .split("/");
         return path.length <= 1 || (path.length === 2 && path[1].startsWith("?"));
       });
       const repoUrls = githubUrls.filter((u) => !profileUrls.includes(u));
@@ -955,9 +964,10 @@ export function normalizeProjects(projects: unknown[], heuristics: ResumeStructu
       if (live_url) {
         const normalizedLive = live_url.toLowerCase().replace(/\/+$/, "");
         if (seenLive.has(normalizedLive)) {
-          live_url = fallback?.live_url && !seenLive.has(fallback.live_url.toLowerCase().replace(/\/+$/, ""))
-            ? fallback.live_url
-            : null;
+          live_url =
+            fallback?.live_url && !seenLive.has(fallback.live_url.toLowerCase().replace(/\/+$/, ""))
+              ? fallback.live_url
+              : null;
         }
         if (live_url) seenLive.add(live_url.toLowerCase().replace(/\/+$/, ""));
       }

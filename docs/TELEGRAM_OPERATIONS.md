@@ -1,142 +1,128 @@
-# Telegram Operations Guide
+# Telegram Operations — VALTREXA-V2
 
-> **Last Updated:** 2026-06-26
-
-## Overview
-
-The Telegram bot is the primary operational interface for VALTREXA-V2. It provides real-time notifications, interactive approvals, and command-based control of the workflow. The bot is deployed as a webhook endpoint at `/api/telegram/webhook`.
+> **Version:** v1.0.0 | **Last updated:** 2026-06-29  
+> **Bot username:** @ValtrexaV2Bot  
+> **Webhook URL:** https://valtrexa-v2.vercel.app/api/telegram/webhook
 
 ## Setup
 
-1. Create a bot via [@BotFather](https://t.me/botfather)
-2. Set `TELEGRAM_BOT_TOKEN` in environment
-3. Set `TELEGRAM_BOT_USERNAME` in environment (e.g., `valtrexa_bot`)
-4. Bot auto-registers webhook on startup via `registerWebhook()` in `telegram-init.ts`
+1. Message [@BotFather](https://t.me/BotFather) → `/newbot` → `ValtrexaV2Bot`
+2. Set `TELEGRAM_BOT_TOKEN` in Vercel environment
+3. Set `TELEGRAM_WEBHOOK_SECRET` (random 32+ chars)
+4. Set `PUBLIC_URL=https://valtrexa-v2.vercel.app`
+5. Deploy — the bot auto-registers its webhook on first request
 
-## Bot Commands
+## Commands (32 registered with BotFather)
 
-### Control Commands
+### General
 
-| Command | Description | Access |
-|---|---|---|
-| `/start` | Initialize bot, link user account | All |
-| `/link` | Link Telegram chat to user account (get OTP from dashboard) | All |
-| `/status` | Show system status: workflow state, provider health, queue depth | Authenticated |
-| `/pause` | Pause the workflow | Authenticated |
-| `/resume` | Resume the workflow | Authenticated |
-| `/stop` | Stop the workflow (reset to idle) | Authenticated |
-| `/restart` | Restart the workflow from scratch | Authenticated |
+- `/start` — Welcome message with connection instructions
+- `/help` — List all commands
+- `/menu` — Interactive menu with inline buttons
+- `/health` — System health check
+- `/status` — Dashboard summary (jobs, apps, interviews)
 
-### Provider Commands
+### Account
 
-| Command | Description | Access |
-|---|---|---|
-| `/providers` | List all providers with status (enabled/paused/disabled) | Authenticated |
-| `/check linkedin` | Validate LinkedIn cookie health | Authenticated |
-| `/pause linkedin` | Pause a specific provider | Authenticated |
-| `/resume linkedin` | Resume a specific provider | Authenticated |
-| `/enable linkedin` | Enable a disabled provider | Authenticated |
-| `/disable linkedin` | Disable a provider | Authenticated |
+- `/connect` — Generate binding token → link Telegram to your account
 
-### Job Commands
+### Jobs & Applications
 
-| Command | Description | Access |
-|---|---|---|
-| `/jobs` | Show recent job matches | Authenticated |
-| `/jobs --limit 5` | Show last N matched jobs | Authenticated |
-| `/apply` | Trigger manual apply cycle | Authenticated |
+- `/jobs` — Recent 10 job imports
+- `/applications` — Recent 10 applications
+- `/approvals` — Pending approvals
+- `/highvalue` — High value companies
+- `/followups` — Overdue follow-ups
+- `/interviews` — Upcoming interviews
+- `/analytics` — System analytics
+- `/recruiters` — Discovered recruiters
+- `/matching_status` — Job matching results
 
-### Analytics Commands
+### Provider Management
 
-| Command | Description | Access |
-|---|---|---|
-| `/analytics` | Show application statistics | Authenticated |
-| `/analytics --days 7` | Filter analytics by time window | Authenticated |
-| `/history` | Show workflow run history | Authenticated |
-| `/stats` | Show match statistics, scores, success rates | Authenticated |
+- `/provider_status` — Provider status overview (all or by name)
+- `/provider_enable <name>` — Enable a provider
+- `/provider_disable <name>` — Disable a provider
+- `/provider_pause <name>` — Pause a provider
+- `/provider_resume <name>` — Resume a provider
+- `/provider_history <name>` — Provider downtime history
 
-### Admin Commands
+### Cookie Management
 
-| Command | Description | Access |
-|---|---|---|
-| `/broadcast <message>` | Send announcement to all linked users | Admin |
-| `/inspect <user_id>` | View user details | Admin |
-| `/admin-status` | Detailed admin system status | Admin |
+- `/refresh_cookies` — Check/refresh all provider cookies
+- `/refresh_cookies <provider>` — Check specific provider cookie
+- `/refresh_cookies <provider> <new_cookie>` — Set new cookie value
+- Note: `/refresh-cookies` (hyphen) is also accepted as a text alias but not registered with BotFather (Telegram commands only allow `[a-z0-9_]`)
 
-## Interactive Approval Workflow
+### Workflow
 
-When approval mode is enabled (`approval_mode: true`):
+- `/workflow_start` — Start the automation workflow
+- `/workflow_stop` — Stop the automation workflow
+- `/workflow_pause` — Pause the automation workflow
+- `/workflow_resume` — Resume the automation workflow
+- `/workflow_status` — Check workflow status
 
-```mermaid
-sequenceDiagram
-    participant Bot as Telegram Bot
-    participant User as User
-    participant Engine as Apply Engine
+### Operations & Stats
 
-    Engine->>Bot: Application ready (requires approval)
-    Bot->>User: 📋 Application for SDE at Google\n🏢 via LinkedIn\n📄 Resume: main.pdf\n\n[Approve ✅] [Reject ❌] [Details 📄]
-    User->>Bot: Approve ✅
-    Bot->>Engine: Execute application
-    Engine->>Bot: Application submitted ✅
-    Bot->>User: ✅ Application submitted successfully
+- `/queue_status` — Operations queue status
+- `/jobs_imported` — Job import statistics
+- `/applications_today` — Today's application count
+- `/recruiters_found` — Recruiters discovered
+- `/outreach_status` — Outreach generation status
+
+### Multi-User Binding
+
+- All commands (except `/health`, `/start`, `/help`, `/menu`) require a Telegram account binding
+- Bind via `/connect` → visit the provided URL → confirm → done
+- Unbound users see a "not connected" prompt
+- No env-var fallback — each user must bind their own chat
+
+## Interactive Approvals
+
+When an application needs approval (Telegam approval mode enabled):
+
+```
+📋 New Application: Senior Engineer at Acme Corp
+┌─────────────────────────────────────┐
+│  ✅ Approve    ✏️ Edit              │
+│  ⏭️ Skip                            │
+│  🔁 Always     🚫 Never             │
+└─────────────────────────────────────┘
 ```
 
-Approval messages include:
-- Job title and company
-- Provider name
-- Resume to be used
-- AI-generated cover letter or answers (if applicable)
-- Action buttons: Approve / Reject / Details
+- **Approve**: AI-generated answer is accepted → application continues
+- **Edit**: User sends corrected answer as reply
+- **Skip**: Application is skipped (not submitted)
+- **Always**: Answer saved permanently for similar questions
+- **Never**: Question will be auto-skipped in future
 
-Outreach approval follows the same pattern with:
-- Recipient name and title
-- Channel (cold_email / linkedin_message / founder_outreach)
-- Draft content preview
-- Action buttons: Approve / Reject / Edit
+## Notifications
 
-## Notification Types
+The bot sends notifications for:
 
-Notifications are delivered to the linked Telegram chat with category-specific icons:
-
-| Category | Icon | Example |
-|---|---|---|
-| application_submitted | ✅ | `✅ Applied: SDE at Google` |
-| application_failed | ❌ | `❌ Apply failed: SDE at Google (form not found)` |
-| match_found | 🎯 | `🎯 New match: SDE at Google (85%)` |
-| workflow_update | 🔄 | `🔄 Pipeline A started` |
-| approval_requested | 📋 | `📋 Approval needed: SDE at Google` |
-| approval_approved | ✅ | `✅ Application approved by you` |
-| approval_rejected | ❌ | `❌ Application rejected by you` |
-| cookie_expired | ⚠️ | `⚠️ LinkedIn cookie expired — please re-upload` |
-| error | 🚨 | `🚨 Workflow error: Playwright context crashed` |
-| provider_down | 🔴 | `🔴 LinkedIn provider auto-disabled` |
-| provider_recovered | 🟢 | `🟢 Indeed provider health restored` |
-| system | ℹ️ | `ℹ️ Workflow completed: 5 applied, 2 failed` |
-| outreach | 📤 | `📤 Outreach draft ready for John Doe` |
-| batch_complete | 📊 | `📊 Batch apply complete: 12 submitted, 3 failed` |
-
-## Cookie Management via Telegram
-
-| Command | Description |
-|---|---|
-| `/check linkedin` | Validate cookie for provider |
-| `/cookies` | List all stored cookies and expiry status |
-| `/expired` | List expired cookies needing renewal |
+- New job matches
+- Application submissions (success/failure)
+- Cookie expiry warnings
+- Provider failures
+- Workflow state changes
+- Batch approval requests
 
 ## Troubleshooting
 
-| Problem | Likely Cause | Solution |
-|---|---|---|
-| Bot doesn't respond | Webhook misconfigured | Check `TELEGRAM_BOT_TOKEN` and webhook URL |
-| `/link` returns "Chat not found" | Chat ID not registered | Run `/start` first |
-| Approve/Reject not working | Inline keyboard timeout (old message) | Re-run `/apply` or wait for new approval |
-| Notifications not arriving | User not linked | Run `/link` with OTP from dashboard |
-| Commands return "Unauthorized" | Chat not linked to any user | Link account via `/link` |
-| Bot sends to wrong chat | User linked from wrong Telegram account | Re-link with correct account |
+| Issue                             | Solution                                                                                 |
+| --------------------------------- | ---------------------------------------------------------------------------------------- |
+| Bot doesn't respond               | Check `TELEGRAM_BOT_TOKEN` is correct                                                    |
+| "Not connected" error             | Use `/connect` to link your account                                                      |
+| Webhook not registering           | Verify `PUBLIC_URL` is set                                                               |
+| Commands not found                | Bot registers commands on startup — may need re-deploy. Verify via `getMyCommands` API   |
+| Callback data errors              | Update to latest version (fixes 64-byte truncation)                                      |
+| `/help` missing from command list | BotFather registration issue — re-deploy re-runs `registerTelegramCommands()`            |
+| `/refresh-cookies` not in menu    | Hyphenated names are invalid for BotFather — use `/refresh_cookies` (underscore) instead |
 
-## Security
+## Command Verification
 
-- **Authentication:** Users must link their Telegram chat to their VALTREXA-V2 account via a one-time code from the dashboard
-- **Admin commands:** Protected by chat ID allowlist (`TELEGRAM_ADMIN_IDS`) — supports multiple comma-separated IDs
-- **Data isolation:** Bot only accesses data for the linked user
-- **No raw secrets:** Bot never exposes encrypted cookie values or API keys
+All 32 commands registered with BotFather can be verified:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/getMyCommands"
+```

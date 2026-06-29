@@ -38,10 +38,8 @@ const BOT_COMMANDS = [
     command: "refresh_cookies",
     description: "Check/refresh provider cookies (usage: /refresh_cookies <provider> [new_cookie])",
   },
-  {
-    command: "refresh-cookies",
-    description: "Check/refresh provider cookies (usage: /refresh-cookies <provider> [new_cookie])",
-  },
+  // Note: refresh-cookies (hyphen) is handled in telegram.ts text matching
+  // but NOT registered with BotFather — Telegram commands only allow [a-z0-9_]
 ];
 
 function getBotToken(): string {

@@ -66,6 +66,7 @@ type PainPointRecord = {
 
 export const Route = createFileRoute("/_authenticated/company-research")({
   component: CompanyResearchPage,
+  head: () => ({ meta: [{ title: "Company Research — VALTREXA-V2" }] }),
 });
 
 function CompanyResearchPage() {

@@ -43,7 +43,10 @@ type Project = {
   impact: string | null;
 };
 
-export const Route = createFileRoute("/_authenticated/projects")({ component: ProjectsPage });
+export const Route = createFileRoute("/_authenticated/projects")({
+  component: ProjectsPage,
+  head: () => ({ meta: [{ title: "Projects — VALTREXA-V2" }] }),
+});
 
 function ProjectsPage() {
   const { user } = useAuth();

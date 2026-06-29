@@ -15,6 +15,8 @@ import { Route as LoginRouteImport } from './routes/login'
 import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AuthenticatedRouteImport } from './routes/_authenticated'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthConfirmEmailRouteImport } from './routes/auth/confirm-email'
+import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 import { Route as AuthenticatedWorkflowTimelineRouteImport } from './routes/_authenticated/workflow-timeline'
 import { Route as AuthenticatedSkillsRouteImport } from './routes/_authenticated/skills'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -64,6 +66,16 @@ const AuthenticatedRoute = AuthenticatedRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthConfirmEmailRoute = AuthConfirmEmailRouteImport.update({
+  id: '/auth/confirm-email',
+  path: '/auth/confirm-email',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedWorkflowTimelineRoute =
@@ -205,6 +217,8 @@ export interface FileRoutesByFullPath {
   '/settings': typeof AuthenticatedSettingsRoute
   '/skills': typeof AuthenticatedSkillsRoute
   '/workflow-timeline': typeof AuthenticatedWorkflowTimelineRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/confirm-email': typeof AuthConfirmEmailRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -233,6 +247,8 @@ export interface FileRoutesByTo {
   '/settings': typeof AuthenticatedSettingsRoute
   '/skills': typeof AuthenticatedSkillsRoute
   '/workflow-timeline': typeof AuthenticatedWorkflowTimelineRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/confirm-email': typeof AuthConfirmEmailRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -263,6 +279,8 @@ export interface FileRoutesById {
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
   '/_authenticated/skills': typeof AuthenticatedSkillsRoute
   '/_authenticated/workflow-timeline': typeof AuthenticatedWorkflowTimelineRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/auth/confirm-email': typeof AuthConfirmEmailRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -293,6 +311,8 @@ export interface FileRouteTypes {
     | '/settings'
     | '/skills'
     | '/workflow-timeline'
+    | '/auth/callback'
+    | '/auth/confirm-email'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -321,6 +341,8 @@ export interface FileRouteTypes {
     | '/settings'
     | '/skills'
     | '/workflow-timeline'
+    | '/auth/callback'
+    | '/auth/confirm-email'
   id:
     | '__root__'
     | '/'
@@ -350,6 +372,8 @@ export interface FileRouteTypes {
     | '/_authenticated/settings'
     | '/_authenticated/skills'
     | '/_authenticated/workflow-timeline'
+    | '/auth/callback'
+    | '/auth/confirm-email'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -359,6 +383,8 @@ export interface RootRouteChildren {
   LoginRoute: typeof LoginRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   SignupRoute: typeof SignupRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  AuthConfirmEmailRoute: typeof AuthConfirmEmailRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -403,6 +429,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/confirm-email': {
+      id: '/auth/confirm-email'
+      path: '/auth/confirm-email'
+      fullPath: '/auth/confirm-email'
+      preLoaderRoute: typeof AuthConfirmEmailRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated/workflow-timeline': {
@@ -614,6 +654,8 @@ const rootRouteChildren: RootRouteChildren = {
   LoginRoute: LoginRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   SignupRoute: SignupRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
+  AuthConfirmEmailRoute: AuthConfirmEmailRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

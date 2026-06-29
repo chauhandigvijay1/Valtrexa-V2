@@ -95,7 +95,10 @@ type ResearchOption = {
   summary: string | null;
 };
 
-export const Route = createFileRoute("/_authenticated/outreach")({ component: OutreachPage });
+export const Route = createFileRoute("/_authenticated/outreach")({
+  component: OutreachPage,
+  head: () => ({ meta: [{ title: "Outreach — VALTREXA-V2" }] }),
+});
 
 function OutreachPage() {
   const qc = useQueryClient();

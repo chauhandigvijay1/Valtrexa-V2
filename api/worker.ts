@@ -181,7 +181,14 @@ async function start(): Promise<void> {
 
   async function acquireCycleLock(): Promise<boolean> {
     try {
-      const result = await (connection as any).call("SET", CYCLE_LOCK_KEY, "1", "NX", "EX", CYCLE_LOCK_TTL);
+      const result = await (connection as any).call(
+        "SET",
+        CYCLE_LOCK_KEY,
+        "1",
+        "NX",
+        "EX",
+        CYCLE_LOCK_TTL,
+      );
       return result === "OK";
     } catch (err) {
       logger.warn("[worker] Failed to acquire distributed lock — proceeding anyway", err);
@@ -216,7 +223,11 @@ async function start(): Promise<void> {
       const staleThreshold = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString();
       await supabaseAdmin
         .from("workflow_state")
-        .update({ status: "stopped", error: "Auto-stopped: stale workflow (>2h without update)", updated_at: new Date().toISOString() })
+        .update({
+          status: "stopped",
+          error: "Auto-stopped: stale workflow (>2h without update)",
+          updated_at: new Date().toISOString(),
+        })
         .eq("status", "running")
         .lt("updated_at", staleThreshold);
 

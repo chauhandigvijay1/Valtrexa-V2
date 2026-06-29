@@ -821,7 +821,6 @@ function buildSummary(payload: {
   ].join("\n");
 }
 
-
 async function handleResumeProcess(request: Request) {
   if (request.method !== "POST") return methodNotAllowed(["POST"]);
   const user = await requireApiUser(request);
@@ -1762,7 +1761,7 @@ async function handleJobsMatch(request: Request) {
   }
 
   if (insert.error || !insert.data) {
-    return json({ error: insert.error?.message ?? "Failed to save job match." }, { status: 400 });
+    return json({ error: safeErrorMessage(insert.error) }, { status: 400 });
   }
 
   await supabaseAdmin
@@ -1884,6 +1883,7 @@ async function handleCompanyResearch(request: Request) {
         .from("company_research")
         .update(basePayload)
         .eq("id", existing.data.id)
+        .eq("user_id", user.id)
         .select("*")
         .single()
     : await supabaseAdmin.from("company_research").insert(basePayload).select("*").single();
@@ -1927,10 +1927,7 @@ async function handlePainPoints(request: Request) {
     const inserted = await generatePainPointsForCompany(user.id, body);
     return json({ painPoints: inserted });
   } catch (error) {
-    return json(
-      { error: error instanceof Error ? error.message : "Failed to save pain points." },
-      { status: 400 },
-    );
+    return json({ error: safeErrorMessage(error) }, { status: 400 });
   }
 }
 
@@ -2652,9 +2649,10 @@ async function handleCandidateBrain(request: Request) {
           await supabaseAdmin.from("candidate_memory").insert({
             user_id: user.id,
             topic: mem.topic,
-            content: mem.content || "",
-            importance: mem.importance || 5,
-            tags: mem.tags || [],
+            answer: mem.answer || mem.content || "",
+            category: mem.category || "general",
+            source: mem.source || "manual",
+            is_active: mem.is_active ?? true,
           });
         }
       }
@@ -3018,7 +3016,11 @@ Return a strict JSON object with:
   let companyId: string;
   if (existingCompany.data?.id) {
     companyId = existingCompany.data.id;
-    await supabaseAdmin.from("companies").update(companyPayload).eq("id", companyId).eq("user_id", user.id);
+    await supabaseAdmin
+      .from("companies")
+      .update(companyPayload)
+      .eq("id", companyId)
+      .eq("user_id", user.id);
   } else {
     const insertResult = await supabaseAdmin
       .from("companies")
@@ -3071,7 +3073,11 @@ Return a strict JSON object with:
 
     if (existingRecruiter.data?.id) {
       recruiterId = existingRecruiter.data.id;
-      await supabaseAdmin.from("recruiters").update(recruiterPayload).eq("id", recruiterId).eq("user_id", user.id);
+      await supabaseAdmin
+        .from("recruiters")
+        .update(recruiterPayload)
+        .eq("id", recruiterId)
+        .eq("user_id", user.id);
     } else {
       const recResult = await supabaseAdmin
         .from("recruiters")
@@ -3605,9 +3611,12 @@ async function resolveUserIdFromTelegramChat(chatId: number): Promise<string> {
     .limit(1)
     .maybeSingle();
   if (data?.user_id) return data.user_id;
-  // Fallback: env var (legacy single-user mode)
-  return process.env.TELEGRAM_USER_ID?.trim() ?? "";
+  // Unbound chat — return empty so processTelegramUpdate shows "not connected" prompt
+  return "";
 }
+
+// Per-chat rate limit state for Telegram webhook (max 10 req / 3s per chat)
+const tgChatRateMap = new Map<string, number[]>();
 
 async function handleTelegramWebhook(request: Request) {
   if (request.method !== "POST") {
@@ -3622,9 +3631,21 @@ async function handleTelegramWebhook(request: Request) {
   }
   const body = await request.json();
   const chatId = body.message?.chat?.id ?? body.callback_query?.message?.chat?.id;
+
+  // Per-chat rate limiting: max 10 requests per 3 seconds per chat
+  if (chatId) {
+    const chatKey = `tg:${chatId}`;
+    const now = Date.now();
+    const chatWindow: number[] = (tgChatRateMap.get(chatKey) ?? []).filter((t) => now - t < 3000);
+    if (chatWindow.length >= 10) {
+      return json({ handled: false, error: "rate_limited" });
+    }
+    chatWindow.push(now);
+    tgChatRateMap.set(chatKey, chatWindow);
+  }
+
   let userId = "";
   if (chatId) userId = await resolveUserIdFromTelegramChat(chatId);
-  if (!userId) userId = process.env.TELEGRAM_USER_ID ?? "";
   const result = await processTelegramUpdate(body, userId);
   return json({ handled: result.handled });
 }
@@ -3654,7 +3675,12 @@ async function handleCookiesValidate(request: Request) {
   const user = await requireApiUser(request);
   const body = await readJson<{ provider: string; cookie?: string }>(request);
   if (body.cookie?.trim()) {
-    return json(validateCookieValue(body.cookie.trim()));
+    const basic = validateCookieValue(body.cookie.trim());
+    return json({
+      valid: basic.valid,
+      reason: basic.reason,
+      status: basic.valid ? "pending" : "invalid",
+    });
   }
   const result = await checkProviderCookie(user.id, body.provider);
   return json({ valid: result.status === "valid", reason: result.message, status: result.status });
@@ -3683,6 +3709,34 @@ async function handleCookiesDelete(request: Request, provider: string) {
   const user = await requireApiUser(request);
   const result = await deleteProviderCookie(user.id, provider);
   return json(result);
+}
+
+async function handleAuthCreateProfile(request: Request) {
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  const user = await requireApiUser(request);
+  const body = await readJson<{ name?: string }>(request).catch(() => ({ name: undefined }));
+  const name = body.name ?? user.email ?? "User";
+  const { error } = await supabaseAdmin
+    .from("profiles")
+    .upsert(
+      { id: user.id, name, email: user.email, created_at: new Date().toISOString() },
+      { onConflict: "id" },
+    );
+  if (error) return json({ error: safeErrorMessage(error) }, { status: 400 });
+  return json({ ok: true });
+}
+
+async function handleAuthLogEvent(request: Request) {
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  const user = await requireApiUser(request);
+  const body = await readJson<{ event: string }>(request);
+  await supabaseAdmin.from("workflow_events").insert({
+    user_id: user.id,
+    event_type: body.event,
+    entity_type: "auth",
+    payload: { email: user.email },
+  });
+  return json({ ok: true });
 }
 
 export async function routeRequest(request: Request) {
@@ -3800,6 +3854,10 @@ export async function routeRequest(request: Request) {
       return phase.handleEventBusReplay(request);
     case "event-bus/history":
       return phase.handleEventBusHistory(request);
+    case "auth/create-profile":
+      return handleAuthCreateProfile(request);
+    case "auth/log-event":
+      return handleAuthLogEvent(request);
     case "telegram/webhook":
       return handleTelegramWebhook(request);
     case "telegram/binding":
@@ -4022,9 +4080,11 @@ async function handleHealthCheck() {
       .select("*", { count: "exact", head: true })
       .limit(1);
     dbOk = !error;
-    dbError = error?.message ?? null;
-  } catch (e: any) {
-    dbError = e.message;
+    if (error) {
+      dbError = "Database check failed";
+    }
+  } catch {
+    dbError = "Database check failed";
   }
 
   let redisOk = false;
@@ -4040,8 +4100,8 @@ async function handleHealthCheck() {
     await redis.ping();
     redisOk = true;
     await redis.quit();
-  } catch (e: any) {
-    redisError = e.message;
+  } catch {
+    redisError = "Redis check failed";
   }
 
   return json({

@@ -6,7 +6,9 @@ const ALLOWED_ORIGINS = (process.env.FRONTEND_URL || process.env.PUBLIC_URL || "
 function corsOrigin(request: Request): string {
   const origin = request.headers.get("origin");
   if (!origin) return "";
-  if (ALLOWED_ORIGINS.length === 0) return origin;
+  if (ALLOWED_ORIGINS.length === 0) {
+    return "";
+  }
   if (ALLOWED_ORIGINS.some((o) => origin.startsWith(o))) return origin;
   return "";
 }
@@ -72,7 +74,7 @@ export function getBaseUrl(request: Request): string {
     const url = new URL(request.url);
     return `${url.protocol}//${url.host}`;
   } catch {
-    return process.env.PUBLIC_URL || process.env.FRONTEND_URL || "http://localhost:5173";
+    return process.env.PUBLIC_URL || process.env.FRONTEND_URL || "http://localhost:4173";
   }
 }
 

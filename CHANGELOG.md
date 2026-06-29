@@ -6,6 +6,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.0.1] — 2026-06-29
+
+### Fixed
+
+- **Multi-tenant cookie isolation**: Removed `LINKEDIN_COOKIE`, `INDEED_COOKIE`, `NAUKRI_COOKIE`, `WELLFOUND_COOKIE`, `INSTAHYRE_COOKIE` env-var fallbacks from `cookie-manager.ts` and `playwright-platform.ts`. Cookies are now exclusively per-user stored in `provider_cookies` table — no shared env-var fallback.
+- **Telegram inbound isolation**: Removed `TELEGRAM_USER_ID` env-var fallback from `resolveUserIdFromTelegramChat`. Unbound chats now correctly receive "not connected" instead of being silently attributed to a fixed user.
+- **BotFather command registration**: Fixed `/start` description (was "System health check", same as `/health`); added missing `/help` command; removed invalid `refresh-cookies` (hyphen) — Telegram commands only allow `[a-z0-9_`.
+- **Source cleanup**: Removed invalid `refresh-cookies` entry from `BOT_COMMANDS` array in `telegram-init.ts`.
+
+### Changed
+
+- **All 32 BotFather commands re-registered** with correct descriptions.
+- **`resolveStorageState`** (`playwright-platform.ts`): Removed env-var fallback path — now only checks DB cookies and stored browser sessions.
+- **`checkProviderCookie`** (`cookie-manager.ts`): Removed auto-write of env-var cookies to user's DB row — new unconfigured users get "missing" status instead of inheriting shared env cookies.
+- **`.env.example`**: Removed `LINKEDIN_COOKIE`, `TELEGRAM_USER_ID` env vars.
+- **`vitest.config.ts`**: Removed `LINKEDIN_COOKIE` test env var.
+- **Prettier formatting applied** across all files (161 formatting fixes).
+- **Stale docs removed**: `RELEASE_REPORT.md`, `DEPLOYMENT_CHECKLIST.md`, `docs/screenshots/`.
+
+---
+
 ## [1.0.0] — 2026-06-24
 
 ### Initial Release

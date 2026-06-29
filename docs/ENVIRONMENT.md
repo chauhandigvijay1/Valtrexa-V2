@@ -1,112 +1,105 @@
-# Environment Variables Reference
+# Environment Variables — VALTREXA-V2
 
-> **Last Updated:** 2026-06-28
+> **Version:** v1.0.0 | **Last updated:** 2026-06-29
 
-## Supabase
+All environment variables are loaded from `.env` (overridden by `.env.local`).  
+**Production** values are set in Vercel/Railway dashboard — never commit secrets.
 
-| Variable | Required | Description |
-|---|---|---|
-| `SUPABASE_URL` | ✅ | Supabase project URL (e.g., `https://xxx.supabase.co`) |
-| `SUPABASE_ANON_KEY` | ✅ | Public anon key for client-side auth |
-| `SUPABASE_SERVICE_ROLE_KEY` | ✅ | Service role key for admin/bot operations (server-only) |
-| `SUPABASE_JWT_SECRET` | ❌ | JWT secret for verifying auth tokens (admin operations) |
+---
 
-## Application
+## 1. Supabase
 
-| Variable | Required | Description |
-|---|---|---|
-| `APP_NAME` | ❌ | Application display name (default: `VALTREXA-V2`) |
-| `APP_URL` | ❌ | Public URL (default: derived from `VERCEL_URL` or `http://localhost:3000`) |
-| `SESSION_SECRET` | ✅ | Secret for session encryption (minimum 32 characters) |
-| `NODE_ENV` | ❌ | Environment: `development`, `test`, `production` (default: `development`) |
+| Variable                    | Required | Production Value            | Notes                              |
+| --------------------------- | -------- | --------------------------- | ---------------------------------- |
+| `SUPABASE_URL`              | **Yes**  | Your Supabase project URL   | `https://<project>.supabase.co`    |
+| `SUPABASE_SERVICE_ROLE_KEY` | **Yes**  | Your service_role key       | **Never expose to client**         |
+| `SUPABASE_ANON_KEY`         | **Yes**  | Your anon key               | Safe for client use (RLS enforces) |
+| `SUPABASE_PUBLISHABLE_KEY`  | No       | Same as `SUPABASE_ANON_KEY` | Alias for frontend                 |
 
-## Telegram
+## 2. Application
 
-| Variable | Required | Description |
-|---|---|---|
-| `TELEGRAM_BOT_TOKEN` | ✅ | Bot token from @BotFather |
-| `TELEGRAM_BOT_USERNAME` | ✅ | Bot username (e.g., `valtrexa_bot`) |
-| `TELEGRAM_ADMIN_IDS` | ❌ | Comma-separated Telegram chat IDs with admin access |
+| Variable         | Required | Production Value                 | Notes                                               |
+| ---------------- | -------- | -------------------------------- | --------------------------------------------------- |
+| `PUBLIC_URL`     | **Yes**  | `https://valtrexa-v2.vercel.app` | Used for CORS, redirects, webhook registration      |
+| `FRONTEND_URL`   | **Yes**  | `https://valtrexa-v2.vercel.app` | CORS allowed origin (comma-separated for multiples) |
+| `SESSION_SECRET` | **Yes**  | Random 32+ char string           | Server-side session signing                         |
+| `NODE_ENV`       | No       | `production`                     | Set automatically by Vercel                         |
+| `PORT`           | No       | `3000`                           | Dev only                                            |
 
-## Encryption
+## 3. Telegram Bot
 
-| Variable | Required | Description |
-|---|---|---|
-| `COOKIE_ENCRYPTION_KEY` | ❌ | 64-character hex string (32 bytes) for AES-256-GCM. Must be set explicitly if cookie encryption is needed |
+| Variable                  | Required | Production Value       | Notes                                                                                                      |
+| ------------------------- | -------- | ---------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `TELEGRAM_BOT_TOKEN`      | **Yes**  | From BotFather         | Bot authentication                                                                                         |
+| `TELEGRAM_WEBHOOK_SECRET` | **Yes**  | Random 32+ char string | HMAC verification — prevents unauthorized webhook calls                                                    |
+| `TELEGRAM_BOT_USERNAME`   | No       | `ValtrexaV2Bot`        | Used for deep-link generation                                                                              |
+| `TELEGRAM_CHAT_ID` | Legacy | Your Telegram chat ID | Admin alerting only (outbound). NOT used for inbound user resolution |
 
-## AI / LLM
+## 4. Encryption & Security
 
-| Variable | Required | Description |
-|---|---|---|
-| `OPENROUTER_API_KEY` | ✅ | OpenRouter API key for multi-model AI access |
-| `OPENROUTER_MODEL` | ❌ | Default model override (e.g., `anthropic/claude-3.5-sonnet`) |
-| `GROQ_API_KEY` | ❌ | Groq API key for fast inference tasks |
-| `GROQ_MODEL` | ❌ | Default Groq model override (e.g., `llama-3.3-70b-versatile`) |
+| Variable                  | Required | Production Value                                | Notes                                                                                    |
+| ------------------------- | -------- | ----------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `COOKIE_ENCRYPTION_KEY`   | **Yes**  | Random 32+ char string (A-Z, a-z, 0-9, symbols) | AES-256-GCM key derivation. Without this, stored cookies are decryptable via SHA-256("") |
+| `RATE_LIMIT_WINDOW_MS`    | No       | `60000`                                         | Rate limit window in ms                                                                  |
+| `RATE_LIMIT_MAX_REQUESTS` | No       | `100`                                           | Max requests per window                                                                  |
 
-## Automation (Playwright)
+## 5. AI / LLM Providers
 
-| Variable | Required | Description |
-|---|---|---|
-| `PLAYWRIGHT_HEADLESS` | ❌ | Run browser in headless mode (`true`/`false`, default: `true`) |
-| `PLAYWRIGHT_TIMEOUT` | ❌ | Default navigation timeout in ms (default: `30000`) |
-| `PLAYWRIGHT_WS_ENDPOINT` | ❌ | Remote Playwright endpoint (for browserless.io or similar) |
+| Variable             | Required | Production Value           | Notes                |
+| -------------------- | -------- | -------------------------- | -------------------- |
+| `OPENROUTER_API_KEY` | **Yes**  | From openrouter.ai/keys    | Primary AI provider  |
+| `OPENROUTER_MODEL`   | No       | `openai/gpt-4o-mini`       | Default model        |
+| `GROQ_API_KEY`       | No       | From console.groq.com/keys | Fallback AI provider |
+| `GEMINI_API_KEY`     | No       | From aistudio.google.com   | Secondary fallback   |
 
-## Workflow
+## 6. Gmail OAuth
 
-| Variable | Required | Description |
-|---|---|---|
-| `WORKFLOW_INTERVAL_MINUTES` | ❌ | Time between workflow cycles in minutes (default: `60`) |
-| `MATCH_THRESHOLD` | ❌ | Minimum match score to trigger apply (0–100, default: `70`) |
-| `MAX_APPLICATIONS_PER_CYCLE` | ❌ | Max applications per pipeline run (default: `10`) |
-| `ENABLE_TELEGRAM_APPROVALS` | ❌ | Require Telegram approval before applying (`true`/`false`, default: `true`) |
+| Variable              | Required | Production Value                 | Notes                           |
+| --------------------- | -------- | -------------------------------- | ------------------------------- |
+| `GMAIL_CLIENT_ID`     | **Yes**  | From Google Cloud Console        | OAuth 2.0 Client ID             |
+| `GMAIL_CLIENT_SECRET` | **Yes**  | From Google Cloud Console        | OAuth 2.0 Client Secret         |
+| `GMAIL_REFRESH_TOKEN` | **Yes**  | Obtained via OAuth consent flow  | Single-mailbox shared token     |
+| `GMAIL_REDIRECT_URI`  | **Yes**  | `https://valtrexa-v2.vercel.app` | Must match Google Cloud Console |
 
-To run the dedicated background worker (e.g. on Railway): `npm run worker`
+**⚠️ Gmail is single-mailbox only.** The system uses one shared Gmail account configured via env vars. Multi-tenant Gmail is not supported.
 
-## Redis / Queue
+**⚠️ No per-provider cookie env vars.** `LINKEDIN_COOKIE`, `INDEED_COOKIE`, `NAUKRI_COOKIE`, `WELLFOUND_COOKIE`, `INSTAHYRE_COOKIE` were removed in v1.0.1. All provider cookies are per-user encrypted in `provider_cookies` table. Each user must add cookies via dashboard Settings or Telegram `/refresh_cookies`.
 
-| Variable | Required | Description |
-|---|---|---|
-| `REDIS_URL` | ❌ | Redis connection string (e.g., `rediss://default:password@host:port`). Required for BullMQ; inline fallback if not set |
-| `REDIS_TOKEN` | ❌ | Upstash Redis token (alternative to `REDIS_URL`) |
+## 7. Playwright / Browser Automation
 
-## Monitoring
+| Variable                 | Required | Production Value     | Notes                                   |
+| ------------------------ | -------- | -------------------- | --------------------------------------- |
+| `PLAYWRIGHT_HEADLESS`    | No       | `true`               | Run browser in headless mode            |
+| `EDGE_PATH`              | No       | Path to Edge binary  | Only needed for local cookie extraction |
+| `EDGE_USER_DATA_DIR`     | No       | Path to Edge profile | Only needed for local cookie extraction |
+| `EDGE_PROFILE_DIRECTORY` | No       | `Default`            | Edge profile name                       |
 
-| Variable | Required | Description |
-|---|---|---|
-| `SENTRY_DSN` | ❌ | Sentry DSN for error tracking (node + react) |
-| `SENTRY_ENVIRONMENT` | ❌ | Sentry environment label (default: `NODE_ENV`) |
-| `LOG_LEVEL` | ❌ | Pino log level: `trace`, `debug`, `info`, `warn`, `error`, `fatal` (default: `info`) |
+## 8. Redis / Queue
 
-## Cookie Fallbacks (Development)
+| Variable         | Required | Production Value                     | Notes                    |
+| ---------------- | -------- | ------------------------------------ | ------------------------ |
+| `REDIS_URL`      | **Yes**  | `redis://default:password@host:port` | Upstash or Railway Redis |
+| `REDISCLOUD_URL` | No       | Fallback alias for REDIS_URL         | Legacy compatibility     |
 
-| Variable | Required | Description |
-|---|---|---|
-| `LINKEDIN_COOKIE` | ❌ | LinkedIn session cookie value (dev/test fallback) |
-| `INDEED_COOKIE` | ❌ | Indeed session cookie value (dev/test fallback) |
-| `NAUKRI_COOKIE` | ❌ | Naukri session cookie value (dev/test fallback) |
-| `WELLFOUND_COOKIE` | ❌ | Wellfound session cookie value (dev/test fallback) |
+## 9. Monitoring
 
-## Browser Automation
+| Variable             | Required | Production Value | Notes                                             |
+| -------------------- | -------- | ---------------- | ------------------------------------------------- |
+| `SENTRY_DSN`         | **Yes**  | From sentry.io   | Error tracking                                    |
+| `SENTRY_ENVIRONMENT` | No       | `production`     | Sentry environment tag                            |
+| `LOG_LEVEL`          | No       | `info`           | Pino log level (`info`, `warn`, `error`, `debug`) |
 
-| Variable | Required | Description |
-|---|---|---|
-| `EDGE_PROFILE_DIRECTORY` | ❌ | Path to Edge profile directory for persistent browser contexts (default: `edge-profile`) |
-| `EDGE_PATH` | ❌ | Path to Microsoft Edge executable (auto-detected if not set) |
+## 10. Feature Flags
 
-## Vercel (Auto-Provided)
+| Variable                    | Required | Production Value | Notes                                                             |
+| --------------------------- | -------- | ---------------- | ----------------------------------------------------------------- |
+| `ENABLE_TELEGRAM_APPROVALS` | No       | `true`           | Enable approval flow via Telegram                                 |
+| `TELEGRAM_CHAT_ID`          | No       | —                | Admin alerts destination (outbound only, not for user resolution) |
 
-| Variable | Description |
-|---|---|
-| `VERCEL_URL` | Auto-provided deployment URL |
-| `VERCEL_ENV` | `production`, `preview`, `development` |
-| `VERCEL_REGION` | Serverless function region |
+## 11. Vercel Auto-Provided
 
-## Environment File Loading Order
+These are set automatically by Vercel:
 
-Environment variables are loaded in `api/_lib/env.ts` with the following precedence (highest first):
-
-1. Actual runtime environment (process.env) — includes Vercel auto-provided vars and dashboard-configured secrets
-2. `.env.local` — local overrides (git-ignored)
-3. `.env` — shared defaults (committed to repo)
-
-All vars are validated on startup by `env.ts`. Missing required vars throw an error with clear messaging. Optional vars use defaults defined in the config files.
+- `VERCEL=1`
+- `VERCEL_ENV=production`
+- `VERCEL_URL=valtrexa-v2.vercel.app`

@@ -39,7 +39,10 @@ type Skill = {
 };
 const LEVELS = ["beginner", "intermediate", "advanced", "expert"] as const;
 
-export const Route = createFileRoute("/_authenticated/skills")({ component: SkillsPage });
+export const Route = createFileRoute("/_authenticated/skills")({
+  component: SkillsPage,
+  head: () => ({ meta: [{ title: "Skills — VALTREXA-V2" }] }),
+});
 
 function SkillsPage() {
   const [search, setSearch] = useState("");

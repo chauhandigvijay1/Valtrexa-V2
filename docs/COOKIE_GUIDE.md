@@ -1,136 +1,95 @@
-# Cookie Guide
+# Cookie Guide — VALTREXA-V2
 
-> **Last Updated:** 2026-06-28
+> **Version:** v1.0.0 | **Last updated:** 2026-06-29
 
 ## Why Cookie-Based Auth?
 
-Instead of storing passwords for job portals, VALTREXA-V2 stores **encrypted session cookies** extracted from your authenticated browser. This design:
+Job portals (LinkedIn, Indeed, Naukri, etc.) use cookie-based sessions rather than API tokens. VALTREXA-V2 automates applications by storing encrypted session cookies for each provider.
 
-- Avoids credential storage and password rotation
-- Works around login CAPTCHAs and MFA that automated logins cannot handle
-- Leverages existing authenticated sessions without repeated logins
-- Allows the system to operate as "you" on job portals
+> **v1.0.1+**: Provider cookies are **per-user only**. The legacy env-var fallbacks (`LINKEDIN_COOKIE`, `INDEED_COOKIE`, etc.) have been removed. Each user must configure their own cookies.
 
-## How It Works
+**Benefits:**
 
-```mermaid
-flowchart LR
-    subgraph Manual
-        U1[User Browser DevTools] -->|Copy cookie JSON| D[Dashboard Cookie Form]
-    end
-    subgraph Automated
-        U2[refresh-cookies.ts] -->|Launch browser profile| U1
-    end
-    D -->|3. Encrypt AES-256-GCM| CR[crypto-utils.ts]
-    CR -->|4. Store| DB[(provider_cookies table)]
-    PW[Playwright] -->|5. Read & decrypt| DB
-    PW -->|6. Inject into browser context| S[Job Portal Session]
-```
+- No credentials stored on the server
+- Works with CAPTCHA/MFA (session is pre-authenticated)
+- Per-user isolation (each user stores their own cookies)
 
 ## Encryption
 
-- **Algorithm:** AES-256-GCM (authenticated encryption)
-- **Key source:** `COOKIE_ENCRYPTION_KEY` env var (64 hex chars = 32 bytes)
-- **Per-value IV:** Each encryption generates a unique 16-byte initialization vector
-- **Auth tag:** GCM appends a 16-byte authentication tag to detect tampering
-
-Implementation in `api/_lib/crypto-utils.ts`:
-
-```
-encryptCookie(plaintext: string) -> { encrypted: base64, iv: base64 }
-decryptCookie(encrypted: base64, iv: base64) -> string
-```
+- **Algorithm**: AES-256-GCM with random 16-byte IV
+- **Key**: SHA-256(`COOKIE_ENCRYPTION_KEY`)
+- **Format**: `hex(iv):hex(authTag):hex(ciphertext)`
+- Stored in `provider_cookies.cookie_value`
 
 ## Database Schema
 
-Table: `provider_cookies` (scoped by `user_id`)
-
-| Column | Type | Description |
-|---|---|---|
-| id | uuid PK | Auto-generated |
-| user_id | uuid FK | Owner (auth.users) |
-| provider | text | e.g., `linkedin`, `indeed`, `naukri` |
-| cookie_name | text | e.g., `li_at`, `JSESSIONID` |
-| cookie_value | text | **Encrypted** cookie value |
-| domain | text | e.g., `.linkedin.com` |
-| expires_at | timestamptz | Cookie expiry (auto-detected) |
-| is_active | boolean | Soft enable/disable |
-| last_validated_at | timestamptz | Last successful validation |
-| created_at | timestamptz | Creation timestamp |
-| updated_at | timestamptz | Last update timestamp |
-
-## Extraction
-
-### Automated (Recommended)
-
-Run the refresh script on your local machine (requires [Playwright](https://playwright.dev/docs/cli)):
-
-```bash
-npx tsx scripts/refresh-cookies.ts --provider linkedin --user-id <your-uuid>
+```sql
+provider_cookies (
+  id uuid PRIMARY KEY,
+  user_id uuid NOT NULL REFERENCES auth.users(id),
+  provider text NOT NULL,
+  cookie_value text NOT NULL,     -- encrypted blob
+  status text CHECK (valid, invalid, expired, pending, ...),
+  health_data jsonb,              -- validation results
+  UNIQUE(user_id, provider)
+);
 ```
 
-This launches your local Edge or Chrome with your logged-in browser profile, extracts all session cookies for the given provider, encrypts them with AES-256-GCM, and saves them to the `provider_cookies` table. It also resets `provider_controls.is_cookies_paused = false` so the workflow can proceed.
+RLS: User can only access their own cookies.
 
-Supported providers: `linkedin`, `indeed`, `naukri`, `wellfound`, `instahyre`
+## Extracting Cookies
 
-### Manual (Fallback)
+### Method 1: Automated Script (Local Machine)
 
-If the automated script doesn't work (no local browser, headless server, WSL without GUI, etc.):
+```bash
+npx.cmd tsx scripts/refresh-cookies.ts --provider linkedin --user-id <YOUR_USER_ID>
+```
 
-#### LinkedIn
-1. Log into LinkedIn in your browser
-2. Open DevTools → Application → Cookies → `https://www.linkedin.com`
-3. Find `li_at` — copy its **value** (long base64 string)
-4. Also extract `JSESSIONID` (csrf token, starts with `"ajax:"`)
-5. Paste both into the Cookie Management dashboard
+**Prerequisites:**
 
-#### Indeed
-1. Log into Indeed
-2. Open DevTools → Application → Cookies → `https://www.indeed.com`
-3. Extract `CTK` (the main session cookie) and optionally `SESSIONID`
-4. Paste into dashboard
+- Microsoft Edge installed
+- Logged into the provider in Edge
+- `EDGE_USER_DATA_DIR` set (path to Edge profile directory)
+- `COOKIE_ENCRYPTION_KEY` set in `.env`
 
-#### Naukri
-1. Log into Naukri
-2. DevTools → Application → Cookies → `https://www.naukri.com`
-3. Extract `NAUKRI_SESSION` or `ntoken`
-4. Paste into dashboard
+### Method 2: Manual Paste (Any Machine)
 
-#### Wellfound (AngelList)
-1. Log into Wellfound
-2. DevTools → Application → Cookies → `https://wellfound.com`
-3. Extract any session cookies (varies)
-4. Paste into dashboard
+1. Log into the provider in your browser
+2. Open DevTools → Application → Cookies
+3. Copy the relevant cookie values
+4. Paste in VALTREXA-V2 dashboard → Settings → Cookies
 
-#### Instahyre
-1. Log into Instahyre
-2. DevTools → Application → Cookies → `https://www.instahyre.com`
-3. Extract session cookies
-4. Paste into dashboard
+### Cookie Names by Provider
+
+| Provider  | Key Cookies              |
+| --------- | ------------------------ |
+| LinkedIn  | `li_at`                  |
+| Indeed    | `CTK`                    |
+| Naukri    | `nauk_sid`               |
+| Wellfound | `_wellfound_session`     |
+| Instahyre | `sessionid`, `csrftoken` |
 
 ## Validation
 
-The system validates cookies by making real HTTP requests to the provider:
+When you add or refresh a cookie, the system:
 
-```
-GET https://linkedin.com/feed          → 200 = valid, 302/401 = expired
-GET https://www.indeed.com/            → 200 = valid
-GET https://www.naukri.com/mnjuser/homepage → 200 = valid
-```
+1. **Basic validation** — length ≥ 10, no expired/signin/login keywords, not JSON
+2. **HTTP validation** — fetches the provider homepage with the cookie, checks for login page indicators
+3. **Status update** — `valid`, `expired`, `captcha_required`, or `invalid`
 
-Validation is triggered:
-- Automatically when a cookie is added/updated
-- Periodically during workflow precheck phase
-- On demand via `/validate` in the dashboard or Telegram `/check` command
+## Expiry & Auto-Disable
 
-Expired cookies are marked `is_active = false`. The workflow precheck will fail and pause if critical cookies are invalid.
+- Cookies expire naturally (provider session timeout)
+- On validation failure → provider is **paused**
+- On consecutive failures → provider is **disabled** (auto)
+- User must re-extract and re-paste fresh cookies
 
 ## Troubleshooting
 
-| Symptom | Likely Cause | Fix |
-|---|---|---|
-| "Cookie expired" | Session logged out | Re-extract and re-upload |
-| "Invalid cookie" | Wrong cookie name/value | Check DevTools for correct key |
-| "Encryption failed" | Missing/invalid `COOKIE_ENCRYPTION_KEY` | Verify env var is 64 hex chars |
-| "Provider unreachable" | Network/blocked | Check if provider is accessible from your Vercel region |
-| "CSRF token missing" | Linkedin `JSESSIONID` not provided | Extract and add `JSESSIONID` cookie |
+| Issue                           | Fix                                                         |
+| ------------------------------- | ----------------------------------------------------------- |
+| Cookie shows "expired"          | Re-login to provider, re-extract fresh cookie               |
+| Cookie shows "captcha_required" | Login manually in browser, solve CAPTCHA, re-extract        |
+| "No cookie configured"          | Add cookie via dashboard or Telegram                        |
+| "Invalid secret token"          | Verify `TELEGRAM_WEBHOOK_SECRET` matches                    |
+| Encryption key changed          | All stored cookies become unrecoverable — must re-paste all |

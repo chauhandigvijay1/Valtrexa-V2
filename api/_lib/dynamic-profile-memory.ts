@@ -103,11 +103,12 @@ export function isMemorizable(questionText: string): boolean {
 }
 
 export async function isNeverAsked(userId: string, questionText: string): Promise<boolean> {
+  const normalized = `never_ask_${questionText.toLowerCase().trim().replace(/\s+/g, "_").substring(0, 200)}`;
   const { data } = await supabase
     .from("candidate_memory")
     .select("id")
     .eq("user_id", userId)
-    .eq("topic", `never_ask_${questionText.toLowerCase().trim()}`)
+    .eq("topic", normalized)
     .maybeSingle();
   return !!data;
 }
@@ -266,21 +267,34 @@ export async function notifyUnknownQuestion(
     message += `\n\n<i>This answer will be regenerated fresh each time.</i>`;
   }
 
-  const answerSnippet = suggestedAnswer.substring(0, 200);
-  const questionSnippet = questionText.substring(0, 100);
+  // Store question context so handleMemoryCallback can use questionText as memory topic
+  await supabase.from("candidate_memory").upsert(
+    {
+      user_id: userId,
+      topic: `_pending_q_${applicationId}`,
+      content: questionText,
+      answer: suggestedAnswer,
+      category: "pending",
+      is_active: false,
+      source: "auto",
+    },
+    { onConflict: "user_id,topic", ignoreDuplicates: false },
+  );
 
+  // Store full answer in pending row above; callback_data passes only applicationId
+  // because Telegram's callback_data is limited to 64 bytes total.
   const buttons: Array<{ text: string; callback_data: string }[]> = [
     [
-      { text: "✅ Approve", callback_data: `memory:approve:${applicationId}:${answerSnippet}` },
-      { text: "✏️ Edit", callback_data: `memory:edit:${applicationId}:${questionSnippet}` },
+      { text: "✅ Approve", callback_data: `memory:approve:${applicationId}` },
+      { text: "✏️ Edit", callback_data: `memory:edit:${applicationId}` },
     ],
     [{ text: "⏭️ Skip", callback_data: `memory:skip:${applicationId}` }],
   ];
 
   if (!isFresh && isStorable) {
     buttons.push([
-      { text: "🔁 Always", callback_data: `memory:always:${applicationId}:${answerSnippet}` },
-      { text: "🚫 Never", callback_data: `memory:never:${applicationId}:${questionSnippet}` },
+      { text: "🔁 Always", callback_data: `memory:always:${applicationId}` },
+      { text: "🚫 Never", callback_data: `memory:never:${applicationId}` },
     ]);
   }
 
@@ -293,9 +307,22 @@ export async function handleMemoryCallback(
   extra: string,
   userId: string,
 ): Promise<string> {
+  // Load question context saved by notifyUnknownQuestion for topic-based storage
+  const { data: pending } = await supabase
+    .from("candidate_memory")
+    .select("content, answer")
+    .eq("user_id", userId)
+    .eq("topic", `_pending_q_${applicationId}`)
+    .maybeSingle();
+
   switch (action) {
     case "approve": {
-      await storeInMemory(userId, `application_answer_${applicationId}`, extra, "dynamic");
+      const answer = pending?.answer ?? "";
+      if (!answer) return "❌ No answer data found for this question.";
+      if (pending?.content) {
+        await storeInMemory(userId, pending.content, answer, "dynamic");
+      }
+      await storeInMemory(userId, `application_answer_${applicationId}`, answer, "dynamic");
       await supabase
         .from("applications")
         .update({
@@ -305,7 +332,8 @@ export async function handleMemoryCallback(
         })
         .eq("id", applicationId)
         .eq("user_id", userId);
-      return "✅ Answer approved. Application will continue.";
+      await cleanPendingQuestion(userId, applicationId);
+      return "✅ Answer approved. Application will continue on next cycle.";
     }
     case "skip": {
       await supabase
@@ -313,27 +341,45 @@ export async function handleMemoryCallback(
         .update({ status: "skipped", approval_status: "skipped" })
         .eq("id", applicationId)
         .eq("user_id", userId);
+      await cleanPendingQuestion(userId, applicationId);
       return "⏭️ Application skipped.";
     }
-    case "edit":
+    case "edit": {
+      await supabase.from("candidate_memory").upsert(
+        {
+          user_id: userId,
+          topic: `_pending_edit_${applicationId}`,
+          content: pending?.content ?? "unknown",
+          answer: pending?.answer ?? "",
+          category: "pending",
+          is_active: false,
+          source: "auto",
+        },
+        { onConflict: "user_id,topic", ignoreDuplicates: false },
+      );
       return "✏️ Please send the corrected answer as a reply to this message.";
+    }
     case "always": {
-      const [answerText, questionPattern] = extra.split("||");
-      const topic = questionPattern
-        ? questionPattern.toLowerCase().replace(/\s+/g, "_")
-        : `auto_${applicationId}`;
-      await storeInMemory(userId, topic, answerText || extra, "permanent");
+      const answer = pending?.answer ?? "";
+      if (!answer) return "❌ No answer data found for this question.";
+      if (pending?.content) {
+        await storeInMemory(userId, pending.content, answer, "permanent");
+      }
+      await storeInMemory(userId, `application_answer_${applicationId}`, answer, "permanent");
       await supabase
         .from("applications")
         .update({ status: "pending", approval_status: "approved" })
         .eq("id", applicationId)
         .eq("user_id", userId);
+      await cleanPendingQuestion(userId, applicationId);
       return "🔁 Answer saved permanently. Future similar questions will use this automatically.";
     }
     case "never": {
+      const questionText = pending?.content;
+      if (!questionText) return "❌ No question data found for this application.";
       await supabase.from("candidate_memory").insert({
         user_id: userId,
-        topic: extra.startsWith("never_ask_") ? extra : `never_ask_${extra}`,
+        topic: `never_ask_${questionText.toLowerCase().trim().replace(/\s+/g, "_").substring(0, 200)}`,
         answer: "never",
         category: "general",
         is_active: false,
@@ -344,11 +390,62 @@ export async function handleMemoryCallback(
         .update({ status: "pending", approval_status: "approved" })
         .eq("id", applicationId)
         .eq("user_id", userId);
+      await cleanPendingQuestion(userId, applicationId);
       return "🚫 Noted. This question will be skipped in future applications.";
     }
     default:
       return `Unknown memory action: ${action}`;
   }
+}
+
+export async function handleEditReply(
+  userId: string,
+  text: string,
+): Promise<{ handled: boolean; text: string }> {
+  const { data: pendingEdit } = await supabase
+    .from("candidate_memory")
+    .select("topic, content, answer")
+    .eq("user_id", userId)
+    .ilike("topic", `_pending_edit_%`)
+    .limit(1)
+    .maybeSingle();
+
+  if (!pendingEdit) return { handled: false, text: "" };
+
+  const applicationId = pendingEdit.topic.replace("_pending_edit_", "");
+  const questionText = pendingEdit.content ?? "unknown";
+
+  const corrected = text.trim();
+  await storeInMemory(userId, questionText, corrected, "dynamic");
+  await supabase
+    .from("applications")
+    .update({
+      status: "pending",
+      approval_status: "approved",
+      approval_note: "Answer edited by user",
+    })
+    .eq("id", applicationId)
+    .eq("user_id", userId);
+
+  await supabase
+    .from("candidate_memory")
+    .delete()
+    .eq("user_id", userId)
+    .eq("topic", pendingEdit.topic);
+  await cleanPendingQuestion(userId, applicationId);
+
+  return {
+    handled: true,
+    text: `✅ Answer saved: "${corrected.substring(0, 200)}"\n\nApplication will continue on next cycle.`,
+  };
+}
+
+async function cleanPendingQuestion(userId: string, applicationId: string): Promise<void> {
+  await supabase
+    .from("candidate_memory")
+    .delete()
+    .eq("user_id", userId)
+    .eq("topic", `_pending_q_${applicationId}`);
 }
 
 export async function autoFillFromMemory(

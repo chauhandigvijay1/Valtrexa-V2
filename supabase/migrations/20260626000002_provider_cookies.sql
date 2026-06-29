@@ -14,6 +14,7 @@ CREATE TABLE IF NOT EXISTS public.provider_cookies (
 
 ALTER TABLE public.provider_cookies ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "pc owner" ON public.provider_cookies;
 CREATE POLICY "pc owner" ON public.provider_cookies
   FOR ALL TO authenticated
   USING (user_id = auth.uid() OR auth.role() = 'service_role')
@@ -23,6 +24,7 @@ CREATE INDEX IF NOT EXISTS idx_provider_cookies_user ON public.provider_cookies(
 CREATE INDEX IF NOT EXISTS idx_provider_cookies_provider ON public.provider_cookies(provider);
 
 DROP TRIGGER IF EXISTS trg_pc_upd ON public.provider_cookies;
-CREATE TRIGGER trg_pc_upd BEFORE UPDATE ON public.provider_cookies FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+DROP TRIGGER IF EXISTS trg_pc_upd_cookies ON public.provider_cookies;
+CREATE TRIGGER trg_pc_upd_cookies BEFORE UPDATE ON public.provider_cookies FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 
 GRANT ALL ON public.provider_cookies TO service_role, authenticated, anon;

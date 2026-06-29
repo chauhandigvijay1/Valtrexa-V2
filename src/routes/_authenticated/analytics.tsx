@@ -4,7 +4,10 @@ import { PageHeader } from "@/components/page-header";
 import { Card } from "@/components/ui/card";
 import { apiGet } from "@/lib/api-client";
 
-export const Route = createFileRoute("/_authenticated/analytics")({ component: AnalyticsPage });
+export const Route = createFileRoute("/_authenticated/analytics")({
+  component: AnalyticsPage,
+  head: () => ({ meta: [{ title: "Analytics — VALTREXA-V2" }] }),
+});
 
 function AnalyticsPage() {
   const summary = useQuery({

@@ -89,7 +89,11 @@ export async function bindTelegramAccount(
   firstName?: string,
 ): Promise<{ ok: boolean; error?: string }> {
   // Mark token as used
-  await supabase.from("telegram_binding_tokens").update({ used: true }).eq("id", tokenId);
+  await supabase
+    .from("telegram_binding_tokens")
+    .update({ used: true })
+    .eq("id", tokenId)
+    .eq("user_id", userId);
 
   // Upsert binding
   const { error } = await supabase.from("telegram_bindings").upsert(

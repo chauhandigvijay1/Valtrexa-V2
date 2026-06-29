@@ -15,7 +15,10 @@ function getGmailClient() {
   const oauth2 = new google.auth.OAuth2(
     clientId,
     clientSecret,
-    process.env.GMAIL_REDIRECT_URI ?? (() => { throw new Error("GMAIL_REDIRECT_URI environment variable is required for Gmail OAuth"); })(),
+    process.env.GMAIL_REDIRECT_URI ??
+      (() => {
+        throw new Error("GMAIL_REDIRECT_URI environment variable is required for Gmail OAuth");
+      })(),
   );
   oauth2.setCredentials({ refresh_token: refreshToken });
   return google.gmail({ version: "v1", auth: oauth2 });
@@ -39,9 +42,9 @@ function encodeEmail(rfc2822: string): string {
   return Buffer.from(rfc2822, "utf-8").toString("base64url");
 }
 
-export async function sendOutreachMessage(outreachId: string, userId?: string): Promise<boolean> {
+export async function sendOutreachMessage(outreachId: string, userId: string): Promise<boolean> {
   const query = supabaseAdmin.from("outreach_messages").select("*").eq("id", outreachId);
-  if (userId) query.eq("user_id", userId);
+  query.eq("user_id", userId);
   const { data: msg, error } = await query.single();
 
   if (error || !msg) {
@@ -78,7 +81,7 @@ export async function sendOutreachMessage(outreachId: string, userId?: string): 
       .from("outreach_messages")
       .update({ status: "failed", error_message: "No recruiter email" })
       .eq("id", outreachId);
-    if (userId) failQuery = failQuery.eq("user_id", userId);
+    failQuery = failQuery.eq("user_id", userId);
     await failQuery;
     return false;
   }
@@ -103,7 +106,7 @@ export async function sendOutreachMessage(outreachId: string, userId?: string): 
       .from("outreach_messages")
       .update({ status: "sent", sent_at: new Date().toISOString() })
       .eq("id", outreachId);
-    if (userId) sentQuery = sentQuery.eq("user_id", userId);
+    sentQuery = sentQuery.eq("user_id", userId);
     await sentQuery;
     logger.info("Outreach sent via Gmail", { id: outreachId, to: toEmail, kind: msg.kind });
     return true;
@@ -112,7 +115,7 @@ export async function sendOutreachMessage(outreachId: string, userId?: string): 
       .from("outreach_messages")
       .update({ status: "failed", error_message: err.message })
       .eq("id", outreachId);
-    if (userId) catchQuery = catchQuery.eq("user_id", userId);
+    catchQuery = catchQuery.eq("user_id", userId);
     await catchQuery;
     logger.error("Failed to send outreach", { id: outreachId, to: toEmail, error: err.message });
     return false;
@@ -121,14 +124,14 @@ export async function sendOutreachMessage(outreachId: string, userId?: string): 
 
 export async function sendPendingOutreaches(
   limit = 10,
-  userId?: string,
+  userId: string,
 ): Promise<{ sent: number; failed: number }> {
   const query = supabaseAdmin
     .from("outreach_messages")
     .select("id")
     .eq("status", "draft")
     .in("kind", ["cold_email", "hiring_manager_outreach", "founder_outreach"]);
-  if (userId) query.eq("user_id", userId);
+  query.eq("user_id", userId);
   query.limit(limit);
   const { data: drafts, error } = await query;
 

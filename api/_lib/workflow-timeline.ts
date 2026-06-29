@@ -52,11 +52,18 @@ export async function startStage(
   return data as WorkflowStage;
 }
 
-export async function updateStageProgress(stageId: string, progress: number, message?: string) {
+export async function updateStageProgress(
+  stageId: string,
+  progress: number,
+  message?: string,
+  userId?: string,
+) {
   if (!stageId) return;
   const update: Record<string, any> = { progress };
   if (message !== undefined) update.message = message;
-  const { error } = await supabaseAdmin.from("workflow_timeline").update(update).eq("id", stageId);
+  let query = supabaseAdmin.from("workflow_timeline").update(update).eq("id", stageId);
+  if (userId) query = query.eq("user_id", userId);
+  const { error } = await query;
   if (error && !isSchemaCacheErr(error))
     logger.error(`[workflow-timeline] updateStageProgress error:`, error.message);
 }
@@ -65,6 +72,7 @@ export async function completeStage(
   stageId: string,
   message?: string,
   metadata?: Record<string, any>,
+  userId?: string,
 ) {
   if (!stageId) return;
   const update: Record<string, any> = {
@@ -73,17 +81,21 @@ export async function completeStage(
   };
   if (message !== undefined) update.message = message;
   if (metadata !== undefined) update.metadata = metadata;
-  const { error } = await supabaseAdmin.from("workflow_timeline").update(update).eq("id", stageId);
+  let query = supabaseAdmin.from("workflow_timeline").update(update).eq("id", stageId);
+  if (userId) query = query.eq("user_id", userId);
+  const { error } = await query;
   if (error && !isSchemaCacheErr(error))
     logger.error(`[workflow-timeline] completeStage error:`, error.message);
 }
 
-export async function failStage(stageId: string, errorMsg: string) {
+export async function failStage(stageId: string, errorMsg: string, userId?: string) {
   if (!stageId) return;
-  const { error } = await supabaseAdmin
+  let query = supabaseAdmin
     .from("workflow_timeline")
     .update({ status: "failed", message: errorMsg, completed_at: new Date().toISOString() })
     .eq("id", stageId);
+  if (userId) query = query.eq("user_id", userId);
+  const { error } = await query;
   if (error && !isSchemaCacheErr(error))
     logger.error(`[workflow-timeline] failStage error:`, error.message);
 }

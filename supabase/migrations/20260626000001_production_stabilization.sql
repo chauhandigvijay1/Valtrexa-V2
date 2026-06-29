@@ -13,11 +13,18 @@ ALTER TABLE IF EXISTS public.provider_controls
 -- 3. UNIQUE constraint on applications (prevent duplicate applications for same job by same user)
 DELETE FROM public.applications a1 USING public.applications a2
   WHERE a1.id < a2.id AND a1.user_id = a2.user_id AND a1.job_id = a2.job_id;
-ALTER TABLE IF EXISTS public.applications
-  ADD CONSTRAINT applications_user_job_unique UNIQUE (user_id, job_id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'applications_user_job_unique'
+  ) THEN
+    ALTER TABLE public.applications ADD CONSTRAINT applications_user_job_unique UNIQUE (user_id, job_id);
+  END IF;
+END $$;
 
 -- 4. Fix RLS on provider_controls to be per-user
 DROP POLICY IF EXISTS "pc admin all" ON public.provider_controls;
+DROP POLICY IF EXISTS "pc owner" ON public.provider_controls;
 -- Users can manage their own provider controls, admins can manage all
 CREATE POLICY "pc owner" ON public.provider_controls
   FOR ALL TO authenticated

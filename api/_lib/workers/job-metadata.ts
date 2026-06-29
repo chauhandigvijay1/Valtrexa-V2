@@ -46,11 +46,7 @@ export function inferSalaryBounds(text: string) {
   return { salaryMin: normalize(min), salaryMax: normalize(max) };
 }
 
-export function inferSalaryBoundsV2(
-  title: string,
-  description: string,
-  location: string | null,
-) {
+export function inferSalaryBoundsV2(title: string, description: string, location: string | null) {
   const { salary_min, salary_max } = extractSalaries(title, description, location);
   return { salaryMin: salary_min, salaryMax: salary_max };
 }

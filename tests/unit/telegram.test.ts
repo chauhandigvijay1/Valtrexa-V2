@@ -1,23 +1,46 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
+let mockMaybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+let mockLimit = vi.fn().mockResolvedValue({ data: [], error: null });
+
+function resetMockChain() {
+  mockMaybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
+  mockLimit = vi.fn().mockResolvedValue({ data: [], error: null });
+}
+
+vi.mock("../../api/_lib/supabase.js", () => {
+  const chain: any = {};
+  chain.select = vi.fn().mockReturnValue(chain);
+  chain.eq = vi.fn().mockReturnValue(chain);
+  chain.order = vi.fn().mockReturnValue(chain);
+  chain.limit = vi.fn().mockImplementation(() => mockLimit());
+  chain.maybeSingle = vi.fn().mockImplementation(() => mockMaybeSingle());
+  chain.single = vi.fn().mockResolvedValue({ data: null, error: null });
+  const mockFrom = vi.fn().mockReturnValue(chain);
+  return {
+    supabaseAdmin: {
+      from: mockFrom,
+    },
+  };
+});
+
 const envBackup: Record<string, string | undefined> = {};
 
 beforeEach(() => {
   envBackup.SUPABASE_URL = process.env.SUPABASE_URL;
   envBackup.SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
   envBackup.TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-  envBackup.TELEGRAM_CHAT_ID = process.env.TELEGRAM_CHAT_ID;
   process.env.SUPABASE_URL = "https://test.supabase.co";
   process.env.SUPABASE_SERVICE_ROLE_KEY = "test-service-role-key";
   process.env.TELEGRAM_BOT_TOKEN = "test:token";
-  process.env.TELEGRAM_CHAT_ID = "12345";
 });
 
 afterEach(() => {
   process.env.SUPABASE_URL = envBackup.SUPABASE_URL;
   process.env.SUPABASE_SERVICE_ROLE_KEY = envBackup.SUPABASE_SERVICE_ROLE_KEY;
   process.env.TELEGRAM_BOT_TOKEN = envBackup.TELEGRAM_BOT_TOKEN;
-  process.env.TELEGRAM_CHAT_ID = envBackup.TELEGRAM_CHAT_ID;
+  vi.clearAllMocks();
+  resetMockChain();
 });
 
 describe("telegram module — structural checks", () => {
@@ -219,6 +242,10 @@ describe("processTelegramUpdate", () => {
 });
 
 describe("notification functions", () => {
+  beforeEach(() => {
+    mockMaybeSingle = vi.fn().mockResolvedValue({ data: { chat_id: 12345 }, error: null });
+  });
+
   it("notifyJobImport sends message", async () => {
     vi.stubGlobal(
       "fetch",
@@ -329,7 +356,7 @@ describe("notification functions", () => {
   });
 
   it("returns ok=false when chat id missing", async () => {
-    delete process.env.TELEGRAM_CHAT_ID;
+    mockMaybeSingle = vi.fn().mockResolvedValue({ data: null, error: null });
     const mod = await import("../../api/_lib/telegram.js");
     const result = await mod.notifyJobImport("user-1", "linkedin", 5);
     expect(result.ok).toBe(false);

@@ -2,9 +2,9 @@ import { config } from "dotenv";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { accessSync } from "node:fs";
-import crypto from "node:crypto";
 import { chromium } from "playwright";
 import { createClient } from "@supabase/supabase-js";
+import { encrypt as encryptCookie } from "../api/_lib/crypto-utils.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
@@ -26,25 +26,6 @@ const PROVIDER_COOKIES: Record<string, string[]> = {
   wellfound: ["_wellfound_session"],
   instahyre: ["sessionid", "csrftoken"],
 };
-
-const ALGORITHM = "aes-256-gcm";
-const IV_LENGTH = 16;
-
-function getEncryptionKey(): Buffer {
-  const raw: string = process.env.COOKIE_ENCRYPTION_KEY ?? "";
-  if (!raw) throw new Error("COOKIE_ENCRYPTION_KEY must be set in .env");
-  return crypto.createHash("sha256").update(raw).digest();
-}
-
-function encryptCookie(text: string): string {
-  const key = getEncryptionKey();
-  const iv = crypto.randomBytes(IV_LENGTH);
-  const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
-  let encrypted = cipher.update(text, "utf8", "hex");
-  encrypted += cipher.final("hex");
-  const tag = cipher.getAuthTag().toString("hex");
-  return `${iv.toString("hex")}:${tag}:${encrypted}`;
-}
 
 function findEdgeExecutable(): string {
   const candidates = [
@@ -68,10 +49,9 @@ function getProfileDirectory(): string {
 }
 
 function getUserDataDir(): string {
-  return (
-    process.env.EDGE_USER_DATA_DIR ||
-    "C:\\Users\\ASUS\\AppData\\Local\\Microsoft\\Edge\\User Data"
-  );
+  const dir = process.env.EDGE_USER_DATA_DIR;
+  if (!dir) throw new Error("EDGE_USER_DATA_DIR must be set when using Edge profile login");
+  return dir;
 }
 
 function getSupabaseClient() {
@@ -122,7 +102,8 @@ async function extractCookies(args: Args): Promise<string | null> {
   console.log(`Launching ${args.browser} with profile "${getProfileDirectory()}"...`);
   console.log(`Navigating to ${url}...`);
 
-  const executablePath = args.browser === "edge" ? findEdgeExecutable() : (process.env.CHROME_PATH || "");
+  const executablePath =
+    args.browser === "edge" ? findEdgeExecutable() : process.env.CHROME_PATH || "";
 
   const browser = await chromium.launch({
     executablePath: executablePath || undefined,
@@ -151,12 +132,9 @@ async function extractCookies(args: Args): Promise<string | null> {
     );
 
     if (found.length === 0) {
-      const allCookies = cookies.map((c) => `${c.name}=${c.value}`).join("; ");
-      if (allCookies) {
-        console.log(`Fallback: extracted ${cookies.length} cookies from ${args.provider}`);
-        return allCookies;
-      }
-      console.error("No cookies extracted. Are you logged in?");
+      const names = relevantCookies.join(", ");
+      console.error(`No matching cookies found for ${args.provider}. Expected: ${names}`);
+      console.error("Ensure you are logged in and the profile has active sessions.");
       return null;
     }
 

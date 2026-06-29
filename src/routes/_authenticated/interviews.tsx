@@ -58,7 +58,10 @@ const color: Record<IvStatus, string> = {
   rescheduled: "bg-status-screening/15 text-status-screening",
 };
 
-export const Route = createFileRoute("/_authenticated/interviews")({ component: InterviewsPage });
+export const Route = createFileRoute("/_authenticated/interviews")({
+  component: InterviewsPage,
+  head: () => ({ meta: [{ title: "Interviews — VALTREXA-V2" }] }),
+});
 
 function InterviewsPage() {
   const qc = useQueryClient();

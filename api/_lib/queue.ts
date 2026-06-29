@@ -148,7 +148,7 @@ export async function updateQueueJobStatus(
   auditId: string,
   status: string,
   patch: { jobId?: string; result?: unknown; error?: string },
-  userId?: string,
+  userId = "",
 ) {
   const payload: Record<string, unknown> = { status };
   if (patch.jobId) payload.job_id = patch.jobId;

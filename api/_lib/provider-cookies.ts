@@ -117,8 +117,7 @@ export async function updateCookieStatus(
 ): Promise<void> {
   const update: any = { status };
   if (healthData) {
-    const existing = await getCookie(userId, provider);
-    update.health_data = { ...(existing?.row.health_data || {}), ...healthData };
+    update.health_data = healthData;
   }
   await supabaseAdmin
     .from("provider_cookies")

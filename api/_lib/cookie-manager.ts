@@ -15,14 +15,6 @@ import {
 
 export { SUPPORTED_PROVIDERS, getProviderGuide as getLoginGuide };
 
-const PROVIDER_COOKIE_ENV: Record<string, string> = {
-  linkedin: "LINKEDIN_COOKIE",
-  indeed: "INDEED_COOKIE",
-  naukri: "NAUKRI_COOKIE",
-  wellfound: "WELLFOUND_COOKIE",
-  instahyre: "INSTAHYRE_COOKIE",
-};
-
 type ProviderCookieRow = {
   id: string;
   user_id: string;
@@ -34,28 +26,21 @@ type ProviderCookieRow = {
   updated_at: string;
 };
 
-function getEnvCookie(provider: string): string | null {
-  const envKey = PROVIDER_COOKIE_ENV[provider.toLowerCase()];
-  if (!envKey) return null;
-  return process.env[envKey]?.trim() ?? null;
-}
-
 export function checkProviderCookieSync(provider: string): {
   available: boolean;
   valid: boolean;
   reason?: string;
 } {
-  const envFallback = getEnvCookie(provider);
-  if (envFallback) {
-    const basic = validateCookieBasic(envFallback);
-    return { available: true, valid: basic.valid, reason: basic.reason };
-  }
-  return { available: false, valid: false, reason: "No cookie configured" };
+  return {
+    available: false,
+    valid: false,
+    reason: "No cookie configured (sync check requires DB)",
+  };
 }
 
 export function validateCookieBasic(cookie: string): { valid: boolean; reason?: string } {
   if (!cookie || cookie.length < 10) return { valid: false, reason: "Cookie too short" };
-  if (/expired|signin|login/i.test(cookie))
+  if (/\b(expired|signin|login)\b/i.test(cookie))
     return { valid: false, reason: "Contains expired/signin indicators" };
   if (/^[{[]/.test(cookie.trim()))
     return { valid: false, reason: "Looks like JSON, not cookie string" };
@@ -63,11 +48,6 @@ export function validateCookieBasic(cookie: string): { valid: boolean; reason?: 
 }
 
 export function getCookieValue(provider: string): string | null {
-  const envFallback = getEnvCookie(provider);
-  if (envFallback) {
-    const basic = validateCookieBasic(envFallback);
-    return basic.valid ? envFallback : null;
-  }
   return null;
 }
 
@@ -77,7 +57,7 @@ export async function getPersistedCookieValue(
 ): Promise<string | null> {
   const stored = await getCookie(userId, provider);
   if (stored) return stored.cookie;
-  return getCookieValue(provider);
+  return null;
 }
 
 export async function checkProviderCookie(
@@ -87,14 +67,6 @@ export async function checkProviderCookie(
   const stored = await getCookie(userId, provider);
 
   if (!stored) {
-    const envFallback = getEnvCookie(provider);
-    if (envFallback) {
-      const basic = validateCookieBasic(envFallback);
-      if (basic.valid) {
-        await setCookie(userId, provider, envFallback);
-        return { status: "valid", message: `${provider} cookie loaded from env` };
-      }
-    }
     await createNotification({
       userId,
       category: "cookie_expiry",
@@ -143,11 +115,20 @@ export async function checkProviderCookie(
     return { status: "valid", message: `${provider} cookie validated` };
   }
 
-  await supabaseAdmin
+  const currentControl: any = await supabaseAdmin
     .from("provider_controls")
-    .update({ status: "paused" })
+    .select("status")
     .eq("user_id", userId)
-    .eq("provider", provider);
+    .eq("provider", provider)
+    .maybeSingle()
+    .then((r: any) => r.data);
+  if (currentControl?.status !== "disabled") {
+    await supabaseAdmin
+      .from("provider_controls")
+      .update({ status: "paused" })
+      .eq("user_id", userId)
+      .eq("provider", provider);
+  }
   await triggerCookieExpiryNotification(userId, provider, validation);
   return {
     status: validation.status,
@@ -240,7 +221,8 @@ export async function refreshCookieViaPlaywright(
     });
     return {
       ok: true,
-      message: `ℹ️ Serverless environment — can't launch browser.\n` +
+      message:
+        `ℹ️ Serverless environment — can't launch browser.\n` +
         `Run locally: npx tsx scripts/refresh-cookies.ts --provider ${provider} --user-id ${userId}\n` +
         `Or paste cookie via /cookie ${provider} <value>`,
     };
@@ -259,7 +241,10 @@ export async function refreshCookieViaPlaywright(
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 20000 });
     await page.waitForLoadState("networkidle", { timeout: 15000 });
     const currentUrl = page.url().toLowerCase();
-    const authenticated = !currentUrl.includes("login") && !currentUrl.includes("auth") && !currentUrl.includes("signin");
+    const authenticated =
+      !currentUrl.includes("login") &&
+      !currentUrl.includes("auth") &&
+      !currentUrl.includes("signin");
 
     if (!authenticated) {
       await page.close();
@@ -267,7 +252,8 @@ export async function refreshCookieViaPlaywright(
       await browser.close();
       return {
         ok: false,
-        message: `❌ Not logged into ${provider} on the server's browser.\n` +
+        message:
+          `❌ Not logged into ${provider} on the server's browser.\n` +
           `Login once via the dashboard browser session, then retry.\n` +
           `Or run locally: npx tsx scripts/refresh-cookies.ts --provider ${provider} --user-id ${userId}`,
       };
@@ -284,7 +270,8 @@ export async function refreshCookieViaPlaywright(
       const names = relevantNames.join(", ");
       return {
         ok: false,
-        message: `❌ Found ${cookies.length} cookies on ${provider} but none matched expected names (${names}).\n` +
+        message:
+          `❌ Found ${cookies.length} cookies on ${provider} but none matched expected names (${names}).\n` +
           `Try manual paste via /cookie ${provider} <value>`,
       };
     }
@@ -298,7 +285,11 @@ export async function refreshCookieViaPlaywright(
     if (!saved.ok) return { ok: false, message: `❌ Failed to save cookies: ${saved.message}` };
 
     const msg = `✅ Extracted ${relevant.length} cookie(s) from ${provider} and saved to database.`;
-    logger.info(`[cookie-manager] Server-side cookie refresh succeeded`, { userId, provider, count: relevant.length });
+    logger.info(`[cookie-manager] Server-side cookie refresh succeeded`, {
+      userId,
+      provider,
+      count: relevant.length,
+    });
 
     await createNotification({
       userId,
@@ -311,7 +302,11 @@ export async function refreshCookieViaPlaywright(
 
     return { ok: true, message: msg };
   } catch (err: any) {
-    logger.error(`[cookie-manager] refreshCookieViaPlaywright failed`, { userId, provider, error: err.message });
+    logger.error(`[cookie-manager] refreshCookieViaPlaywright failed`, {
+      userId,
+      provider,
+      error: err.message,
+    });
     return {
       ok: false,
       message: `❌ Failed to refresh ${provider} cookie: ${err.message}`,
@@ -323,7 +318,22 @@ export async function deleteProviderCookie(
   userId: string,
   provider: string,
 ): Promise<{ ok: boolean; message: string }> {
-  return deleteCookie(userId, provider);
+  const result = await deleteCookie(userId, provider);
+  if (!result.ok) return result;
+
+  await supabaseAdmin
+    .from("browser_sessions")
+    .delete()
+    .eq("user_id", userId)
+    .eq("provider", provider.toLowerCase());
+
+  await supabaseAdmin
+    .from("provider_controls")
+    .update({ consecutive_failures: 0, status: "enabled" })
+    .eq("user_id", userId)
+    .eq("provider", provider.toLowerCase());
+
+  return { ok: true, message: `${provider} cookie removed and provider reset` };
 }
 
 export function validateCookieValue(cookie: string): { valid: boolean; reason?: string } {

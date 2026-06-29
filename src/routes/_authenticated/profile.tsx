@@ -49,7 +49,10 @@ import {
   ExternalLink,
 } from "lucide-react";
 
-export const Route = createFileRoute("/_authenticated/profile")({ component: ProfilePage });
+export const Route = createFileRoute("/_authenticated/profile")({
+  component: ProfilePage,
+  head: () => ({ meta: [{ title: "Profile — VALTREXA-V2" }] }),
+});
 
 type ProfileData = {
   id?: string;

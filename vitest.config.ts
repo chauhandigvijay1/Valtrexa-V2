@@ -17,7 +17,7 @@ export default defineConfig({
       COOKIE_ENCRYPTION_KEY: "0000000000000000000000000000000000000000000000000000000000000000",
       TELEGRAM_BOT_TOKEN: "test-telegram-token",
       TELEGRAM_CHAT_ID: "123456789",
-      LINKEDIN_COOKIE: "li_at=test-cookie-value",
+
       GMAIL_CLIENT_ID: "test-client-id",
       GMAIL_CLIENT_SECRET: "test-client-secret",
       GMAIL_REFRESH_TOKEN: "test-refresh-token",

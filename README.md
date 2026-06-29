@@ -9,7 +9,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.6-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=flat-square&logo=react&logoColor=white)](https://react.dev/)
 [![TanStack Start](https://img.shields.io/badge/TanStack%20Start-FF4154?style=flat-square&logo=react&logoColor=white)](https://tanstack.com/start)
-[![Vite](https://img.shields.io/badge/Vite-6-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev/)
+[![Vite](https://img.shields.io/badge/Vite-7-646CFF?style=flat-square&logo=vite&logoColor=white)](https://vite.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-3FCF8E?style=flat-square&logo=supabase&logoColor=white)](https://supabase.com/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 
@@ -29,7 +29,7 @@ VALTREXA-V2 automates the end-to-end software engineering job search — from re
 
 ## Architecture
 
-The system is a **server-rendered React frontend** (TanStack Start + Vite) with a **Nitro-powered API layer** (file-based routing in `api/[...route].ts`), **Supabase PostgreSQL** for persistence (27 migrations, RLS on every table), **BullMQ/Redis** for optional background job queues with inline fallback, and **Telegram** for notifications and interactive operations. Browser automation uses **Playwright** with persistent cookie-based sessions stored encrypted (AES-256-GCM) in the `provider_cookies` table. A **workflow runner** orchestrates Pipeline A (auto-apply for matched jobs) and Pipeline B (high-value company research, recruiter discovery, outreach approval) through a persistent state machine.
+The system is a **server-rendered React frontend** (TanStack Start + Vite) with a **Nitro-powered API layer** (file-based routing in `api/[...route].ts`), **Supabase PostgreSQL** for persistence (28 migrations, RLS on every table), **BullMQ/Redis** for optional background job queues with inline fallback, and **Telegram** for notifications and interactive operations. Browser automation uses **Playwright** with persistent cookie-based sessions stored encrypted (AES-256-GCM) in the `provider_cookies` table. A **workflow runner** orchestrates Pipeline A (auto-apply for matched jobs) and Pipeline B (high-value company research, recruiter discovery, outreach approval) through a persistent state machine.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the full architecture.
 
@@ -52,36 +52,36 @@ Full setup: [docs/SETUP.md](docs/SETUP.md)
 
 ## Documentation
 
-| Document | Description |
-|---|---|
-| [Architecture](docs/ARCHITECTURE.md) | System design, data flow, stack decisions |
-| [Environment Variables](docs/ENVIRONMENT.md) | Complete env reference organized by category |
-| [Cookie Guide](docs/COOKIE_GUIDE.md) | Cookie-based auth, encryption, extraction guides |
-| [Provider Guide](docs/PROVIDER_GUIDE.md) | Provider integrations, auth methods, capabilities |
-| [Workflow Guide](docs/WORKFLOW.md) | Pipeline A/B, state machine, recovery |
-| [Deployment](docs/DEPLOYMENT.md) | Production deployment (Vercel) |
-| [Admin Guide](docs/ADMIN.md) | Admin dashboard, user inspection, queue management |
-| [Telegram Operations](docs/TELEGRAM_OPERATIONS.md) | Bot commands, notifications, approval workflow |
-| [Setup Guide](docs/SETUP.md) | Local development setup |
-| [Security](docs/SECURITY.md) | Auth, RLS, secrets management |
-| [Contributing](CONTRIBUTING.md) | Development guide and conventions |
-| [Changelog](CHANGELOG.md) | Release history |
+| Document                                           | Description                                        |
+| -------------------------------------------------- | -------------------------------------------------- |
+| [Architecture](docs/ARCHITECTURE.md)               | System design, data flow, stack decisions          |
+| [Environment Variables](docs/ENVIRONMENT.md)       | Complete env reference organized by category       |
+| [Cookie Guide](docs/COOKIE_GUIDE.md)               | Cookie-based auth, encryption, extraction guides   |
+| [Provider Guide](docs/PROVIDER_GUIDE.md)           | Provider integrations, auth methods, capabilities  |
+| [Workflow Guide](docs/WORKFLOW.md)                 | Pipeline A/B, state machine, recovery              |
+| [Deployment](docs/DEPLOYMENT.md)                   | Production deployment (Vercel)                     |
+| [Admin Guide](docs/ADMIN.md)                       | Admin dashboard, user inspection, queue management |
+| [Telegram Operations](docs/TELEGRAM_OPERATIONS.md) | Bot commands, notifications, approval workflow     |
+| [Setup Guide](docs/SETUP.md)                       | Local development setup                            |
+| [Security](docs/SECURITY.md)                       | Auth, RLS, secrets management                      |
+| [Contributing](CONTRIBUTING.md)                    | Development guide and conventions                  |
+| [Changelog](CHANGELOG.md)                          | Release history                                    |
 
 ---
 
 ## Tech Stack
 
-| Layer | Technology |
-|---|---|
-| Frontend | TanStack Start (React 19), TanStack Router, TanStack Query, Tailwind CSS v4, shadcn/ui |
-| API | Nitro SSR (Vite 7), file-based routing in `api/[...route].ts` (72+ endpoints) |
-| Database | Supabase PostgreSQL with Row Level Security (27 migrations) |
-| AI | OpenRouter gateway (GPT-4o, Claude 3.5 Sonnet, Gemini 2.5 Pro, DeepSeek V3), Groq |
-| Automation | Playwright with self-healing selectors and persistent Edge profiles |
-| Queues | BullMQ (Redis) with inline fallback |
-| Notifications | In-app notification center + Telegram bot |
-| Auth | Supabase Auth (email/password, Google OAuth) |
-| Monitoring | Sentry (node + react), Pino structured logging |
+| Layer         | Technology                                                                             |
+| ------------- | -------------------------------------------------------------------------------------- |
+| Frontend      | TanStack Start (React 19), TanStack Router, TanStack Query, Tailwind CSS v4, shadcn/ui |
+| API           | Nitro SSR (Vite 7), file-based routing in `api/[...route].ts` (72+ endpoints)          |
+| Database      | Supabase PostgreSQL with Row Level Security (28 migrations)                            |
+| AI            | OpenRouter gateway (GPT-4o, Claude 3.5 Sonnet, Gemini 2.5 Pro, DeepSeek V3), Groq      |
+| Automation    | Playwright with self-healing selectors and persistent Edge profiles                    |
+| Queues        | BullMQ (Redis) with inline fallback                                                    |
+| Notifications | In-app notification center + Telegram bot                                              |
+| Auth          | Supabase Auth (email/password, Google OAuth)                                           |
+| Monitoring    | Sentry (node + react), Pino structured logging                                         |
 
 ---
 
@@ -103,7 +103,7 @@ Full setup: [docs/SETUP.md](docs/SETUP.md)
 - **Inbox Intelligence** — Gmail sync + message classification (interview, assessment, offer, rejection)
 - **Telegram Bot** — Full operations interface: provider status, health checks, approval, jobs, analytics
 - **Workflow Timeline** — Live stage tracking with progress bars, duration counters, start/pause/stop controls
-- **Multi-User Isolation** — user_id scoping on all tables, RLS policies, `auth.uid()` checks
+- **Multi-User Isolation** — user_id scoping on all tables, RLS policies, `auth.uid()` checks; Telegram inbound via `/connect` binding (no env-var fallback)
 - **Event Bus** — Persisted workflow events with delivery tracking, follow-up scheduling
 - **Admin Dashboard** — Multi-tab admin: user inspection, provider controls, queue monitoring, workflow state
 - **Notification Center** — In-app notifications with filter tabs, severity icons, category badges

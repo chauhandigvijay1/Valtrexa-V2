@@ -65,7 +65,10 @@ type Recruiter = {
   profile_url: string | null;
 };
 
-export const Route = createFileRoute("/_authenticated/recruiters")({ component: RecruitersPage });
+export const Route = createFileRoute("/_authenticated/recruiters")({
+  component: RecruitersPage,
+  head: () => ({ meta: [{ title: "Recruiters — VALTREXA-V2" }] }),
+});
 
 function RecruitersPage() {
   const qc = useQueryClient();

@@ -19,14 +19,6 @@ type StoredSession = {
   last_used_at: string | null;
 };
 
-const ENV_COOKIE_BY_PROVIDER: Record<BrowserProviderName, string> = {
-  linkedin: "LINKEDIN_COOKIE",
-  indeed: "INDEED_COOKIE",
-  naukri: "NAUKRI_COOKIE",
-  instahyre: "INSTAHYRE_COOKIE",
-  wellfound: "WELLFOUND_COOKIE",
-};
-
 const COOKIE_DOMAIN_HINT: Record<BrowserProviderName, string> = {
   linkedin: ".linkedin.com",
   indeed: ".indeed.com",
@@ -74,18 +66,6 @@ export function parseCookieHeader(
     .filter((c) => c.name && c.value);
 }
 
-function buildStorageStateFromEnv(provider: BrowserProviderName): {
-  storageState: any;
-  cookies: any[];
-  empty: boolean;
-} {
-  const envVar = ENV_COOKIE_BY_PROVIDER[provider];
-  const raw = process.env[envVar] ?? "";
-  const domain = COOKIE_DOMAIN_HINT[provider];
-  const cookies = parseCookieHeader(raw, domain);
-  return { storageState: { cookies, origins: [] }, cookies, empty: cookies.length === 0 };
-}
-
 export async function buildStorageStateFromDB(
   userId: string,
   provider: BrowserProviderName,
@@ -121,11 +101,6 @@ export async function resolveStorageState(
   if (!fromDB.empty) {
     await upsertStoredSession(userId, provider, fromDB.storageState, fromDB.cookies, "ready");
     return { storageState: fromDB.storageState, source: "db", cookies: fromDB.cookies };
-  }
-  const fromEnv = buildStorageStateFromEnv(provider);
-  if (!fromEnv.empty) {
-    await upsertStoredSession(userId, provider, fromEnv.storageState, fromEnv.cookies, "ready");
-    return { storageState: fromEnv.storageState, source: "env", cookies: fromEnv.cookies };
   }
   const stored = await loadStoredSession(userId, provider);
   if (stored?.cookies?.length) {
@@ -233,7 +208,6 @@ export async function listBrowserProfiles(userId: string) {
   if (error) throw new Error(error.message);
   return (data ?? []).map((row: any) => ({
     ...row,
-    has_env_credentials: !!process.env[ENV_COOKIE_BY_PROVIDER[row.provider as BrowserProviderName]],
   }));
 }
 

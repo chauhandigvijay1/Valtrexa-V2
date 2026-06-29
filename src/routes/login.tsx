@@ -92,6 +92,19 @@ function LoginPage() {
     };
   }, [nav]);
 
+  const emitEvent = (event: string) => {
+    supabase.auth.getSession().then(({ data: sData }) => {
+      const token = sData.session?.access_token;
+      if (token) {
+        fetch("/api/auth/log-event", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ event }),
+        }).catch(() => {});
+      }
+    });
+  };
+
   const submit = async (event: React.FormEvent) => {
     event.preventDefault();
     setBusy(true);
@@ -102,14 +115,18 @@ function LoginPage() {
       return;
     }
     toast.success("Welcome back");
+    emitEvent("user_logged_in");
   };
 
   const google = async () => {
     setOauthBusy(true);
+    const state = crypto.randomUUID();
+    sessionStorage.setItem("oauth_state", state);
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: `${window.location.origin}/login`,
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { state },
       },
     });
     if (error) {

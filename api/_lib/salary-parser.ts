@@ -55,10 +55,14 @@ function applyMultiplier(raw: string, value: number): number {
 
 function convertToYearly(value: number, period: SalaryPeriod): number {
   switch (period) {
-    case "hourly": return value * 2080;
-    case "monthly": return value * 12;
-    case "one-time": return value;
-    case "yearly": return value;
+    case "hourly":
+      return value * 2080;
+    case "monthly":
+      return value * 12;
+    case "one-time":
+      return value;
+    case "yearly":
+      return value;
   }
 }
 
@@ -73,7 +77,11 @@ const RATES: Record<string, number> = {
   CAD: 0.73,
 };
 
-function toYearlyUSD(minYearly: number | null, maxYearly: number | null, currency: string): { min: number | null; max: number | null } {
+function toYearlyUSD(
+  minYearly: number | null,
+  maxYearly: number | null,
+  currency: string,
+): { min: number | null; max: number | null } {
   const rate = RATES[currency.toUpperCase()] ?? 1;
   return {
     min: minYearly != null ? Math.round(minYearly * rate) : null,
@@ -88,7 +96,8 @@ interface RawValue {
 }
 
 function extractValues(text: string): RawValue[] {
-  const valueRegex = /(?:[₹$€£¥₩])?[\s]*(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(k|K|L|l|lpa|LPA|lakh|Lakh|L|crore|Crore|million|M|m|(?:\/hr|\/hour|\/mo|\/month|per\s*hour|per\s*month|per\s*yr|per\s*year|annum|yearly|monthly|hourly)?)\b/g;
+  const valueRegex =
+    /(?:[₹$€£¥₩])?[\s]*(\d{1,3}(?:,\d{3})*(?:\.\d+)?)\s*(k|K|L|l|lpa|LPA|lakh|Lakh|L|crore|Crore|million|M|m|(?:\/hr|\/hour|\/mo|\/month|per\s*hour|per\s*month|per\s*yr|per\s*year|annum|yearly|monthly|hourly)?)\b/g;
   const results: RawValue[] = [];
   let match;
   while ((match = valueRegex.exec(text)) !== null) {
@@ -127,7 +136,11 @@ export function parseSalary(text: string | null | undefined): ParsedSalary {
   const period = detectPeriod(cleaned);
 
   // Check for "competitive", "negotiable", "DOE"
-  if (/^\s*(competitive|negotiable|doe|depending on experience|based on experience)\s*$/i.test(cleaned)) {
+  if (
+    /^\s*(competitive|negotiable|doe|depending on experience|based on experience)\s*$/i.test(
+      cleaned,
+    )
+  ) {
     return { min: null, max: null, currency, period: "yearly", original: text };
   }
 
@@ -159,7 +172,10 @@ export function parseSalary(text: string | null | undefined): ParsedSalary {
   };
 }
 
-export function salaryToYearlyUSD(parsed: ParsedSalary): { min: number | null; max: number | null } {
+export function salaryToYearlyUSD(parsed: ParsedSalary): {
+  min: number | null;
+  max: number | null;
+} {
   return toYearlyUSD(parsed.min, parsed.max, parsed.currency);
 }
 
@@ -175,7 +191,9 @@ export function extractSalaries(
 ): JobSalaryFields {
   const combined = `${title}\n${description}\n${location ?? ""}`;
   // Remove known non-salary numbers (years, dates, phone numbers)
-  const cleaned = combined.replace(/\b\d{4}\b/g, "").replace(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, "");
+  const cleaned = combined
+    .replace(/\b\d{4}\b/g, "")
+    .replace(/\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, "");
   const parsed = parseSalary(cleaned);
 
   if (parsed.min == null && parsed.max == null) {
