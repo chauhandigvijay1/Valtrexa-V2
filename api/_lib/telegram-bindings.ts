@@ -22,26 +22,29 @@ export async function generateBindingToken(userId: string): Promise<{
   deepLink: string;
   expiresAt: string;
 }> {
-  // Invalidate any existing unused tokens
-  await supabase
-    .from("telegram_binding_tokens")
-    .update({ used: true })
-    .eq("user_id", userId)
-    .eq("used", false);
-
   const token = crypto.randomUUID().replace(/-/g, "").substring(0, 24);
   const expiresAt = new Date(Date.now() + BINDING_TOKEN_EXPIRY_MINUTES * 60000).toISOString();
 
-  const { error } = await supabase.from("telegram_binding_tokens").insert({
+  // Insert new token FIRST, then invalidate old ones
+  // This avoids the race condition where all tokens are invalidated but the new insert fails
+  const { error: insertError } = await supabase.from("telegram_binding_tokens").insert({
     user_id: userId,
     token,
     expires_at: expiresAt,
   });
 
-  if (error) {
-    logger.error("Failed to create binding token", { userId, error: error.message });
+  if (insertError) {
+    logger.error("Failed to create binding token", { userId, error: insertError.message });
     throw new Error("Failed to generate binding token");
   }
+
+  // Invalidate any existing unused tokens (safe to do after insert succeeds)
+  await supabase
+    .from("telegram_binding_tokens")
+    .update({ used: true })
+    .eq("user_id", userId)
+    .eq("used", false)
+    .neq("token", token);
 
   return {
     token,
@@ -97,6 +100,7 @@ export async function bindTelegramAccount(
       username: username ?? null,
       first_name: firstName ?? null,
       last_active_at: new Date().toISOString(),
+      confirmed_at: new Date().toISOString(),
     },
     { onConflict: "user_id", ignoreDuplicates: false },
   );

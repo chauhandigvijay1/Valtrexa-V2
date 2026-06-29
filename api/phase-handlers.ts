@@ -235,7 +235,7 @@ export async function handleStrategicValue(request: Request) {
   } as any;
 
   if (companyRowData.id) {
-    await supabaseAdmin.from("companies").update(payload).eq("id", companyRowData.id);
+    await supabaseAdmin.from("companies").update(payload).eq("id", companyRowData.id).eq("user_id", user.id);
   } else {
     await supabaseAdmin.from("companies").insert(payload);
   }
@@ -338,6 +338,7 @@ export async function handleRecruiterDiscoveryV2(request: Request) {
         .from("recruiters")
         .update(payload)
         .eq("id", dup.data.id)
+        .eq("user_id", user.id)
         .select("*")
         .single();
       row = upd.data;
@@ -812,6 +813,7 @@ export async function handleRecruiterDiscoveryV3(request: Request) {
         .from("recruiters")
         .update(payload)
         .eq("id", dup.data.id)
+        .eq("user_id", user.id)
         .select("*")
         .single();
       row = upd.data;
@@ -956,7 +958,7 @@ export async function handleHighValueV3(request: Request) {
   } as any;
 
   if (companyRowData.id) {
-    await supabaseAdmin.from("companies").update(payload).eq("id", companyRowData.id);
+    await supabaseAdmin.from("companies").update(payload).eq("id", companyRowData.id).eq("user_id", user.id);
   } else {
     await supabaseAdmin.from("companies").insert(payload);
   }

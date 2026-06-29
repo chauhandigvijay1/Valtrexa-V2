@@ -1314,7 +1314,6 @@ async function skipEntity(entityType: string, entityId: string, userId: string):
         .from("applications")
         .update({ status: "skipped", approval_status: "skipped" })
         .eq("id", entityId)
-        .eq("user_id", userId)
         .eq("user_id", userId);
       return "⏭️ Application skipped.";
     }

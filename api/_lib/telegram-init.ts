@@ -4,7 +4,7 @@ const TELEGRAM_API_BASE = `https://api.telegram.org/bot`;
 
 const BOT_COMMANDS = [
   { command: "health", description: "System health check" },
-  { command: "start", description: "System health check" },
+  { command: "start", description: "Start the bot and show welcome screen" },
   { command: "status", description: "Dashboard summary (jobs, apps, interviews)" },
   { command: "jobs", description: "Recent 10 job imports" },
   { command: "applications", description: "Recent 10 applications" },

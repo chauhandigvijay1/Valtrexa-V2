@@ -395,17 +395,20 @@ async function phaseHighValuePipeline(userId: string): Promise<PhaseResult> {
     details.companies = companyMap.size;
 
     // Phase B2: For each company, discover recruiters
-    const recruitersFound = 0;
+    let recruitersFound = 0;
     for (const [company, jobs] of companyMap) {
       const companyTitle = jobs[0].company_name ?? "Unknown";
       try {
         // Check if we already have recruiters for this company
-        const { count: existingCount } = await supabase
+        const { count: existingCount, data: existingRecruiters } = await supabase
           .from("recruiters")
-          .select("id", { count: "exact", head: true })
+          .select("id")
           .eq("user_id", userId)
           .ilike("company", `%${company}%`);
-        if (existingCount && existingCount > 0) continue;
+        if (existingCount && existingCount > 0) {
+          recruitersFound += existingCount;
+          continue;
+        }
 
         // Placeholder creation removed — violates "never create fake data" constraint
 

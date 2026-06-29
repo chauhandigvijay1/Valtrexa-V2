@@ -114,21 +114,16 @@ DROP POLICY IF EXISTS candidate_memory_self ON candidate_memory;
 CREATE POLICY candidate_memory_self ON candidate_memory
   USING (user_id = auth.uid() OR auth.role() = 'service_role');
 
--- 6. Create telegram_bindings (multi-user telegram)
+-- 6. Ensure telegram_bindings has confirmed_at column (table created in migration 0003)
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS telegram_bindings (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id uuid NOT NULL UNIQUE,
-  telegram_chat_id bigint NOT NULL UNIQUE,
-  telegram_username text,
-  connected_at timestamptz DEFAULT now(),
-  last_used_at timestamptz DEFAULT now()
-);
-CREATE INDEX IF NOT EXISTS idx_telegram_bindings_user ON telegram_bindings(user_id);
-ALTER TABLE telegram_bindings ENABLE ROW LEVEL SECURITY;
-DROP POLICY IF EXISTS telegram_bindings_self ON telegram_bindings;
-CREATE POLICY telegram_bindings_self ON telegram_bindings
-  USING (user_id = auth.uid() OR auth.role() = 'service_role');
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.columns
+    WHERE table_name = 'telegram_bindings' AND column_name = 'confirmed_at'
+  ) THEN
+    ALTER TABLE telegram_bindings ADD COLUMN confirmed_at timestamptz;
+  END IF;
+END $$;
 
 -- 7. Create outreach (outreach engine)
 -- ============================================================================

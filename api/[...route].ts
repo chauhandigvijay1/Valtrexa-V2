@@ -690,6 +690,7 @@ async function generatePainPointsForCompany(userId: string, body: PainPointBody)
           .from("painpoints")
           .update(payload)
           .eq("id", existing.data.id)
+          .eq("user_id", userId)
           .select("*")
           .single()
       : await supabaseAdmin.from("painpoints").insert(payload).select("*").single();
@@ -2528,7 +2529,8 @@ async function handleCandidateBrain(request: Request) {
         await supabaseAdmin
           .from("candidate_profiles")
           .update(profilePayload)
-          .eq("id", existing.data.id);
+          .eq("id", existing.data.id)
+          .eq("user_id", user.id);
       } else {
         await supabaseAdmin
           .from("candidate_profiles")
@@ -3016,7 +3018,7 @@ Return a strict JSON object with:
   let companyId: string;
   if (existingCompany.data?.id) {
     companyId = existingCompany.data.id;
-    await supabaseAdmin.from("companies").update(companyPayload).eq("id", companyId);
+    await supabaseAdmin.from("companies").update(companyPayload).eq("id", companyId).eq("user_id", user.id);
   } else {
     const insertResult = await supabaseAdmin
       .from("companies")
@@ -3069,7 +3071,7 @@ Return a strict JSON object with:
 
     if (existingRecruiter.data?.id) {
       recruiterId = existingRecruiter.data.id;
-      await supabaseAdmin.from("recruiters").update(recruiterPayload).eq("id", recruiterId);
+      await supabaseAdmin.from("recruiters").update(recruiterPayload).eq("id", recruiterId).eq("user_id", user.id);
     } else {
       const recResult = await supabaseAdmin
         .from("recruiters")
@@ -3195,6 +3197,7 @@ async function handleCompanyTarget(request: Request) {
         .from("companies")
         .update(payload)
         .eq("id", existing.data.id)
+        .eq("user_id", user.id)
         .select("*")
         .single();
     } else {
@@ -3388,6 +3391,7 @@ async function handleRecruiterDiscovery(request: Request) {
           notes: `${rec.title}\n\n${rec.reason}\n\nSearch: ${rec.searchQuery}`,
         })
         .eq("id", existing.data.id)
+        .eq("user_id", user.id)
         .select("*")
         .single();
       if (data) insertedRecruiters.push(data);
