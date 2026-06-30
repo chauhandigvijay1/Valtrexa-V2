@@ -1,6 +1,6 @@
 # Telegram Operations — VALTREXA-V2
 
-> **Version:** v1.0.0 | **Last updated:** 2026-06-29  
+> **Version:** v1.0.1 | **Last updated:** 2026-06-30  
 > **Bot username:** @ValtrexaV2Bot  
 > **Webhook URL:** https://valtrexa-v2.vercel.app/api/telegram/webhook
 
@@ -24,7 +24,8 @@
 
 ### Account
 
-- `/connect` — Generate binding token → link Telegram to your account
+- `/connect <token>` — Link Telegram to your account using a one-time token generated from Settings page
+- `/start` — Welcome message with connection instructions
 
 ### Jobs & Applications
 

@@ -112,6 +112,11 @@ Full setup: [docs/SETUP.md](docs/SETUP.md)
 
 ## Screenshots
 
+<details>
+<summary><b>📸 Click to expand — 10 screenshots</b></summary>
+
+<br>
+
 <div align="center">
   <table>
     <tr>
@@ -156,6 +161,8 @@ Full setup: [docs/SETUP.md](docs/SETUP.md)
     </tr>
   </table>
 </div>
+
+</details>
 
 ---
 

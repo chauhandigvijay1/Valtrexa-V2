@@ -1,6 +1,6 @@
 # Setup Guide — VALTREXA-V2
 
-> **Version:** v1.0.0 | **Last updated:** 2026-06-29
+> **Version:** v1.0.1 | **Last updated:** 2026-06-30
 
 ## Prerequisites
 
@@ -72,12 +72,13 @@ See [`ENVIRONMENT.md`](./ENVIRONMENT.md) for the complete reference.
 
 ### Telegram Multi-User Binding
 
-Each user must connect their Telegram chat via `/connect`:
+Each user must connect their Telegram chat via a one-time token:
 
-1. Send `/connect` to the bot → receives a unique URL
-2. Visit the URL in a browser → confirms binding
-3. The bot now associates your chat with your user account
-4. All commands (except `/health`, `/start`, `/help`, `/menu`) require binding
+1. In the web dashboard, go to **Settings → Telegram Connection** → **Generate Connection Token**
+2. Copy the generated token (expires in 15 minutes)
+3. Send `/connect <token>` to the bot
+4. The bot confirms binding — now your chat is linked to your account
+5. All commands (except `/health`, `/start`, `/help`, `/menu`) require a binding
 
 ⚠️ No env-var fallback for inbound. Users without a binding will see "not connected".
 
