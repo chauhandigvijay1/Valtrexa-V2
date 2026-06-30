@@ -20,10 +20,11 @@ function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
+  const [oauthBusy, setOauthBusy] = useState(false);
 
   useEffect(() => {
     if (!loading && user) {
-      nav({ to: "/onboarding", replace: true });
+      nav({ to: "/dashboard", replace: true });
     }
   }, [loading, user, nav]);
 
@@ -38,6 +39,23 @@ function SignupPage() {
         }).catch(() => {});
       }
     });
+  };
+
+  const google = async () => {
+    setOauthBusy(true);
+    const state = crypto.randomUUID();
+    sessionStorage.setItem("oauth_state", state);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: { state },
+      },
+    });
+    if (error) {
+      setOauthBusy(false);
+      toast.error(error.message);
+    }
   };
 
   const submit = async (event: React.FormEvent) => {
@@ -66,7 +84,7 @@ function SignupPage() {
         body: JSON.stringify({ name }),
       }).catch(() => {});
       emitEvent("user_signed_up");
-      nav({ to: "/onboarding", replace: true });
+      nav({ to: "/dashboard", replace: true });
     } else {
       // Email confirmation required — redirect to confirm page
       nav({ to: "/auth/confirm-email", replace: true });
@@ -81,6 +99,21 @@ function SignupPage() {
           <p className="text-sm text-muted-foreground">
             Set up your workspace for resumes, jobs, and outreach.
           </p>
+        </div>
+
+        {oauthBusy ? (
+          <div className="rounded-lg border border-primary/20 bg-primary/5 px-3 py-4 text-sm text-muted-foreground">
+            Completing Google sign-in and restoring your session...
+          </div>
+        ) : (
+          <Button onClick={google} variant="outline" className="w-full" disabled={busy}>
+            Continue with Google
+          </Button>
+        )}
+
+        <div className="relative text-center text-xs text-muted-foreground">
+          <span className="bg-card px-2 relative z-10">or</span>
+          <div className="absolute inset-x-0 top-1/2 h-px bg-border" />
         </div>
 
         <form onSubmit={submit} className="space-y-3">
@@ -114,7 +147,7 @@ function SignupPage() {
               required
             />
           </div>
-          <Button type="submit" disabled={busy} className="w-full">
+          <Button type="submit" disabled={busy || oauthBusy} className="w-full">
             {busy ? "Creating account…" : "Create account"}
           </Button>
         </form>

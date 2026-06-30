@@ -131,8 +131,9 @@ function SettingsPage() {
         <AlertDescription>
           Telegram (bot), Gmail (OAuth), Groq (AI fallback), Indeed (scraping), and Instahyre
           (scraping) are fully wired into the production workflow but configured through server-side
-          environment variables rather than this UI. LinkedIn, Naukri, and Wellfound cookies can
-          also be set globally via WELLFOUND_COOKIE in .env.
+          environment variables rather than this UI. Provider cookies are per-user and managed via
+          the Cookie Health page. Env-var cookie fallbacks were removed in v1.0.1 for true
+          multi-tenant isolation.
         </AlertDescription>
       </Alert>
       <div className="grid gap-4 xl:grid-cols-2">
@@ -145,7 +146,8 @@ function SettingsPage() {
 }
 
 function IntegrationCard({ provider }: { provider: Provider }) {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const token = session?.access_token;
   const qc = useQueryClient();
   const queryKey = ["integration", provider.key, user?.id];
 
@@ -189,7 +191,10 @@ function IntegrationCard({ provider }: { provider: Provider }) {
         if (key.toLowerCase().includes("cookie") && value?.trim()) {
           const resp = await fetch("/api/cookies/set", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
             body: JSON.stringify({ provider: provider.key, cookie: value }),
           });
           if (!resp.ok) throw new Error((await resp.json()).error ?? "Failed to store cookie");
@@ -222,7 +227,10 @@ function IntegrationCard({ provider }: { provider: Provider }) {
     mutationFn: async (cookieValue: string) => {
       const resp = await fetch("/api/cookies/validate", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
         body: JSON.stringify({ provider: provider.key, cookie: cookieValue }),
       });
       if (!resp.ok) throw new Error((await resp.json()).error ?? "Validation failed");
@@ -244,7 +252,12 @@ function IntegrationCard({ provider }: { provider: Provider }) {
 
   const removeCookie = useMutation({
     mutationFn: async () => {
-      const resp = await fetch(`/api/cookies/${provider.key}`, { method: "DELETE" });
+      const resp = await fetch(`/api/cookies/${provider.key}`, {
+        method: "DELETE",
+        headers: {
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
       if (!resp.ok) throw new Error((await resp.json()).error ?? "Remove failed");
     },
     onSuccess: () => {
@@ -404,7 +417,9 @@ function IntegrationCard({ provider }: { provider: Provider }) {
 }
 
 function TelegramBindingCard() {
-  const [token, setToken] = useState<string | null>(null);
+  const { session } = useAuth();
+  const authToken = session?.access_token;
+  const [bindingToken, setBindingToken] = useState<string | null>(null);
   const [deepLink, setDeepLink] = useState<string | null>(null);
   const [expiresAt, setExpiresAt] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -412,10 +427,15 @@ function TelegramBindingCard() {
   const generateToken = async () => {
     setLoading(true);
     try {
-      const res = await fetch("/api/telegram/binding", { method: "POST" });
+      const res = await fetch("/api/telegram/binding", {
+        method: "POST",
+        headers: {
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
+      });
       if (!res.ok) throw new Error((await res.json()).error ?? "Failed to generate token");
       const result = await res.json();
-      setToken(result.token);
+      setBindingToken(result.token);
       setDeepLink(result.deepLink);
       setExpiresAt(result.expiresAt);
     } catch (err: any) {
@@ -426,8 +446,8 @@ function TelegramBindingCard() {
   };
 
   const copyToken = () => {
-    if (token) {
-      navigator.clipboard.writeText(token);
+    if (bindingToken) {
+      navigator.clipboard.writeText(bindingToken);
       toast.success("Token copied to clipboard");
     }
   };
@@ -439,18 +459,18 @@ function TelegramBindingCard() {
           <MessageCircle className="h-5 w-5 text-blue-500" />
           <h3 className="font-semibold">Telegram Connection</h3>
         </div>
-        <Badge variant={token ? "default" : "secondary"}>
-          {token ? "Token Generated" : "Not Connected"}
+        <Badge variant={bindingToken ? "default" : "secondary"}>
+          {bindingToken ? "Token Generated" : "Not Connected"}
         </Badge>
       </div>
       <p className="text-sm text-muted-foreground mb-3">
         Generate a one-time token, then send it to the Telegram bot via{" "}
         <code>/connect &lt;token&gt;</code>
       </p>
-      {token ? (
+      {bindingToken ? (
         <div className="space-y-2">
           <div className="flex items-center gap-2">
-            <Input readOnly value={token} className="font-mono text-xs" />
+            <Input readOnly value={bindingToken} className="font-mono text-xs" />
             <Button size="sm" onClick={copyToken}>
               Copy
             </Button>
@@ -474,7 +494,7 @@ function TelegramBindingCard() {
             size="sm"
             variant="outline"
             onClick={() => {
-              setToken(null);
+              setBindingToken(null);
               setDeepLink(null);
               setExpiresAt(null);
             }}

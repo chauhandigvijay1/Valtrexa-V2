@@ -35,21 +35,18 @@ function AuthCallbackPage() {
         supabase.auth.getSession().then(async ({ data: sData }) => {
           if (sData.session?.user) {
             const token = sData.session.access_token;
-            const isNew = url.searchParams.get("is_new") === "true";
-            if (isNew) {
-              const oauthName =
-                sData.session.user.user_metadata?.full_name ||
-                sData.session.user.user_metadata?.name ||
-                "";
-              await fetch("/api/auth/create-profile", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                  Authorization: `Bearer ${token}`,
-                },
-                body: JSON.stringify({ name: oauthName }),
-              }).catch(() => {});
-            }
+            const oauthName =
+              sData.session.user.user_metadata?.full_name ||
+              sData.session.user.user_metadata?.name ||
+              "";
+            await fetch("/api/auth/create-profile", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${token}`,
+              },
+              body: JSON.stringify({ name: oauthName }),
+            }).catch(() => {});
             await fetch("/api/auth/log-event", {
               method: "POST",
               headers: {

@@ -1,4 +1,6 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { useAuth } from "@/hooks/use-auth";
 import { Button } from "@/components/ui/button";
 import {
   ArrowRight,
@@ -25,6 +27,14 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
+  const { user, loading } = useAuth();
+  const nav = useNavigate();
+
+  useEffect(() => {
+    if (!loading && user) {
+      nav({ to: "/dashboard", replace: true });
+    }
+  }, [loading, user, nav]);
   return (
     <div className="min-h-screen bg-background text-foreground">
       <a

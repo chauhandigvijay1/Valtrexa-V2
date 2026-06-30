@@ -35,7 +35,7 @@ function AuthedLayout() {
 
   return (
     <SidebarProvider>
-      {location.pathname !== "/onboarding" && <OnboardingWizard />}
+      {location.pathname === "/dashboard" && <OnboardingWizard />}
       <div className="min-h-screen flex w-full bg-background text-foreground">
         <AppSidebar />
         <div className="flex-1 flex flex-col min-w-0">

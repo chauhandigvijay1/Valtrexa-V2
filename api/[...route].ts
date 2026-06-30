@@ -3716,13 +3716,25 @@ async function handleAuthCreateProfile(request: Request) {
   const user = await requireApiUser(request);
   const body = await readJson<{ name?: string }>(request).catch(() => ({ name: undefined }));
   const name = body.name ?? user.email ?? "User";
-  const { error } = await supabaseAdmin
+  const { error: profileError } = await supabaseAdmin
     .from("profiles")
     .upsert(
       { id: user.id, name, email: user.email, created_at: new Date().toISOString() },
       { onConflict: "id" },
     );
-  if (error) return json({ error: safeErrorMessage(error) }, { status: 400 });
+  if (profileError) return json({ error: safeErrorMessage(profileError) }, { status: 400 });
+  const { error: cpError } = await supabaseAdmin
+    .from("candidate_profiles")
+    .upsert(
+      {
+        user_id: user.id,
+        name,
+        email: user.email,
+        onboarding_step: 0,
+      },
+      { onConflict: "user_id" },
+    );
+  if (cpError) return json({ error: safeErrorMessage(cpError) }, { status: 400 });
   return json({ ok: true });
 }
 
@@ -3885,6 +3897,14 @@ export async function routeRequest(request: Request) {
       return phase.handleWorkflowValidate(request);
     case "workflow/cycle":
       return handleWorkflowCycle(request);
+    case "workflow/start":
+      return handleWorkflowStart(request);
+    case "workflow/stop":
+      return handleWorkflowStop(request);
+    case "workflow/pause":
+      return handleWorkflowPause(request);
+    case "workflow/resume":
+      return handleWorkflowResume(request);
     case "admin":
       return handleAdminArea(request);
     case "admin/users":
@@ -4163,6 +4183,54 @@ async function handleWorkflowCycle(request: Request) {
     return json(result);
   } catch (err: any) {
     return json({ error: safeErrorMessage(err) }, { status: 500 });
+  }
+}
+
+async function handleWorkflowStart(request: Request) {
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  try {
+    const user = await requireApiUser(request);
+    const { startWorkflow } = await import("./_lib/workflow-state.js");
+    const state = await startWorkflow(user.id);
+    return json({ ok: true, state });
+  } catch (err: any) {
+    return json({ error: safeErrorMessage(err) }, { status: 400 });
+  }
+}
+
+async function handleWorkflowStop(request: Request) {
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  try {
+    const user = await requireApiUser(request);
+    const { stopWorkflow } = await import("./_lib/workflow-state.js");
+    const state = await stopWorkflow(user.id);
+    return json({ ok: true, state });
+  } catch (err: any) {
+    return json({ error: safeErrorMessage(err) }, { status: 400 });
+  }
+}
+
+async function handleWorkflowPause(request: Request) {
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  try {
+    const user = await requireApiUser(request);
+    const { pauseWorkflow } = await import("./_lib/workflow-state.js");
+    const state = await pauseWorkflow(user.id);
+    return json({ ok: true, state });
+  } catch (err: any) {
+    return json({ error: safeErrorMessage(err) }, { status: 400 });
+  }
+}
+
+async function handleWorkflowResume(request: Request) {
+  if (request.method !== "POST") return methodNotAllowed(["POST"]);
+  try {
+    const user = await requireApiUser(request);
+    const { resumeWorkflow } = await import("./_lib/workflow-state.js");
+    const state = await resumeWorkflow(user.id);
+    return json({ ok: true, state });
+  } catch (err: any) {
+    return json({ error: safeErrorMessage(err) }, { status: 400 });
   }
 }
 

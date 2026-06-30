@@ -40,7 +40,8 @@ type Stage = {
 };
 
 function WorkflowTimelinePage() {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
+  const authToken = session?.access_token;
   const qc = useQueryClient();
 
   const { data: stages = [], isLoading } = useQuery({
@@ -78,7 +79,10 @@ function WorkflowTimelinePage() {
     mutationFn: async () => {
       const resp = await fetch("/api/workflow/start", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({}),
       });
       if (!resp.ok) throw new Error((await resp.json()).error ?? "Failed to start");
@@ -94,7 +98,10 @@ function WorkflowTimelinePage() {
     mutationFn: async () => {
       const resp = await fetch("/api/workflow/pause", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({}),
       });
       if (!resp.ok) throw new Error((await resp.json()).error ?? "Failed to pause");
@@ -109,7 +116,10 @@ function WorkflowTimelinePage() {
     mutationFn: async () => {
       const resp = await fetch("/api/workflow/stop", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(authToken ? { Authorization: `Bearer ${authToken}` } : {}),
+        },
         body: JSON.stringify({}),
       });
       if (!resp.ok) throw new Error((await resp.json()).error ?? "Failed to stop");
