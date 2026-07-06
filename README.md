@@ -49,7 +49,7 @@
 ## 🎬 Demo Video
 <p align="center">
   <a href="https://player.cloudinary.com/embed/?cloud_name=dtdvtkzsm&public_id=Valtrexa_uqdfzg" target="_blank">
-    <img src="./docs/assets/gifs/demo-thumbnail.gif" alt="VALTREXA-V2 Demo Video" width="150" style="border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);" />
+    <img src="./docs/assets/gifs/demo-thumbnail.gif" alt="VALTREXA-V2 Demo Video" width="360" style="border-radius: 12px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);" />
   </a>
   <br/>
   <em>Click above to watch the official VALTREXA-V2 demo video.</em>
