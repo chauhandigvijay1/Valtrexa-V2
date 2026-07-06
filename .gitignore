@@ -59,14 +59,14 @@ OPERATIONS_RUNBOOK.md
 *.md.report
 
 # Screenshots & evidence
-screenshots/
+
 !docs/screenshots/
 evidence/
-*.png
+
 !docs/screenshots/*.png
 *.jpg
 *.jpeg
-*.gif
+
 captures/
 
 # Exports & temp files
