@@ -1,8 +1,44 @@
-# Changelog
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/favicon.svg">
+    <img src="docs/assets/favicon.svg" alt="Valtrexa V2" width="64" height="64">
+  </picture>
+</p>
 
-All notable changes to the **VALTREXA-V2** project are documented in this file.
+<h1 align="center">📄 Version History</h1>
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+<p align="center">
+  <strong>Version:</strong> v1.0.1 •
+  <strong>Last Updated:</strong> 2026-07-05 •
+  <strong>Category:</strong> Changelog
+</p>
+
+**Description:** Complete changelog documenting all notable changes to the VALTREXA-V2 project.
+
+---
+
+## Table of Contents
+
+- [Release Lifecycle](#release-lifecycle)
+- [1.0.1 — 2026-06-29](#101--2026-06-29)
+- [1.0.0 — 2026-06-24](#100--2026-06-24)
+- [Related Documents](#related-documents)
+
+---
+
+> [!NOTE]
+> The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## Release Lifecycle
+
+```mermaid
+gantt
+    title VALTREXA-V2 Release Timeline
+    dateFormat YYYY-MM-DD
+    section Releases
+    v1.0.0 (Initial)           :milestone, 2026-06-24, 0d
+    v1.0.1 (Patch)             :milestone, 2026-06-29, 0d
+```
 
 ---
 
@@ -25,13 +61,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Prettier formatting applied** across all files (161 formatting fixes).
 - **Stale docs removed**: `RELEASE_REPORT.md`, `DEPLOYMENT_CHECKLIST.md`, `docs/screenshots/`.
 
+> [!IMPORTANT]
+> The v1.0.1 patch introduces strict multi-tenant isolation. All cookie and user identity env-var fallbacks have been removed. Existing deployments relying on shared env cookies must migrate per-user credentials.
+
 ---
 
 ## [1.0.0] — 2026-06-24
 
 ### Initial Release
 
-#### Features
+#### Core Capabilities
 
 - **Resume-Driven Candidate Profile** — Upload, parse, analyze, and tailor resumes. AI-powered skill extraction, keyword gap analysis, and role suitability scoring. Resume version history with primary resume selection.
 - **Job Import Engine** — Multi-provider job import from Greenhouse, Lever, Ashby, Workable, LinkedIn, Indeed, Naukri, Wellfound, and Instahyre. Deduplication and upsert by `user_id + source + external_id`.
@@ -56,7 +95,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Rate Limiting** — Per-IP rate limiting with configurable window and max requests.
 - **Sentry Error Tracking** — Server-side error reporting with health endpoint exclusion.
 
-#### Architecture
+#### Architecture Flow
 
 - **TanStack Start** server framework with Vite build tooling.
 - **File-based API routing** via `api/[...route].ts` catch-all handler.
@@ -69,3 +108,32 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 - **Redis** for BullMQ queue backend.
 - **Zustand + React Query** for state management.
 - **Radix UI + Tailwind CSS v4** for component library.
+
+```mermaid
+graph TD
+    subgraph "Application Pipeline"
+        Resume[Resume Profile] --> Match[Match Scoring]
+        Match --> Apply[Automated Apply]
+        Apply --> Track[Follow-Up Engine]
+    end
+    subgraph "Job Import"
+        Providers[Multi-Provider Import] --> Dedup[Deduplication]
+        Dedup --> Store[(Database)]
+    end
+    subgraph "Outreach"
+        AI[AI Drafts] --> Send[Gmail SMTP]
+        Send --> Follow[Follow-Up]
+    end
+    Store --> Match
+```
+
+> [!TIP]
+> v1.0.0 is the foundational release with 22+ feature modules. For detailed migration notes, see the [README](README.md).
+
+## Related Documents
+
+- [README](README.md) — Project overview and getting started
+- [Contributing Guide](CONTRIBUTING.md) — Development conventions and pull request process
+- [Security Policy](SECURITY.md) — Vulnerability reporting
+
+---

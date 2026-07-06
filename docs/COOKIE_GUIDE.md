@@ -1,11 +1,57 @@
-# Cookie Guide — VALTREXA-V2
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="docs/assets/favicon.svg">
+    <img src="assets/favicon.svg" alt="Valtrexa V2" width="64" height="64">
+  </picture>
+</p>
 
-> **Version:** v1.0.0 | **Last updated:** 2026-06-29
+<h1 align="center">🍪 Cookie Guide</h1>
 
-## Why Cookie-Based Auth?
+<p align="center">
+  <strong>Version:</strong> v1.0.0 •
+  <strong>Last Updated:</strong> 2026-06-29 •
+  <strong>Category:</strong> Operations
+</p>
+
+**Description:** VALTREXA-V2 — Session Cookie Management for Automated Job Applications
+
+---
+
+## Table of Contents
+
+- [Overview](#overview)
+- [Why Cookie-Based Auth](#why-cookie-based-auth)
+- [Encryption](#encryption)
+- [Database Schema](#database-schema)
+- [Extracting Cookies](#extracting-cookies)
+- [Validation](#validation)
+- [Expiry & Auto-Disable](#expiry--auto-disable)
+- [Troubleshooting](#troubleshooting)
+- [Best Practices](#best-practices)
+- [Related Documents](#related-documents)
+
+---
+
+## Overview
+
+> [!IMPORTANT]
+> **v1.0.1+**: Provider cookies are **per-user only**. The legacy env-var fallbacks (`LINKEDIN_COOKIE`, `INDEED_COOKIE`, etc.) have been removed. Each user must configure their own cookies.
 
 Job portals (LinkedIn, Indeed, Naukri, etc.) use cookie-based sessions rather than API tokens. VALTREXA-V2 automates applications by storing encrypted session cookies for each provider.
 
+**Benefits:**
+
+- No credentials stored on the server
+- Works with CAPTCHA/MFA (session is pre-authenticated)
+- Per-user isolation (each user stores their own cookies)
+
+---
+
+## Why Cookie-Based Auth
+
+Job portals (LinkedIn, Indeed, Naukri, etc.) use cookie-based sessions rather than API tokens. VALTREXA-V2 automates applications by storing encrypted session cookies for each provider.
+
+> [!IMPORTANT]
 > **v1.0.1+**: Provider cookies are **per-user only**. The legacy env-var fallbacks (`LINKEDIN_COOKIE`, `INDEED_COOKIE`, etc.) have been removed. Each user must configure their own cookies.
 
 **Benefits:**
@@ -14,28 +60,38 @@ Job portals (LinkedIn, Indeed, Naukri, etc.) use cookie-based sessions rather th
 - Works with CAPTCHA/MFA (session is pre-authenticated)
 - Per-user isolation (each user stores their own cookies)
 
+---
+
 ## Encryption
 
-- **Algorithm**: AES-256-GCM with random 16-byte IV
-- **Key**: SHA-256(`COOKIE_ENCRYPTION_KEY`)
-- **Format**: `hex(iv):hex(authTag):hex(ciphertext)`
-- Stored in `provider_cookies.cookie_value`
+| Property       | Value                                      |
+| -------------- | ------------------------------------------ |
+| Algorithm      | AES-256-GCM                                |
+| Key Derivation | SHA-256(`COOKIE_ENCRYPTION_KEY`)           |
+| IV             | Random 16 bytes per encryption             |
+| Storage Format | `hex(iv):hex(authTag):hex(ciphertext)`     |
+| Column         | `provider_cookies.cookie_value`            |
+
+---
 
 ## Database Schema
 
 ```sql
 provider_cookies (
-  id uuid PRIMARY KEY,
-  user_id uuid NOT NULL REFERENCES auth.users(id),
-  provider text NOT NULL,
-  cookie_value text NOT NULL,     -- encrypted blob
-  status text CHECK (valid, invalid, expired, pending, ...),
-  health_data jsonb,              -- validation results
+  id              uuid PRIMARY KEY,
+  user_id         uuid NOT NULL REFERENCES auth.users(id),
+  provider        text NOT NULL,
+  cookie_value    text NOT NULL,           -- encrypted blob
+  status          text CHECK (valid, invalid, expired, pending, ...),
+  health_data     jsonb,                   -- validation results
   UNIQUE(user_id, provider)
 );
 ```
 
-RLS: User can only access their own cookies.
+> [!NOTE]
+> Row-Level Security (RLS) ensures users can only access their own cookies.
+
+---
 
 ## Extracting Cookies
 
@@ -69,6 +125,8 @@ npx.cmd tsx scripts/refresh-cookies.ts --provider linkedin --user-id <YOUR_USER_
 | Wellfound | `_wellfound_session`     |
 | Instahyre | `sessionid`, `csrftoken` |
 
+---
+
 ## Validation
 
 When you add or refresh a cookie, the system:
@@ -77,12 +135,25 @@ When you add or refresh a cookie, the system:
 2. **HTTP validation** — fetches the provider homepage with the cookie, checks for login page indicators
 3. **Status update** — `valid`, `expired`, `captcha_required`, or `invalid`
 
+```mermaid
+flowchart LR
+  A[Add Cookie] --> B{Basic Check}
+  B -->|Pass| C[HTTP Validation]
+  B -->|Fail| D[Invalid]
+  C -->|Pass| E[Valid]
+  C -->|Fail| F[Expired / CAPTCHA]
+```
+
+---
+
 ## Expiry & Auto-Disable
 
 - Cookies expire naturally (provider session timeout)
 - On validation failure → provider is **paused**
 - On consecutive failures → provider is **disabled** (auto)
 - User must re-extract and re-paste fresh cookies
+
+---
 
 ## Troubleshooting
 
@@ -93,3 +164,29 @@ When you add or refresh a cookie, the system:
 | "No cookie configured"          | Add cookie via dashboard or Telegram                        |
 | "Invalid secret token"          | Verify `TELEGRAM_WEBHOOK_SECRET` matches                    |
 | Encryption key changed          | All stored cookies become unrecoverable — must re-paste all |
+
+---
+
+## Best Practices
+
+> [!TIP]
+> - Set a strong `COOKIE_ENCRYPTION_KEY` — never use the default empty value
+> - Re-extract cookies every 2–3 weeks to prevent expiry
+> - Use the automated Edge script for consistent extraction
+> - Monitor provider health via Telegram `/provider_status`
+> - Rotate encryption key only when necessary (invalidates all stored cookies)
+
+---
+
+## Related Documents
+
+- [Provider Guide](PROVIDER_GUIDE.md) — Supported job board provider configuration
+- [Deployment Guide](DEPLOYMENT.md) — Production deployment instructions
+- [Setup Guide](SETUP.md) — Local development & production setup
+
+---
+
+<br/>
+<div align="center">
+  <strong>Next Reading:</strong> <a href="PROVIDER_GUIDE.md">Provider Integrations →</a>
+</div>

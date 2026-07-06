@@ -1,20 +1,56 @@
-# API Reference — VALTREXA-V2
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="assets/favicon.svg">
+    <img src="assets/favicon.svg" alt="Valtrexa V2" width="64" height="64">
+  </picture>
+</p>
 
-> **Version:** v1.0.0 | **Last updated:** 2026-06-29  
-> **Base URL:** https://valtrexa-v2.vercel.app/api
+<h1 align="center">API Reference — VALTREXA-V2</h1>
+
+<p align="center">
+  <strong>Version:</strong> v1.0.0 &nbsp;•&nbsp;
+  <strong>Last updated:</strong> 2026-06-29 &nbsp;•&nbsp;
+  <strong>Base URL:</strong> <code>https://valtrexa-v2.vercel.app/api</code>
+</p>
+
+---
+
+## Table of Contents
+
+- [Authentication](#authentication)
+- [Rate Limiting](#rate-limiting)
+- [Phase A — Data Layer](#phase-a--data-layer)
+- [Phase B — Action Layer](#phase-b--action-layer)
+- [Auth](#auth)
+- [Cookies](#cookies)
+- [Provider Controls](#provider-controls)
+- [Webhooks](#webhooks)
+- [Admin](#admin)
+- [Error Responses](#error-responses)
+- [API Architecture](#api-architecture)
+- [Best Practices](#best-practices)
+
+---
 
 ## Authentication
 
-All API routes require authentication via `requireApiUser()` middleware:
+> [!IMPORTANT]
+> All API routes require authentication via `requireApiUser()` middleware.
 
-- Header: `Authorization: Bearer <supabase_access_token>`
-- Unauthenticated requests: 401
-- Unconfirmed email (password users): 403
+- **Header:** `Authorization: Bearer <supabase_access_token>`
+- Unauthenticated requests: `401 Unauthorized`
+- Unconfirmed email (password users): `403 Forbidden`
+
+> [!NOTE]
+> Tokens are obtained via Supabase Auth. Tokens expire after 1 hour — refresh using the Supabase `refresh_token` grant.
 
 ## Rate Limiting
 
-- 100 requests per 60s per IP (configurable)
-- Returns 429 with `retry-after` header when exceeded
+- 100 requests per 60s per IP (configurable via `RATE_LIMIT_WINDOW_MS` and `RATE_LIMIT_MAX_REQUESTS`)
+- Returns `429 Too Many Requests` with `retry-after` header when exceeded
+
+> [!TIP]
+> If you hit rate limits, implement exponential backoff in your client. Retry after the duration specified in the `retry-after` header.
 
 ## Phase A — Data Layer
 
@@ -35,7 +71,7 @@ All API routes require authentication via `requireApiUser()` middleware:
 | ------ | ------------------------- | ------------------------------------- |
 | POST   | `/api/submit-application` | Submit job application via Playwright |
 | POST   | `/api/batch-apply`        | Batch application run                 |
-| POST   | `/api/outreach`           | Generate and send outreach            |
+| POST   `/api/outreach`           | Generate and send outreach            |
 | POST   | `/api/followups`          | Process follow-up cadences            |
 | POST   | `/api/inbox-sync`         | Sync Gmail inbox                      |
 
@@ -85,12 +121,66 @@ All API routes require authentication via `requireApiUser()` middleware:
 { "error": "Description of what went wrong" }
 ```
 
-Common status codes:
+**Common status codes:**
 
-- 200: Success
-- 400: Bad request (missing/invalid fields)
-- 401: Unauthorized (no token)
-- 403: Forbidden (unconfirmed email, insufficient role)
-- 404: Not found
-- 429: Rate limited
-- 500: Internal server error
+- `200` — Success
+- `400` — Bad request (missing/invalid fields)
+- `401` — Unauthorized (no token)
+- `403` — Forbidden (unconfirmed email, insufficient role)
+- `404` — Not found
+- `429` — Rate limited
+- `500` — Internal server error
+
+## API Architecture
+
+```mermaid
+graph TD
+    Client[Client App / Telegram Bot]
+    APIGW[API Gateway / Next.js Routes]
+    Auth[requireApiUser Middleware]
+    PhaseA[Phase A — Data Layer]
+    PhaseB[Phase B — Action Layer]
+    Admin[Admin Routes]
+    Webhook[Webhook Handlers]
+    Supabase[Supabase PostgreSQL]
+    Queue[BullMQ / Redis Queue]
+    Browser[Playwright Browser]
+    Gmail[Gmail API]
+    Telegram[Telegram Bot API]
+    LLM[OpenRouter / Groq / Gemini]
+
+    Client --> APIGW
+    APIGW --> Auth
+    Auth --> PhaseA
+    Auth --> PhaseB
+    Auth --> Admin
+    Auth --> Webhook
+    PhaseA --> Supabase
+    PhaseB --> Queue
+    Queue --> Browser
+    PhaseB --> Gmail
+    Webhook --> Telegram
+    PhaseA --> LLM
+```
+
+## Best Practices
+
+> [!TIP]
+> **Idempotency:** POST endpoints like `/api/submit-application` should be called with an idempotency key to prevent duplicate submissions.
+
+> [!WARNING]
+> **Error handling:** Always check for `429` responses and implement backoff. The system is tolerant but will not queue requests beyond the rate limit.
+
+> [!NOTE]
+> **Webhook security:** Telegram webhooks use HMAC verification via `TELEGRAM_WEBHOOK_SECRET`. Verify signatures on your end if consuming webhooks externally.
+
+- Use the `Authorization: Bearer` token pattern consistently across all clients.
+- Never expose `SUPABASE_SERVICE_ROLE_KEY` on the client — use anon key with RLS.
+- Batch operations (`/api/batch-apply`) are asynchronous — poll `/api/workflow-state` for completion status.
+
+---
+
+<br/>
+<div align="center">
+  <strong>Next Reading:</strong> <a href="DATABASE.md">Database Schema →</a>
+</div>
